@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* ================= THEME ================= */
+@theme {
+  --color-primary: #16A34A;
+  --color-primary-dark: #15803D;
+  --color-disable: #6E7784;
+
+  --font-sans: "Pretendard Variable", sans-serif;
+}
+
+/* ================= BASE ================= */
+:root {
+  font-family: var(--font-sans);
+  line-height: 1.4;
+  font-weight: 500;
+
+  color-scheme: light dark;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reset */
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Root container */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Links */
+a {
+  text-decoration: none;
+}
+
+/* ================= OPTIONAL (ONLY IF NEEDED) ================= */
+
+/* Example: Scoped AntD customization */
+.custom-tabs .ant-tabs-tab-active {
+  background: #f2f4f7;
+  border-radius: 9999px;
+}
