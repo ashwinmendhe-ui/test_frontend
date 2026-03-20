@@ -13,7 +13,7 @@ export default function Sidebar(){
                     return(
                         <li key={item.path}>
                             <Link to={item.path}
-                            className={`flex items-center gap-2 px-3 py-2 rounded ${isActive? "bg-gray-600": "hover:bg-gray-700"}`}>
+                            className={`flex items-center gap-2 px-4 py-2 rounded ${isActive? "bg-gray-600": "hover:bg-gray-700"}`}>
                                 <span>{item.icon}</span>
                                 <span>{item.name}</span>
                             </Link>
