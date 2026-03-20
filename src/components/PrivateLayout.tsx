@@ -1,12 +1,10 @@
 import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
 
 export default function PrivateLayout(){
     return(
         <div className="flex h-screen">
-            {/* Sidebar */}
-            <div className="w-60 bg-gray-800 text-white p-4">
-                Sidebar
-            </div>
+            <Sidebar/>
             {/* Main */}
             <div className="flex-1 flex flex-col">
                 {/*Header */}
