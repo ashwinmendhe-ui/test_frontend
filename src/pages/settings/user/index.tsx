@@ -9,6 +9,11 @@ import type { GetProps } from "antd";
 import type { Dayjs } from "dayjs";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import HighlightText from "@/components/common/HighlightText";
+import { filterByQuery } from "@/utils/filterByQuery";
+
+
+
 
 type SearchProps = GetProps<typeof Input.Search>;
 const { Search } = Input;
@@ -67,6 +72,7 @@ export default function User() {
 
   const confirmDelete = () => {
     if (!selectedRecord) return;
+
     setList((prev) => prev.filter((item) => item.id !== selectedRecord.id));
     setIsModalOpen(false);
     setSelectedRecord(null);
@@ -89,25 +95,35 @@ export default function User() {
       dataIndex: "username",
       key: "username",
       enableSort: true,
+      render: (value: string) => (<HighlightText text={value} query={searchKeyword}/>)
     },
     {
-      title: "Company",
-      dataIndex: "companyName",
-      key: "companyName",
-      enableSort: true,
-    },
-    {
-      title: "Phone Number",
-      dataIndex: "phone",
-      key: "phone",
-      enableSort: true,
-    },
-    {
-      title: "Email",
-      dataIndex: "email",
-      key: "email",
-      enableSort: true,
-    },
+  title: "Company",
+  dataIndex: "companyName",
+  key: "companyName",
+  enableSort: true,
+  render: (value: string) => (
+    <HighlightText text={value} query={searchKeyword} />
+  ),
+},
+{
+  title: "Phone Number",
+  dataIndex: "phone",
+  key: "phone",
+  enableSort: true,
+  render: (value: string) => (
+    <HighlightText text={value} query={searchKeyword} />
+  ),
+},
+{
+  title: "Email",
+  dataIndex: "email",
+  key: "email",
+  enableSort: true,
+  render: (value: string) => (
+    <HighlightText text={value} query={searchKeyword} />
+  ),
+},
     {
       title: "Created Date",
       dataIndex: "createdAt",
@@ -119,6 +135,9 @@ export default function User() {
       dataIndex: "role",
       key: "role",
       enableSort: true,
+      render: (value: string) => (
+    <HighlightText text={value} query={searchKeyword} />
+  ),
     },
     {
       title: "Status",
@@ -149,26 +168,28 @@ export default function User() {
     },
   ] satisfies SortableTableColumn<UserRow>[];
 
-  const filteredList = list.filter((item) => {
-    const matchesSearch =
-      searchKeyword.trim() === "" ||
-      item.username.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      item.email.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      item.companyName.toLowerCase().includes(searchKeyword.toLowerCase());
+ const searchFilteredList = filterByQuery(list, searchKeyword, [
+  "username",
+  "email",
+  "companyName",
+  "phone",
+  "role",
+]);
 
-    const matchesDate =
-      !dateRange ||
-      !dateRange[0] ||
-      !dateRange[1] ||
-      (() => {
-        const itemDate = new Date(item.createdAt).getTime();
-        const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
-        const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
-        return itemDate >= from && itemDate <= to;
-      })();
+const filteredList = searchFilteredList.filter((item) => {
+  const matchesDate =
+    !dateRange ||
+    !dateRange[0] ||
+    !dateRange[1] ||
+    (() => {
+      const itemDate = new Date(item.createdAt).getTime();
+      const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
+      const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
+      return itemDate >= from && itemDate <= to;
+    })();
 
-    return matchesSearch && matchesDate;
-  });
+  return matchesDate;
+});
 
   const onSearch: SearchProps["onSearch"] = (value) => {
     setSearchKeyword(value);
@@ -191,12 +212,14 @@ export default function User() {
               placeholder={["From", "To"]}
             />
 
-            <Search
-              size="large"
-              placeholder="Search User"
-              onSearch={onSearch}
-              className="flex-1 rounded-[7px]"
-            />
+           <Search
+            size="large"
+            placeholder="Search User"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            className="flex-1 rounded-[7px]"
+            allowClear
+          />
           </div>
 
           <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
