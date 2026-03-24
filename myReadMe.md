@@ -10,3 +10,6 @@ npm i react-router-dom zustand
 
 ## 4. for checking repo tree structure in mac command
 tree -L 3
+
+## 5. install ant design
+npm install @ant-design/icons
