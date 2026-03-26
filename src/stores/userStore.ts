@@ -64,9 +64,9 @@ interface Store {
 }
 
 const mockDetailUserLogin: UserLoginDetail = {
-  roles: [1],
+  roles: [2],
   user: {
-    id: "login-user-1",
+    id: "1",
     username: "AshwinM",
     email: "ashwin@test.com",
     companyId: "1",
@@ -78,9 +78,9 @@ const mockDetailUserLogin: UserLoginDetail = {
 };
 
 const mockRoles: RoleOption[] = [
-  { id: 1, description: "Admin", roleKey: "admin" },
+  { id: 1, description: "System Administrator", roleKey: "admin" },
   { id: 2, description: "Company Admin", roleKey: "company_admin" },
-  { id: 3, description: "Operator", roleKey: "operator" },
+  { id: 3, description: "Company User", roleKey: "operator" },
 ];
 
 const mockUsers: UserManagementTable[] = [
@@ -91,7 +91,7 @@ const mockUsers: UserManagementTable[] = [
     phone: "9876543210",
     email: "ashwin@test.com",
     createdAt: "2026-03-24 10:00",
-    role: "Admin",
+    role: "System Administrator",
     isActive: true,
   },
   {
@@ -101,15 +101,15 @@ const mockUsers: UserManagementTable[] = [
     phone: "9123456780",
     email: "john@test.com",
     createdAt: "2026-03-20 14:30",
-    role: "Operator",
+    role: "Company User",
     isActive: false,
   },
 ];
 
 const roleIdToLabel = (role?: number) => {
-  if (role === 1) return "Admin";
+  if (role === 1) return "System Administrator";
   if (role === 2) return "Company Admin";
-  if (role === 3) return "Operator";
+  if (role === 3) return "Company User";
   return "";
 };
 
@@ -176,7 +176,7 @@ export const useUserStore = create<Store>((set, get) => ({
     }
 
     const roleId =
-      found.role === "Admin" ? 1 : found.role === "Company Admin" ? 2 : 3;
+      found.role === "System Administrator" ? 1 : found.role === "Company Admin" ? 2 : 3;
 
     set({
       loading: false,
@@ -219,26 +219,47 @@ export const useUserStore = create<Store>((set, get) => ({
   },
 
   updateUser: async (id, param) => {
-    set({ loading: true });
+  set({ loading: true });
 
-    set((state) => ({
+  set((state) => {
+    const updatedList = state.list.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            username: param.username,
+            companyName: companyIdToLabel(param.companyId),
+            phone: param.phone,
+            email: param.email,
+            role: roleIdToLabel(param.role),
+          }
+        : item
+    );
+
+    const shouldUpdateLoggedInUser =
+      state.detailUserLogin?.user?.id === id;
+
+    return {
       loading: false,
-      list: state.list.map((item) =>
-        item.id === id
-          ? {
-              ...item,
+      list: updatedList,
+      detailUserLogin: shouldUpdateLoggedInUser
+        ? {
+            ...state.detailUserLogin!,
+            roles: param.role ? [param.role] : state.detailUserLogin?.roles || [],
+            user: {
+              ...state.detailUserLogin!.user,
               username: param.username,
-              companyName: companyIdToLabel(param.companyId),
-              phone: param.phone,
               email: param.email,
-              role: roleIdToLabel(param.role),
-            }
-          : item
-      ),
-    }));
+              phone: param.phone,
+              companyId: param.companyId,
+              companyName: companyIdToLabel(param.companyId),
+            },
+          }
+        : state.detailUserLogin,
+    };
+  });
 
-    return { code: 0 };
-  },
+  return { code: 0 };
+},
 
   deleteUser: async (id) => {
     set({ loading: true });

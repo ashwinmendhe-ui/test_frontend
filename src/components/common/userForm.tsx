@@ -5,6 +5,7 @@ import CustomModal from "./customModal";
 import { SortableTable, type SortableTableColumn } from "./table"; 
 import ActionMenu from "./actionMenu";
 import ActionIcon from "@/assets/table-action-icon.svg"
+import { useUserStore } from "@/stores/userStore";
 
 export interface UserFormValue {
   role?: number;
@@ -27,9 +28,9 @@ interface Props {
 }
 
 const roleOptions = [
-  { value: 1, label: "Admin" },
+  { value: 1, label: "System Administrator" },
   { value: 2, label: "Company Admin" },
-  { value: 3, label: "Operator" },
+  { value: 3, label: "Company User" },
 ];
 
 const companyOptions = [
@@ -61,6 +62,8 @@ export default function UserForm({
     missionList: string[];
     deviceList: string[];
   };
+  const { detailUserLogin } = useUserStore();
+  const userRole = detailUserLogin?.roles?.[0];
 
 const [sites, setSites] = useState<AssignedSiteRow[]>([]);
 
@@ -258,7 +261,10 @@ const siteOptions: SiteOption[] = [
               <Select
                 placeholder="Select role"
                 className="h-[41px]"
-                options={roleOptions}
+                options={roleOptions.map((role) => ({
+                  ...role,
+                  disabled: userRole !== 1 && role.value === 1,
+                }))}
               />
             </Form.Item>
 

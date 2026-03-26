@@ -13,6 +13,9 @@ import CompanyEditForm from "@/pages/settings/company/[id]/edit";
 import Site from "@/pages/settings/site";
 import SiteCreateForm from "@/pages/settings/site/create";
 import SiteEditForm from "@/pages/settings/site/[id]/edit";
+import Mission from "@/pages/settings/mission";
+import MissionCreateForm from "@/pages/settings/mission/create";
+import MissionEditForm from "@/pages/settings/mission/[id]/edit";
 
 export default function AppRouter() {
   return useRoutes([
@@ -50,6 +53,9 @@ export default function AppRouter() {
         { path: "settings/site", element: <Site /> },
         { path: "settings/site/create", element: <SiteCreateForm /> },
         { path: "settings/site/:id/edit", element: <SiteEditForm /> },
+        { path: "settings/mission", element: <Mission /> },
+        { path: "settings/mission/create", element: <MissionCreateForm /> },
+        { path: "settings/mission/:id/edit", element: <MissionEditForm /> },
       ],
     },
   ]);
