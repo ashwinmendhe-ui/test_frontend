@@ -1,9 +1,7 @@
-import "antd/dist/reset.css"
 import HomeIcon from "../assets/home.svg";
 import StreamIcon from "../assets/stream.svg";
 import SettingIcon from "../assets/setting.svg";
 import UserIcon from "../assets/user-icon.svg";
-
 
 export const menuItems = [
   {

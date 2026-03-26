@@ -18,6 +18,27 @@ export default function Sidebar({
 }) {
 
   const { detailUserLogin, getDetailUserLogin } = useUserStore();
+  const userRole = detailUserLogin?.roles?.[0];
+
+  const filterMenuByRole = (items: typeof menuItems, role?: number) => {
+  // Admin
+  if (role === 1) {
+    return items;
+  }
+
+  // Company Admin
+  if (role === 2) {
+    return items;
+  }
+
+  // Operator
+  if (role === 3) {
+    return items.filter((item) => item.key !== "/settings");
+  }
+
+  return items;
+};
+  const filteredMenuItems = filterMenuByRole(menuItems, userRole);
   const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,7 +124,7 @@ const roleLabel =
         mode="inline"
         selectedKeys={[location.pathname]}
         onClick={(e) => navigate(e.key)}
-        items={menuItems}
+        items={filteredMenuItems}
         className="
           mt-6
           [&_.ant-menu-item]:h-[50px]
