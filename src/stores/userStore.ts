@@ -64,7 +64,7 @@ interface Store {
 }
 
 const mockDetailUserLogin: UserLoginDetail = {
-  roles: [2],
+  roles: [3],
   user: {
     id: "login-user-1",
     username: "AshwinM",

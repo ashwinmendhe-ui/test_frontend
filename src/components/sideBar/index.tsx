@@ -16,32 +16,74 @@ export default function Sidebar({
   width: number;
   setWidth: (w: number) => void;
 }) {
-
   const { detailUserLogin, getDetailUserLogin } = useUserStore();
-  const userRole = detailUserLogin?.roles?.[0];
-
-  const filterMenuByRole = (items: typeof menuItems, role?: number) => {
-  // Admin
-  if (role === 1) {
-    return items;
-  }
-
-  // Company Admin
-  if (role === 2) {
-    return items;
-  }
-
-  // Operator
-  if (role === 3) {
-    return items.filter((item) => item.key !== "/settings");
-  }
-
-  return items;
-};
-  const filteredMenuItems = filterMenuByRole(menuItems, userRole);
   const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const userRole = detailUserLogin?.roles?.[0];
+
+  const filterMenuByRole = (items: typeof menuItems, role?: number) => {
+    // System Administrator -> all menus
+    if (role === 1) {
+      return items;
+    }
+
+    // Company Admin -> all except Company Management
+    if (role === 2) {
+      return items
+        .map((item) => {
+          if (item.key === "/settings" && item.children) {
+            const filteredChildren = item.children.filter(
+              (child) => child.key !== "/settings/company"
+            );
+
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+
+          return item;
+        })
+        .filter((item) => {
+          if (item.key === "/settings" && item.children) {
+            return item.children.length > 0;
+          }
+          return true;
+        });
+    }
+
+    // Operator -> only mission and robot under Settings
+    if (role === 3) {
+      return items
+        .map((item) => {
+          if (item.key === "/settings" && item.children) {
+            const filteredChildren = item.children.filter((child) =>
+              ["/settings/mission", "/settings/robot"].includes(child.key)
+            );
+
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+
+          return item;
+        })
+        .filter((item) => {
+          // Keep normal top-level menus like dashboard/stream
+          if (item.key !== "/settings") return true;
+
+          // Keep settings only if allowed children exist
+          return !!item.children && item.children.length > 0;
+        });
+    }
+
+    return items;
+  };
+
+  const filteredMenuItems = filterMenuByRole(menuItems, userRole);
 
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 600;
@@ -72,26 +114,27 @@ export default function Sidebar({
     await logout();
     navigate("/login");
   };
-  useEffect(() => {
-  getDetailUserLogin();
-}, [getDetailUserLogin]);
-const currentRole = detailUserLogin?.roles?.[0];
 
-const roleLabel =
-  currentRole === 1
-    ? "Admin"
-    : currentRole === 2
-    ? "Company Admin"
-    : currentRole === 3
-    ? "Operator"
-    : "No role";
+  useEffect(() => {
+    getDetailUserLogin();
+  }, [getDetailUserLogin]);
+
+  const currentRole = detailUserLogin?.roles?.[0];
+
+  const roleLabel =
+    currentRole === 1
+      ? "System Administrator"
+      : currentRole === 2
+      ? "Company Admin"
+      : currentRole === 3
+      ? "Company User"
+      : "No role";
 
   return (
     <div
       style={{ width: collapsed ? 80 : width }}
       className="bg-white border-r border-[#E5E7EB] min-h-screen px-[16px] py-[40px] relative transition-all duration-300"
     >
-      {/* 🔹 Top Section */}
       <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-8 gap-4">
         <div className="flex items-center">
           <Avatar shape="square" size={40} icon={<UserOutlined />} />
@@ -103,10 +146,15 @@ const roleLabel =
         </div>
 
         {!collapsed && (
-          <div className="mt-3 bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-1">
-            {roleLabel}
-          </div>
-        )}
+            <div className="flex items-center justify-center mt-3.5">
+              <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
+                Role
+              </span>
+              <span className="font-semibold text-[#333D4B] text-xs ml-4">
+                {roleLabel}
+              </span>
+            </div>
+          )}
 
         {!collapsed && (
           <Button
@@ -119,7 +167,6 @@ const roleLabel =
         )}
       </div>
 
-      {/* 🔹 Menu */}
       <Menu
         mode="inline"
         selectedKeys={[location.pathname]}
@@ -140,7 +187,6 @@ const roleLabel =
         }}
       />
 
-      {/* 🔹 Drag Handle */}
       {!collapsed && (
         <div
           onMouseDown={handleMouseDown}
