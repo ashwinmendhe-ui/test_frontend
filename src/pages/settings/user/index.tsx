@@ -5,17 +5,13 @@ import CustomModal from "@/components/common/customModal";
 import StatusBadge from "@/components/common/statusBadge";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
 import { Button, DatePicker, Dropdown, Input } from "antd";
-import type { GetProps } from "antd";
 import type { Dayjs } from "dayjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+import { useUserStore } from "@/stores/userStore";
 
-
-
-
-type SearchProps = GetProps<typeof Input.Search>;
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
@@ -32,29 +28,7 @@ interface UserRow {
 
 export default function User() {
   const navigate = useNavigate();
-
-  const [list, setList] = useState<UserRow[]>([
-    {
-      id: "1",
-      username: "Ashwin",
-      companyName: "Dhive",
-      phone: "9876543210",
-      email: "ashwin@test.com",
-      createdAt: "2026-03-24 10:00",
-      role: "Admin",
-      isActive: true,
-    },
-    {
-      id: "2",
-      username: "John",
-      companyName: "Dhive",
-      phone: "9123456780",
-      email: "john@test.com",
-      createdAt: "2026-03-20 14:30",
-      role: "Operator",
-      isActive: false,
-    },
-  ]);
+  const { loading, list, getList, deleteUser } = useUserStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<UserRow | null>(null);
@@ -70,10 +44,10 @@ export default function User() {
     setIsModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!selectedRecord) return;
 
-    setList((prev) => prev.filter((item) => item.id !== selectedRecord.id));
+    await deleteUser(selectedRecord.id);
     setIsModalOpen(false);
     setSelectedRecord(null);
   };
@@ -95,35 +69,37 @@ export default function User() {
       dataIndex: "username",
       key: "username",
       enableSort: true,
-      render: (value: string) => (<HighlightText text={value} query={searchKeyword}/>)
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-  title: "Company",
-  dataIndex: "companyName",
-  key: "companyName",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
-{
-  title: "Phone Number",
-  dataIndex: "phone",
-  key: "phone",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
-{
-  title: "Email",
-  dataIndex: "email",
-  key: "email",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
+      title: "Company",
+      dataIndex: "companyName",
+      key: "companyName",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
+    {
+      title: "Phone Number",
+      dataIndex: "phone",
+      key: "phone",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
+    {
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
     {
       title: "Created Date",
       dataIndex: "createdAt",
@@ -136,8 +112,8 @@ export default function User() {
       key: "role",
       enableSort: true,
       render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
       title: "Status",
@@ -168,40 +144,42 @@ export default function User() {
     },
   ] satisfies SortableTableColumn<UserRow>[];
 
- const searchFilteredList = filterByQuery(list, searchKeyword, [
-  "username",
-  "email",
-  "companyName",
-  "phone",
-  "role",
-]);
+  const searchFilteredList = filterByQuery(list, searchKeyword, [
+    "username",
+    "email",
+    "companyName",
+    "phone",
+    "role",
+  ]);
 
-const filteredList = searchFilteredList.filter((item) => {
-  const matchesDate =
-    !dateRange ||
-    !dateRange[0] ||
-    !dateRange[1] ||
-    (() => {
-      const itemDate = new Date(item.createdAt).getTime();
-      const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
-      const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
-      return itemDate >= from && itemDate <= to;
-    })();
+  const filteredList = searchFilteredList.filter((item) => {
+    const matchesDate =
+      !dateRange ||
+      !dateRange[0] ||
+      !dateRange[1] ||
+      (() => {
+        const itemDate = new Date(item.createdAt).getTime();
+        const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
+        const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
+        return itemDate >= from && itemDate <= to;
+      })();
 
-  return matchesDate;
-});
-
-  const onSearch: SearchProps["onSearch"] = (value) => {
-    setSearchKeyword(value);
-  };
+    return matchesDate;
+  });
 
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
     setDateRange(dates);
   };
 
+  useEffect(() => {
+    getList();
+  }, [getList]);
+
   return (
     <>
       <div className="w-full relative">
+        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
             <RangePicker
@@ -212,14 +190,14 @@ const filteredList = searchFilteredList.filter((item) => {
               placeholder={["From", "To"]}
             />
 
-           <Search
-            size="large"
-            placeholder="Search User"
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            className="flex-1 rounded-[7px]"
-            allowClear
-          />
+            <Search
+              size="large"
+              placeholder="Search User"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              className="flex-1 rounded-[7px]"
+              allowClear
+            />
           </div>
 
           <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">

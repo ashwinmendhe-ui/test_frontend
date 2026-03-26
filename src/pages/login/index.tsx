@@ -1,21 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
-import { useUserStore } from "../../stores/userStore";
 
 
 export default function Login() {
   const navigate = useNavigate()
   const login = useAuthStore((state) => state.login);
-  const setUser = useUserStore((state) => state.setUser);
 
   const handleLogin = () => {
-    login();
-    setUser({
-      username: "Ashwin",
-      role: "UserOne"
-    });
-    navigate("/dashboard")
-  };  
+  login();
+  navigate("/dashboard");
+};  
 
   return (
     <div className="flex h-screen items-center justify-center">

@@ -1,10 +1,11 @@
 import { Menu, Avatar, Button } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserOutlined } from "@ant-design/icons";
-import { menuItems } from "../../constants/menu"; 
-import LogoutIcon from "../../assets/logout-icon.svg"; 
-import { useUserStore } from "../../stores/userStore";
-
+import { menuItems } from "../../constants/menu";
+import LogoutIcon from "../../assets/logout-icon.svg";
+import { useAuthStore } from "../../stores/authStore";
+import { useEffect } from "react";
+import { useUserStore } from "@/stores/userStore";
 
 export default function Sidebar({
   collapsed,
@@ -15,8 +16,9 @@ export default function Sidebar({
   width: number;
   setWidth: (w: number) => void;
 }) {
-  const user = useUserStore((state) => state.user);
-    const clearUser = useUserStore((state) => state.clearUser);
+
+  const { detailUserLogin, getDetailUserLogin } = useUserStore();
+  const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -44,8 +46,25 @@ export default function Sidebar({
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   };
-    
-  
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+  useEffect(() => {
+  getDetailUserLogin();
+}, [getDetailUserLogin]);
+const currentRole = detailUserLogin?.roles?.[0];
+
+const roleLabel =
+  currentRole === 1
+    ? "Admin"
+    : currentRole === 2
+    ? "Company Admin"
+    : currentRole === 3
+    ? "Operator"
+    : "No role";
+
   return (
     <div
       style={{ width: collapsed ? 80 : width }}
@@ -57,14 +76,14 @@ export default function Sidebar({
           <Avatar shape="square" size={40} icon={<UserOutlined />} />
           {!collapsed && (
             <div className="ml-3 font-bold text-[#757575] text-base">
-              {user?.username || "Guest"}
+              {detailUserLogin?.user?.username || "Guest"}
             </div>
           )}
         </div>
 
         {!collapsed && (
           <div className="mt-3 bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-1">
-            {user?.role || "No role"}
+            {roleLabel}
           </div>
         )}
 
@@ -72,11 +91,7 @@ export default function Sidebar({
           <Button
             className="mt-6 mb-6 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
             icon={<img src={LogoutIcon} alt="logout" />}
-            onClick={() => {
-              localStorage.removeItem("token");
-              clearUser();
-              navigate("/login");
-            }}
+            onClick={handleLogout}
           >
             Logout
           </Button>
@@ -88,7 +103,7 @@ export default function Sidebar({
         mode="inline"
         selectedKeys={[location.pathname]}
         onClick={(e) => navigate(e.key)}
-        items={menuItems} // ✅ USING CONSTANT
+        items={menuItems}
         className="
           mt-6
           [&_.ant-menu-item]:h-[50px]
