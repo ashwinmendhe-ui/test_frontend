@@ -17,4 +17,7 @@ export const breadcrumbNameMap: Record<string, string> = {
   "/settings/mission": "Mission",
   "/settings/mission/create": "Create",
   "/settings/mission/edit": "Edit",
+  "/settings/robot": "Robot",
+    "/settings/robot/create": "Create",
+    "/settings/robot/edit": "Edit",
 };
