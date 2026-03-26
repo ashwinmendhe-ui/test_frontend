@@ -10,6 +10,9 @@ import UserEditForm from "./pages/settings/user/[id]/edit";
 import Company from "@/pages/settings/company";
 import CompanyCreateForm from "@/pages/settings/company/create";
 import CompanyEditForm from "@/pages/settings/company/[id]/edit";
+import Site from "@/pages/settings/site";
+import SiteCreateForm from "@/pages/settings/site/create";
+import SiteEditForm from "@/pages/settings/site/[id]/edit";
 
 export default function AppRouter() {
   return useRoutes([
@@ -44,6 +47,9 @@ export default function AppRouter() {
         { path: "settings/company", element: <Company /> },
         { path: "settings/company/create", element: <CompanyCreateForm /> },
         { path: "settings/company/:id/edit", element: <CompanyEditForm /> },
+        { path: "settings/site", element: <Site /> },
+        { path: "settings/site/create", element: <SiteCreateForm /> },
+        { path: "settings/site/:id/edit", element: <SiteEditForm /> },
       ],
     },
   ]);
