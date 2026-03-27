@@ -12,6 +12,11 @@ export default function Header() {
     localStorage.setItem("lang", value);
   };
 
+  const normalizePath = (pathname: string) => {
+    if (pathname.startsWith("/stream/")) return "/stream";
+    return pathname;
+  };
+
   const pathSnippets = location.pathname.split("/").filter(Boolean);
   const filteredPathSnippets = pathSnippets.filter((part) => isNaN(Number(part)));
 
@@ -23,18 +28,20 @@ export default function Header() {
           },
         ]
       : filteredPathSnippets.map((_, index) => {
-          const url = "/" + filteredPathSnippets.slice(0, index + 1).join("/");
+          const rawUrl = "/" + filteredPathSnippets.slice(0, index + 1).join("/");
+          const url = normalizePath(rawUrl);
 
           return {
-            title: <Link to={url}>{t(breadcrumbNameMap[url] || url)}</Link>,
+            title: <Link to={rawUrl}>{t(breadcrumbNameMap[url] || breadcrumbNameMap["/dashboard"])}</Link>,
           };
         });
 
-  const currentPath =
+  const rawCurrentPath =
     filteredPathSnippets.length > 0
       ? "/" + filteredPathSnippets.join("/")
       : "/dashboard";
 
+  const currentPath = normalizePath(rawCurrentPath);
   const title = t(breadcrumbNameMap[currentPath] || "page_dashboard");
 
   return (

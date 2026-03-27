@@ -21,6 +21,11 @@ import RobotCreateForm from "@/pages/settings/robot/create";
 import RobotEditForm from "@/pages/settings/robot/[id]/edit";
 import History from "./pages/history";
 
+import Stream from "./pages/stream";
+import StreamDetail from "./pages/stream/[id]";
+
+import Playback from "./pages/playback";
+
 export default function AppRouter() {
   return useRoutes([
     {
@@ -64,6 +69,9 @@ export default function AppRouter() {
         { path: "settings/robot/create", element: <RobotCreateForm /> },
         { path: "settings/robot/:id/edit", element: <RobotEditForm /> },
         { path: "history", element: <History /> },
+        { path: "stream", element: <Stream /> },
+        { path: "stream/:id", element: <StreamDetail /> },
+        { path: "playback", element: <Playback /> },
       ],
     },
   ]);

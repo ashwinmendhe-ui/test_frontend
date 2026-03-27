@@ -398,6 +398,84 @@
   "robot_type_drone": "드론",
   "robot_type_quadruped": "4족 보행 로봇",
   "status_inactive": "비활성",
-  "table_no_data": "데이터가 없습니다"
+  "table_no_data": "데이터가 없습니다",
+
+  "dashboard_card_company": "회사",
+  "dashboard_card_site": "사이트",
+  "dashboard_card_user": "사용자",
+  "dashboard_card_robot": "로봇",
+  
+  
+  "dashboard_table_site": "사이트",
+  
+  "dashboard_table_mission": "미션",
+  "dashboard_search_placeholder": "대시보드 검색",
+
+  "stream_page_title": "작업 스트림",
+  "stream_page_description": "회사, 사이트, 장비, 미션을 선택한 후 스트림 화면을 시작하세요.",
+  "stream_preview_title": "선택 미리보기",
+  "stream_preview_company": "회사",
+  "stream_preview_site": "사이트",
+  "stream_preview_device": "장비",
+
+  "stream_select_company": "회사 선택",
+  "stream_select_site": "사이트 선택",
+  "stream_select_device": "장비 선택",
+  "stream_select_mission": "미션 선택",
+  "stream_select_button": "스트림 시작",
+  "stream_stop_button": "스트림 종료",
+  "stream_back_to_select": "선택 화면으로",
+
+  "stream_validation_select_company": "회사를 선택하세요",
+  "stream_validation_select_site": "사이트를 선택하세요",
+  "stream_validation_select_device": "장비를 선택하세요",
+  "stream_validation_select_mission": "미션을 선택하세요",
+
+  "stream_live_title": "라이브 스트림",
+  "stream_video_placeholder": "라이브 비디오 영역",
+  "stream_no_video": "활성화된 비디오 스트림이 없습니다",
+  "stream_secondary_video": "보조 화면",
+  "stream_secondary_video_placeholder": "벡터 / 보조 스트림 영역",
+  "stream_live_map": "실시간 지도",
+  "stream_map_placeholder": "지도 미리보기 영역",
+
+  "stream_device_info": "장비 정보",
+  "stream_info_device": "장비",
+  "stream_info_status": "상태",
+  "stream_info_mission": "미션",
+  "stream_info_serial": "시리얼 번호",
+  "stream_info_start_time": "시작 시간",
+  "stream_info_operating_hour": "운영 시간",
+  "stream_info_latitude": "위도",
+  "stream_info_longitude": "경도",
+
+  "stream_ai_module": "AI 모듈",
+  "stream_ai_common": "일반 감지",
+  "stream_ai_danger": "위험 감지",
+  "stream_ai_category_safety": "안전",
+  "stream_ai_category_object": "객체",
+  "stream_ai_category_risk": "위험",
+  "stream_ai_category_security": "보안",
+  "stream_ai_helmet": "헬멧 감지",
+  "stream_ai_vest": "안전조끼 감지",
+  "stream_ai_person": "사람 감지",
+  "stream_ai_fire": "화재 감지",
+  "stream_ai_smoke": "연기 감지",
+  "stream_ai_intrusion": "침입 감지",
+  "stream_report_generated_message": "이 스트림 세션에 대한 작업 보고서가 생성되었습니다.",
+
+
+  "playback_no_video": "선택된 재생 영상이 없습니다",
+  "playback_select_first_video": "첫 번째 영상을 선택하세요",
+  "playback_primary_video": "기본 영상",
+  "playback_secondary_video": "보조 영상",
+
+  "playback_map_placeholder": "경로 지도 미리보기 영역",
+
+  "playback_validation_select_company": "회사를 선택하세요",
+  "playback_validation_select_site": "사이트를 선택하세요",
+  "playback_validation_select_device": "장비를 선택하세요",
+  "playback_validation_select_mission": "미션을 선택하세요"
+
 
 }

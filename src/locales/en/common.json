@@ -287,7 +287,94 @@
   "button_ok": "OK",
   "status_active": "Active",
   "status_inactive": "Inactive",
-  "table_no_data": "No data"
+  "table_no_data": "No data",
+
+
+  "dashboard_card_company": "Company",
+  "dashboard_card_site": "Site",
+  "dashboard_card_user": "User",
+  "dashboard_card_robot": "Robot",
+  "dashboard_table_name": "Robot Name",
+  "dashboard_table_company": "Company",
+  "dashboard_table_site": "Site",
+  "dashboard_table_status": "Status",
+  "dashboard_table_mission": "Mission",
+  "dashboard_search_placeholder": "Search dashboard",
+
+  "stream_page_title": "Work Stream",
+  "stream_page_description": "Select company, site, device and mission to start the stream view.",
+  "stream_preview_title": "Selection Preview",
+  "stream_preview_company": "Company",
+  "stream_preview_site": "Site",
+  "stream_preview_device": "Device",
+
+  "stream_select_company": "Select company",
+  "stream_select_site": "Select site",
+  "stream_select_device": "Select device",
+  "stream_select_mission": "Select mission",
+  "stream_select_button": "Start Stream",
+  "stream_stop_button": "Stop Stream",
+  "stream_back_to_select": "Back to Selection",
+
+  "stream_validation_select_company": "Please select company",
+  "stream_validation_select_site": "Please select site",
+  "stream_validation_select_device": "Please select device",
+  "stream_validation_select_mission": "Please select mission",
+
+  "stream_live_title": "Live Stream",
+  "stream_video_placeholder": "Live video area",
+  "stream_no_video": "No active video stream",
+  "stream_secondary_video": "Secondary View",
+  "stream_secondary_video_placeholder": "Vector / secondary stream area",
+  "stream_live_map": "Live Map",
+  "stream_map_placeholder": "Map preview area",
+
+  "stream_device_info": "Device Information",
+  "stream_info_device": "Device",
+  "stream_info_status": "Status",
+  "stream_info_mission": "Mission",
+  "stream_info_serial": "Serial Number",
+  "stream_info_start_time": "Start Time",
+  "stream_info_operating_hour": "Operating Hour",
+  "stream_info_latitude": "Latitude",
+  "stream_info_longitude": "Longitude",
+
+  "stream_ai_module": "AI Module",
+  "stream_ai_common": "Common Detection",
+  "stream_ai_danger": "Danger Detection",
+  "stream_ai_category_safety": "Safety",
+  "stream_ai_category_object": "Object",
+  "stream_ai_category_risk": "Risk",
+  "stream_ai_category_security": "Security",
+  "stream_ai_helmet": "Helmet Detection",
+  "stream_ai_vest": "Safety Vest Detection",
+  "stream_ai_person": "Person Detection",
+  "stream_ai_fire": "Fire Detection",
+  "stream_ai_smoke": "Smoke Detection",
+  "stream_ai_intrusion": "Intrusion Detection",
+
+  "stream_device_control": "Device Control",
+  "stream_device_notice": "Device control becomes available after the stream starts.",
+  "stream_take_off": "Take Off",
+  "stream_return_to_base": "Return To Base",
+  "stream_emergency_landing": "Emergency Landing",
+
+  "stream_report_generated_message": "Work report has been generated for this stream session.",
+
+
+  "playback_select_video": "Select Video",
+  "playback_no_video": "No playback video selected",
+  "playback_select_first_video": "Select the first video",
+  "playback_primary_video": "Primary Video",
+  "playback_secondary_video": "Secondary Video",
+  "playback_route_map": "Playback Route Map",
+  "playback_map_placeholder": "Route map preview area",
+
+  "playback_validation_select_company": "Please select company",
+  "playback_validation_select_site": "Please select site",
+  "playback_validation_select_device": "Please select device",
+  "playback_validation_select_mission": "Please select mission"
+
 
   
 }
