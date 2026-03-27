@@ -1,5 +1,6 @@
 import HomeIcon from "../assets/home.svg";
 import StreamIcon from "../assets/stream.svg";
+import PlaybackIcon from "../assets/playback.svg";
 import SettingIcon from "../assets/setting.svg";
 import UserIcon from "../assets/user-icon.svg";
 import CompanyIcon from "../assets/company.svg";
@@ -18,6 +19,11 @@ export const menuItems = [
     key: "/stream",
     icon: <img src={StreamIcon} alt="" className="w-5" />,
     labelKey: "menu_work",
+  },
+  {
+    key: "/playback",
+    icon: <img src={PlaybackIcon} alt="" className="w-5" />,
+    labelKey: "menu_playback",
   },
   {
     key: "/history",

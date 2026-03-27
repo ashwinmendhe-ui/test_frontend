@@ -24,4 +24,7 @@ export const breadcrumbNameMap: Record<string, string> = {
   "/settings/robot": "page_robot",
   "/settings/robot/create": "page_create",
   "/settings/robot/edit": "page_edit",
+
+  "/playback": "page_playback",
+  
 };
