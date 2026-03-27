@@ -4,11 +4,14 @@ import type { SiteFormValue } from "@/stores/siteStore";
 import { Button, Form, Input, Select } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   mode: "add" | "edit";
   initialValues?: SiteFormValue;
-  onSubmit: (values: SiteFormValue) => Promise<{ code?: number | string; message?: string } | void>;
+  onSubmit: (
+    values: SiteFormValue
+  ) => Promise<{ code?: number | string; message?: string } | void>;
   onCancel?: () => void;
   loading: boolean;
 }
@@ -20,6 +23,7 @@ export default function SiteForm({
   onCancel,
   loading,
 }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<SiteFormValue>();
 
@@ -50,8 +54,10 @@ export default function SiteForm({
   const handleSubmit = async (values: SiteFormValue) => {
     const newValues = {
       ...values,
-      companyId: userRole !== 1 ? detailUserLogin?.user?.companyId : values.companyId,
-      companyName: userRole !== 1 ? detailUserLogin?.user?.companyName : values.companyName,
+      companyId:
+        userRole !== 1 ? detailUserLogin?.user?.companyId : values.companyId,
+      companyName:
+        userRole !== 1 ? detailUserLogin?.user?.companyName : values.companyName,
     };
 
     const res = await onSubmit(newValues);
@@ -73,17 +79,38 @@ export default function SiteForm({
         className="space-y-6"
       >
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Site Name</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_name")}
+            </div>
+          }
           name="name"
-          rules={[{ required: true, message: "Please enter site name" }]}
+          rules={[
+            {
+              required: true,
+              message: t("site_validation_enter_name"),
+            },
+          ]}
         >
-          <Input placeholder="Enter site name" className="h-[41px]" />
+          <Input
+            placeholder={t("site_placeholder_name")}
+            className="h-[41px]"
+          />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Company</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_company")}
+            </div>
+          }
           name={userRole !== 1 ? "companyName" : "companyId"}
-          rules={[{ required: true, message: "Please select company" }]}
+          rules={[
+            {
+              required: true,
+              message: t("site_validation_select_company"),
+            },
+          ]}
         >
           <Select
             className="h-[41px]"
@@ -92,42 +119,86 @@ export default function SiteForm({
               label: item.name,
             }))}
             disabled={userRole !== 1 || mode === "edit"}
-            placeholder="Select company"
+            placeholder={t("site_placeholder_select_company")}
           />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Phone Number</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_phone")}
+            </div>
+          }
           name="phoneNumber"
-          rules={[{ required: true, message: "Please enter phone number" }]}
-        >
-          <Input placeholder="Phone Number" className="h-[41px]" />
-        </Form.Item>
-
-        <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Email</div>}
-          name="email"
           rules={[
-            { required: true, message: "Please enter email" },
-            { type: "email", message: "Please enter valid email" },
+            {
+              required: true,
+              message: t("site_validation_enter_phone"),
+            },
           ]}
         >
-          <Input placeholder="Email" className="h-[41px]" />
+          <Input
+            placeholder={t("site_placeholder_phone")}
+            className="h-[41px]"
+          />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Address</div>}
-          name="address"
-          rules={[{ required: true, message: "Please enter address" }]}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_email")}
+            </div>
+          }
+          name="email"
+          rules={[
+            {
+              required: true,
+              message: t("site_validation_enter_email"),
+            },
+            {
+              type: "email",
+              message: t("site_validation_valid_email"),
+            },
+          ]}
         >
-          <Input placeholder="Address" className="h-[41px]" />
+          <Input
+            placeholder={t("site_placeholder_email")}
+            className="h-[41px]"
+          />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Description</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_address")}
+            </div>
+          }
+          name="address"
+          rules={[
+            {
+              required: true,
+              message: t("site_validation_enter_address"),
+            },
+          ]}
+        >
+          <Input
+            placeholder={t("site_placeholder_address")}
+            className="h-[41px]"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("site_form_description")}
+            </div>
+          }
           name="description"
         >
-          <Input.TextArea rows={3} placeholder="Description" />
+          <Input.TextArea
+            rows={3}
+            placeholder={t("site_placeholder_description")}
+          />
         </Form.Item>
 
         <div className="flex justify-end gap-3 pt-4">
@@ -136,7 +207,7 @@ export default function SiteForm({
               onClick={onCancel}
               className="h-[41px] w-[140px] rounded-[7px] bg-white! border! border-[#757575]! text-[#757575]!"
             >
-              Cancel
+              {t("button_cancel")}
             </Button>
           )}
 
@@ -146,7 +217,7 @@ export default function SiteForm({
             loading={loading}
             className="h-[41px] w-[140px] rounded-[7px] bg-primary! hover:bg-primaryDark! border-none text-white!"
           >
-            {mode === "add" ? "Save" : "Update"}
+            {mode === "add" ? t("button_save") : t("button_update")}
           </Button>
         </div>
       </Form>

@@ -1,10 +1,10 @@
 interface HighlightTextProps {
-  text: string;
+  text?: string;
   query: string;
 }
 
 export default function HighlightText({
-  text,
+  text = "",
   query,
 }: HighlightTextProps) {
   if (!query.trim()) {

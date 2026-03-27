@@ -2,11 +2,14 @@ import { Button, Form, Input } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CompanyFormValue } from "@/stores/companyStore";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   mode: "add" | "edit";
   initialValues?: CompanyFormValue;
-  onSubmit: (values: CompanyFormValue) => Promise<{ code?: number | string; message?: string } | void>;
+  onSubmit: (
+    values: CompanyFormValue
+  ) => Promise<{ code?: number | string; message?: string } | void>;
   onCancel?: () => void;
   loading: boolean;
 }
@@ -18,6 +21,7 @@ export default function CompanyForm({
   onCancel,
   loading,
 }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<CompanyFormValue>();
 
@@ -47,45 +51,101 @@ export default function CompanyForm({
         className="space-y-6"
       >
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Company Name</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("company_form_name")}
+            </div>
+          }
           name="name"
-          rules={[{ required: true, message: "Please enter company name" }]}
-        >
-          <Input placeholder="Company Name" className="h-[41px]" />
-        </Form.Item>
-
-        <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Phone Number</div>}
-          name="phoneNumber"
-          rules={[{ required: true, message: "Please enter phone number" }]}
-        >
-          <Input placeholder="Phone Number" className="h-[41px]" />
-        </Form.Item>
-
-        <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Email</div>}
-          name="email"
           rules={[
-            { required: true, message: "Please enter email" },
-            { type: "email", message: "Please enter valid email" },
+            {
+              required: true,
+              message: t("company_validation_enter_name"),
+            },
           ]}
         >
-          <Input placeholder="Email" className="h-[41px]" />
+          <Input
+            placeholder={t("company_placeholder_name")}
+            className="h-[41px]"
+          />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Address</div>}
-          name="address"
-          rules={[{ required: true, message: "Please enter address" }]}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("company_form_phone")}
+            </div>
+          }
+          name="phoneNumber"
+          rules={[
+            {
+              required: true,
+              message: t("company_validation_enter_phone"),
+            },
+          ]}
         >
-          <Input placeholder="Address" className="h-[41px]" />
+          <Input
+            placeholder={t("company_placeholder_phone")}
+            className="h-[41px]"
+          />
         </Form.Item>
 
         <Form.Item
-          label={<div className="text-[18px] font-semibold text-[#333D4B]">Description</div>}
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("company_form_email")}
+            </div>
+          }
+          name="email"
+          rules={[
+            {
+              required: true,
+              message: t("company_validation_enter_email"),
+            },
+            {
+              type: "email",
+              message: t("company_validation_valid_email"),
+            },
+          ]}
+        >
+          <Input
+            placeholder={t("company_placeholder_email")}
+            className="h-[41px]"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("company_form_address")}
+            </div>
+          }
+          name="address"
+          rules={[
+            {
+              required: true,
+              message: t("company_validation_enter_address"),
+            },
+          ]}
+        >
+          <Input
+            placeholder={t("company_placeholder_address")}
+            className="h-[41px]"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <div className="text-[18px] font-semibold text-[#333D4B]">
+              {t("company_form_description")}
+            </div>
+          }
           name="description"
         >
-          <Input.TextArea rows={3} placeholder="Description" />
+          <Input.TextArea
+            rows={3}
+            placeholder={t("company_placeholder_description")}
+          />
         </Form.Item>
 
         <div className="flex justify-end gap-3 pt-4">
@@ -94,7 +154,7 @@ export default function CompanyForm({
               onClick={onCancel}
               className="h-[41px] w-[140px] rounded-[7px] bg-white! border! border-[#757575]! text-[#757575]!"
             >
-              Cancel
+              {t("button_cancel")}
             </Button>
           )}
 
@@ -104,7 +164,7 @@ export default function CompanyForm({
             loading={loading}
             className="h-[41px] w-[140px] rounded-[7px] bg-primary! hover:bg-primaryDark! border-none text-white!"
           >
-            {mode === "add" ? "Save" : "Update"}
+            {mode === "add" ? t("button_save") : t("button_update")}
           </Button>
         </div>
       </Form>

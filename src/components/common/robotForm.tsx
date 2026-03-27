@@ -5,19 +5,17 @@ import type { DetailDevice } from "@/stores/robotStore";
 import { Button, Form, Input, Select } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   mode: "add" | "edit";
   initialValues?: DetailDevice;
-  onSubmit: (values: DetailDevice) => Promise<{ code?: number | string; message?: string } | void>;
+  onSubmit: (
+    values: DetailDevice
+  ) => Promise<{ code?: number | string; message?: string } | void>;
   onCancel?: () => void;
   loading: boolean;
 }
-
-const robotTypeOptions = [
-  { value: "Drone", label: "Drone" },
-  { value: "Quadruped Robot", label: "Quadruped Robot" },
-];
 
 export default function RobotForm({
   mode,
@@ -26,8 +24,14 @@ export default function RobotForm({
   onCancel,
   loading,
 }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<DetailDevice>();
+
+  const robotTypeOptions = [
+    { value: "Drone", label: t("robot_type_drone") },
+    { value: "Quadruped Robot", label: t("robot_type_quadruped") },
+  ];
 
   const { list: listCompany, getList: getListCompany } = useCompanyStore();
   const { list: listSite, getListByCompany: getListSite } = useSiteStore();
@@ -68,9 +72,15 @@ export default function RobotForm({
   const handleSubmit = async (values: DetailDevice) => {
     const newValues = {
       ...values,
-      companyId: userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
-      companyName: userRole !== 1 ? detailUserLogin?.user?.companyName || "" : values.companyName,
-      siteName: listSite.find((site) => site.siteId === values.siteId)?.name || values.siteName,
+      companyId:
+        userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
+      companyName:
+        userRole !== 1
+          ? detailUserLogin?.user?.companyName || ""
+          : values.companyName,
+      siteName:
+        listSite.find((site) => site.siteId === values.siteId)?.name ||
+        values.siteName,
     };
 
     const res = await onSubmit(newValues);
@@ -84,29 +94,63 @@ export default function RobotForm({
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
-      <Form layout="vertical" form={form} onFinish={handleSubmit} initialValues={initialValues}>
+      <Form
+        layout="vertical"
+        form={form}
+        onFinish={handleSubmit}
+        initialValues={initialValues}
+      >
         <div className="grid grid-cols-2 gap-x-16">
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Robot Name</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_name")}
+              </div>
+            }
             name="deviceName"
           >
-            <Input placeholder="Enter robot name" className="h-[41px]" />
+            <Input
+              placeholder={t("robot_placeholder_name")}
+              className="h-[41px]"
+            />
           </Form.Item>
 
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Robot Type</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_type")}
+              </div>
+            }
             name="deviceType"
-            rules={[{ required: true, message: "Please select robot type" }]}
+            rules={[
+              {
+                required: true,
+                message: t("robot_validation_select_type"),
+              },
+            ]}
           >
-            <Select className="h-[41px]" options={robotTypeOptions} placeholder="Select robot type" />
+            <Select
+              className="h-[41px]"
+              options={robotTypeOptions}
+              placeholder={t("robot_placeholder_select_type")}
+            />
           </Form.Item>
         </div>
 
         <div className="grid grid-cols-2 gap-x-16">
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Company</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_company")}
+              </div>
+            }
             name={userRole !== 1 ? "companyName" : "companyId"}
-            rules={[{ required: true, message: "Please select company" }]}
+            rules={[
+              {
+                required: true,
+                message: t("robot_validation_select_company"),
+              },
+            ]}
           >
             <Select
               className="h-[41px]"
@@ -116,12 +160,16 @@ export default function RobotForm({
               }))}
               disabled={userRole !== 1}
               onChange={() => form.setFieldValue("siteId", undefined)}
-              placeholder="Select company"
+              placeholder={t("robot_placeholder_select_company")}
             />
           </Form.Item>
 
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Site</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_site")}
+              </div>
+            }
             name="siteId"
           >
             <Select
@@ -130,40 +178,68 @@ export default function RobotForm({
                 value: item.siteId,
                 label: item.name,
               }))}
-              placeholder="Select site"
+              placeholder={t("robot_placeholder_select_site")}
             />
           </Form.Item>
         </div>
 
         <div className="grid grid-cols-2 gap-x-16">
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Robot Brand</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_brand")}
+              </div>
+            }
             name="brandName"
           >
-            <Input placeholder="Enter brand name" className="h-[41px]" />
+            <Input
+              placeholder={t("robot_placeholder_brand")}
+              className="h-[41px]"
+            />
           </Form.Item>
 
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Model Name</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_model")}
+              </div>
+            }
             name="model"
           >
-            <Input placeholder="Enter model name" className="h-[41px]" />
+            <Input
+              placeholder={t("robot_placeholder_model")}
+              className="h-[41px]"
+            />
           </Form.Item>
         </div>
 
         <div className="grid grid-cols-2 gap-x-16">
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Serial Number</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_serial_number")}
+              </div>
+            }
             name="deviceSn"
           >
-            <Input placeholder="Enter serial number" className="h-[41px]" />
+            <Input
+              placeholder={t("robot_placeholder_serial_number")}
+              className="h-[41px]"
+            />
           </Form.Item>
 
           <Form.Item
-            label={<div className="text-[18px] font-semibold text-[#333D4B]">Robot Identifier</div>}
+            label={
+              <div className="text-[18px] font-semibold text-[#333D4B]">
+                {t("robot_form_identifier")}
+              </div>
+            }
             name="deviceId"
           >
-            <Input placeholder="Enter robot identifier" className="h-[41px]" />
+            <Input
+              placeholder={t("robot_placeholder_identifier")}
+              className="h-[41px]"
+            />
           </Form.Item>
         </div>
 
@@ -173,7 +249,7 @@ export default function RobotForm({
               onClick={onCancel}
               className="h-[41px] w-[140px] rounded-[7px] bg-white! border! border-[#757575]! text-[#757575]!"
             >
-              Cancel
+              {t("button_cancel")}
             </Button>
           )}
 
@@ -183,7 +259,7 @@ export default function RobotForm({
             loading={loading}
             className="h-[41px] w-[140px] rounded-[7px] bg-primary! hover:bg-primaryDark! border-none text-white!"
           >
-            {mode === "add" ? "Save" : "Update"}
+            {mode === "add" ? t("button_save") : t("button_update")}
           </Button>
         </div>
       </Form>

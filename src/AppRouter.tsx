@@ -19,6 +19,7 @@ import MissionEditForm from "@/pages/settings/mission/[id]/edit";
 import Robot from "@/pages/settings/robot";
 import RobotCreateForm from "@/pages/settings/robot/create";
 import RobotEditForm from "@/pages/settings/robot/[id]/edit";
+import History from "./pages/history";
 
 export default function AppRouter() {
   return useRoutes([
@@ -62,6 +63,7 @@ export default function AppRouter() {
         { path: "settings/robot", element: <Robot /> },
         { path: "settings/robot/create", element: <RobotCreateForm /> },
         { path: "settings/robot/:id/edit", element: <RobotEditForm /> },
+        { path: "history", element: <History /> },
       ],
     },
   ]);

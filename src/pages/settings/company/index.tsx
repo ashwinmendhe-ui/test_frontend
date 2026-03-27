@@ -11,11 +11,13 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
 export default function Company() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { loading, list, getList, deleteCompany } = useCompanyStore();
 
@@ -48,57 +50,57 @@ export default function Company() {
 
   const columns = [
     {
-      title: "ID",
+      title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
       render: (_: unknown, __: CompanyManagementTable, index: number) => index + 1,
     },
     {
-  title: "Company Name",
-  dataIndex: "name",
-  key: "name",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
+      title: t("company_table_name"),
+      dataIndex: "name",
+      key: "name",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
     {
-  title: "Phone Number",
-  dataIndex: "phoneNumber",
-  key: "phoneNumber",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
+      title: t("company_table_phone"),
+      dataIndex: "phoneNumber",
+      key: "phoneNumber",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
     {
-  title: "Email",
-  dataIndex: "email",
-  key: "email",
-  enableSort: true,
-  render: (value: string) => (
-    <HighlightText text={value} query={searchKeyword} />
-  ),
-},
+      title: t("company_table_email"),
+      dataIndex: "email",
+      key: "email",
+      enableSort: true,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
+    },
     {
-      title: "Created Date",
+      title: t("company_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
     {
-  title: "Address",
-  dataIndex: "address",
-  key: "address",
-  enableSort: true,
-  render: (value: string) => (
-    <div className="truncate max-w-[250px]" title={value}>
-      <HighlightText text={value} query={searchKeyword} />
-    </div>
-  ),
-},
+      title: t("company_table_address"),
+      dataIndex: "address",
+      key: "address",
+      enableSort: true,
+      render: (value: string) => (
+        <div className="truncate max-w-[250px]" title={value}>
+          <HighlightText text={value} query={searchKeyword} />
+        </div>
+      ),
+    },
     {
-      title: "Status",
+      title: t("table_status"),
       dataIndex: "status",
       key: "status",
       enableSort: true,
@@ -126,31 +128,31 @@ export default function Company() {
     },
   ] satisfies SortableTableColumn<CompanyManagementTable>[];
 
-const searchFilteredList = filterByQuery(list, searchKeyword, [
-  "name",
-  "email",
-  "phoneNumber",
-  "address",
-]);
+  const searchFilteredList = filterByQuery(list, searchKeyword, [
+    "name",
+    "email",
+    "phoneNumber",
+    "address",
+  ]);
 
-const filteredList = searchFilteredList.filter((item) => {
-  const matchesDate =
-    !dateRange ||
-    !dateRange[0] ||
-    !dateRange[1] ||
-    (() => {
-      const itemDate = new Date(item.createdAt).getTime();
-      const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
-      const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
-      return itemDate >= from && itemDate <= to;
-    })();
+  const filteredList = searchFilteredList.filter((item) => {
+    const matchesDate =
+      !dateRange ||
+      !dateRange[0] ||
+      !dateRange[1] ||
+      (() => {
+        const itemDate = new Date(item.createdAt).getTime();
+        const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
+        const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
+        return itemDate >= from && itemDate <= to;
+      })();
 
-  return matchesDate;
-});
+    return matchesDate;
+  });
 
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
-  setDateRange(dates);
-};
+    setDateRange(dates);
+  };
 
   useEffect(() => {
     getList();
@@ -159,7 +161,9 @@ const filteredList = searchFilteredList.filter((item) => {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
 
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
@@ -168,11 +172,11 @@ const filteredList = searchFilteredList.filter((item) => {
               className="min-w-[300px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={["From", "To"]}
+              placeholder={[t("common_from"), t("common_to")]}
             />
             <Search
               size="large"
-              placeholder="Search Company"
+              placeholder={t("company_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -185,19 +189,19 @@ const filteredList = searchFilteredList.filter((item) => {
               className="text-white! hover:text-white! text-[20px]! font-bold!"
               to="/settings/company/create"
             >
-              Add Company
+              {t("button_add_company")}
             </Link>
           </Button>
         </div>
 
-        <SortableTable columns={columns} data={filteredList} rowKey="companyId"/>
+        <SortableTable columns={columns} data={filteredList} rowKey="companyId" />
       </div>
 
       <CustomModal
-        title={`Delete ${selectedRecord?.name ?? "Company"}`}
+        title={`${t("company_delete_title")} ${selectedRecord?.name ?? t("page_company")}`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            Are you sure you want to delete this company?
+            {t("company_delete_confirm")}
           </p>
         }
         open={isModalOpen}
@@ -205,8 +209,8 @@ const filteredList = searchFilteredList.filter((item) => {
         onCancel={handleCancel}
         icon={DeleteIcon}
         useIcon
-        okText="Delete"
-        cancelText="Cancel"
+        okText={t("table_delete")}
+        cancelText={t("button_cancel")}
       />
     </>
   );

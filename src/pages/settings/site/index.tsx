@@ -11,11 +11,13 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
 export default function Site() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { loading, list, getList, deleteSite } = useSiteStore();
 
@@ -48,13 +50,13 @@ export default function Site() {
 
   const columns = [
     {
-      title: "ID",
+      title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
       render: (_: unknown, __: SiteManagementTable, index: number) => index + 1,
     },
     {
-      title: "Site Name",
+      title: t("site_table_name"),
       dataIndex: "name",
       key: "name",
       enableSort: true,
@@ -63,7 +65,7 @@ export default function Site() {
       ),
     },
     {
-      title: "Company",
+      title: t("site_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
@@ -72,25 +74,25 @@ export default function Site() {
       ),
     },
     {
-      title: "Registered Drone",
+      title: t("site_table_registered_drone"),
       dataIndex: "deviceCount",
       key: "deviceCount",
       enableSort: true,
     },
     {
-      title: "Online Drone",
+      title: t("site_table_online_drone"),
       dataIndex: "deviceOnlineCount",
       key: "deviceOnlineCount",
       enableSort: true,
     },
     {
-      title: "Created Date",
+      title: t("site_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
     {
-      title: "Address",
+      title: t("site_table_address"),
       dataIndex: "address",
       key: "address",
       enableSort: true,
@@ -101,7 +103,7 @@ export default function Site() {
       ),
     },
     {
-      title: "Status",
+      title: t("table_status"),
       dataIndex: "status",
       key: "status",
       enableSort: true,
@@ -163,7 +165,9 @@ export default function Site() {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
 
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
@@ -172,11 +176,11 @@ export default function Site() {
               className="min-w-[300px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={["From", "To"]}
+              placeholder={[t("common_from"), t("common_to")]}
             />
             <Search
               size="large"
-              placeholder="Search Site"
+              placeholder={t("site_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -185,8 +189,11 @@ export default function Site() {
           </div>
 
           <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
-            <Link className="text-white! hover:text-white! text-[20px]! font-bold!" to="/settings/site/create">
-              Add Site
+            <Link
+              className="text-white! hover:text-white! text-[20px]! font-bold!"
+              to="/settings/site/create"
+            >
+              {t("button_add_site")}
             </Link>
           </Button>
         </div>
@@ -195,10 +202,10 @@ export default function Site() {
       </div>
 
       <CustomModal
-        title={`Delete ${selectedRecord?.name ?? "Site"}`}
+        title={`${t("site_delete_title")} ${selectedRecord?.name ?? t("page_site")}`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            Are you sure you want to delete this site?
+            {t("site_delete_confirm")}
           </p>
         }
         open={isModalOpen}
@@ -206,8 +213,8 @@ export default function Site() {
         onCancel={handleCancel}
         icon={DeleteIcon}
         useIcon
-        okText="Delete"
-        cancelText="Cancel"
+        okText={t("table_delete")}
+        cancelText={t("button_cancel")}
       />
     </>
   );

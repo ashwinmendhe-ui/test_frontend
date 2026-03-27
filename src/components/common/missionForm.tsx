@@ -5,26 +5,17 @@ import type { MissionFormValue } from "@/stores/missionStore";
 import { Button, Form, Input, Select } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   mode: "add" | "edit";
   initialValues?: MissionFormValue;
-  onSubmit: (values: MissionFormValue) => Promise<{ code?: number; uploadUrl?: string } | void>;
+  onSubmit: (
+    values: MissionFormValue
+  ) => Promise<{ code?: number; uploadUrl?: string } | void>;
   onCancel?: () => void;
   loading: boolean;
 }
-
-const deviceTypeOptions = [
-  { value: "Drone", label: "Drone" },
-  { value: "Robot", label: "Robot" },
-];
-
-const missionTypeOptions = [
-  { value: "Patrol", label: "Patrol" },
-  { value: "Monitoring", label: "Monitoring" },
-  { value: "Delivery", label: "Delivery" },
-  { value: "Cleaning", label: "Cleaning" },
-];
 
 export default function MissionForm({
   mode,
@@ -33,8 +24,21 @@ export default function MissionForm({
   onCancel,
   loading,
 }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<MissionFormValue>();
+
+  const deviceTypeOptions = [
+    { value: "Drone", label: t("mission_device_type_drone") },
+    { value: "Robot", label: t("mission_device_type_robot") },
+  ];
+
+  const missionTypeOptions = [
+    { value: "Patrol", label: t("mission_type_patrol") },
+    { value: "Monitoring", label: t("mission_type_monitoring") },
+    { value: "Delivery", label: t("mission_type_delivery") },
+    { value: "Cleaning", label: t("mission_type_cleaning") },
+  ];
 
   const { list: listCompany, getList: getListCompany } = useCompanyStore();
   const { list: listSite, getListByCompany } = useSiteStore();
@@ -74,8 +78,10 @@ export default function MissionForm({
   const handleSubmit = async (values: MissionFormValue) => {
     const newValues = {
       ...values,
-      companyId: userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
-      companyName: userRole !== 1 ? detailUserLogin?.user?.companyName || "" : values.companyName,
+      companyId:
+        userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
+      companyName:
+        userRole !== 1 ? detailUserLogin?.user?.companyName || "" : values.companyName,
     };
 
     const res = await onSubmit(newValues);
@@ -87,21 +93,47 @@ export default function MissionForm({
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
-      <Form layout="vertical" form={form} onFinish={handleSubmit} initialValues={initialValues}>
+      <Form
+        layout="vertical"
+        form={form}
+        onFinish={handleSubmit}
+        initialValues={initialValues}
+      >
         <div className="grid grid-cols-2 gap-x-16">
           <div className="flex flex-col">
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Mission Name</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_name")}
+                </div>
+              }
               name="missionName"
-              rules={[{ required: true, message: "Please enter mission name" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t("mission_validation_enter_name"),
+                },
+              ]}
             >
-              <Input placeholder="Enter mission name" className="h-[41px]" />
+              <Input
+                placeholder={t("mission_placeholder_name")}
+                className="h-[41px]"
+              />
             </Form.Item>
 
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Company</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_company")}
+                </div>
+              }
               name={userRole !== 1 ? "companyName" : "companyId"}
-              rules={[{ required: true, message: "Please select company" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t("mission_validation_select_company"),
+                },
+              ]}
             >
               <Select
                 className="h-[41px]"
@@ -111,14 +143,23 @@ export default function MissionForm({
                 }))}
                 disabled={userRole !== 1}
                 onChange={() => form.setFieldValue("siteId", undefined)}
-                placeholder="Select company"
+                placeholder={t("mission_placeholder_select_company")}
               />
             </Form.Item>
 
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Site</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_site")}
+                </div>
+              }
               name="siteId"
-              rules={[{ required: true, message: "Please select site" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t("mission_validation_select_site"),
+                },
+              ]}
             >
               <Select
                 className="h-[41px]"
@@ -126,40 +167,80 @@ export default function MissionForm({
                   value: item.siteId,
                   label: item.name,
                 }))}
-                placeholder="Select site"
+                placeholder={t("mission_placeholder_select_site")}
               />
             </Form.Item>
 
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Device Type</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_device_type")}
+                </div>
+              }
               name="deviceType"
-              rules={[{ required: true, message: "Please select device type" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t("mission_validation_select_device_type"),
+                },
+              ]}
             >
-              <Select className="h-[41px]" options={deviceTypeOptions} placeholder="Select device type" />
+              <Select
+                className="h-[41px]"
+                options={deviceTypeOptions}
+                placeholder={t("mission_placeholder_select_device_type")}
+              />
             </Form.Item>
           </div>
 
           <div className="flex flex-col">
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">File</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_file")}
+                </div>
+              }
               name="file"
             >
-              <Input placeholder="File name" className="h-[41px]" />
+              <Input
+                placeholder={t("mission_placeholder_file")}
+                className="h-[41px]"
+              />
             </Form.Item>
 
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Mission Type</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_type")}
+                </div>
+              }
               name="missionType"
-              rules={[{ required: true, message: "Please select mission type" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t("mission_validation_select_type"),
+                },
+              ]}
             >
-              <Select className="h-[41px]" options={missionTypeOptions} placeholder="Select mission type" />
+              <Select
+                className="h-[41px]"
+                options={missionTypeOptions}
+                placeholder={t("mission_placeholder_select_type")}
+              />
             </Form.Item>
 
             <Form.Item
-              label={<div className="text-[18px] font-semibold text-[#333D4B]">Description</div>}
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_description")}
+                </div>
+              }
               name="description"
             >
-              <Input placeholder="Description" className="h-[41px]" />
+              <Input
+                placeholder={t("mission_placeholder_description")}
+                className="h-[41px]"
+              />
             </Form.Item>
           </div>
         </div>
@@ -170,7 +251,7 @@ export default function MissionForm({
               onClick={onCancel}
               className="h-[41px] w-[140px] rounded-[7px] bg-white! border! border-[#757575]! text-[#757575]!"
             >
-              Cancel
+              {t("button_cancel")}
             </Button>
           )}
 
@@ -180,7 +261,7 @@ export default function MissionForm({
             loading={loading}
             className="h-[41px] w-[140px] rounded-[7px] bg-primary! hover:bg-primaryDark! border-none text-white!"
           >
-            {mode === "add" ? "Save" : "Update"}
+            {mode === "add" ? t("button_save") : t("button_update")}
           </Button>
         </div>
       </Form>

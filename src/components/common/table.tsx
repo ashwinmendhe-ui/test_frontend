@@ -3,6 +3,7 @@ import Sort from "@/assets/sort-icon.svg";
 import SortUp from "@/assets/sort-up-icon.svg";
 import { Table } from "antd";
 import type { ColumnsType, ColumnType, TablePaginationConfig } from "antd/es/table";
+import { useTranslation } from "react-i18next";
 
 export interface SortableTableColumn<T> {
   title: string;
@@ -28,6 +29,8 @@ export function SortableTable<T extends Record<string, any>>({
   pagination,
   bordered = false,
 }: SortableTableProps<T>) {
+  const { t } = useTranslation();
+
   const antColumns: ColumnsType<T> = columns.map((col) => {
     const base: ColumnType<T> = {
       title: col.title,
@@ -48,7 +51,7 @@ export function SortableTable<T extends Record<string, any>>({
 
           return typeof valA === "number" && typeof valB === "number"
             ? valA - valB
-            : String(valA).localeCompare(String(valB));
+            : String(valA ?? "").localeCompare(String(valB ?? ""));
         };
 
         base.sortDirections = ["ascend", "descend"];
@@ -80,6 +83,7 @@ export function SortableTable<T extends Record<string, any>>({
       rowKey={rowKey}
       pagination={pagination}
       bordered={bordered}
+      locale={{ emptyText: t("table_no_data") }}
     />
   );
 }

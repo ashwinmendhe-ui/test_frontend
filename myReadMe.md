@@ -13,3 +13,9 @@ tree -L 3
 
 ## 5. install ant design
 npm install @ant-design/icons
+
+## 6. For korea language support 
+npm install i18next react-i18next
+
+## 7. for pdf and view support
+npm install jspdf html2canvas

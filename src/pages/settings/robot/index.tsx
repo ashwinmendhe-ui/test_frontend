@@ -12,11 +12,13 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
 export default function Robot() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { loading, list, getList, deleteRobot } = useRobotStore();
   const { detailUserLogin } = useUserStore();
@@ -52,27 +54,27 @@ export default function Robot() {
 
   const columns = [
     {
-      title: "ID",
+      title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
       render: (_: unknown, __: RobotManagementTable, index: number) => index + 1,
     },
     {
-      title: "Robot Name",
+      title: t("robot_table_name"),
       dataIndex: "deviceName",
       key: "deviceName",
       enableSort: true,
       render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
     },
     {
-      title: "Company",
+      title: t("robot_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
       render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
     },
     {
-      title: "Site",
+      title: t("robot_table_site"),
       dataIndex: "siteName",
       key: "siteName",
       enableSort: true,
@@ -83,48 +85,48 @@ export default function Robot() {
       ),
     },
     {
-      title: "Robot Type",
+      title: t("robot_table_type"),
       dataIndex: "deviceType",
       key: "deviceType",
       enableSort: true,
       render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
     },
     {
-      title: "Robot Brand",
+      title: t("robot_table_brand"),
       dataIndex: "brandName",
       key: "brandName",
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
     {
-      title: "Model Name",
+      title: t("robot_table_model"),
       dataIndex: "model",
       key: "model",
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
     {
-      title: "Serial Number",
+      title: t("robot_table_serial_number"),
       dataIndex: "deviceSn",
       key: "deviceSn",
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
     {
-      title: "Robot Identifier",
+      title: t("robot_table_identifier"),
       dataIndex: "deviceId",
       key: "deviceId",
       enableSort: true,
       render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
     },
     {
-      title: "Created Date",
+      title: t("robot_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
     {
-      title: "Status",
+      title: t("table_status"),
       dataIndex: "status",
       key: "status",
       enableSort: true,
@@ -190,7 +192,7 @@ export default function Robot() {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+        {loading && <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>}
 
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
@@ -199,11 +201,11 @@ export default function Robot() {
               className="min-w-[300px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={["From", "To"]}
+              placeholder={[t("common_from"), t("common_to")]}
             />
             <Search
               size="large"
-              placeholder="Search Robot"
+              placeholder={t("robot_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -213,8 +215,11 @@ export default function Robot() {
 
           {userRole !== 3 && (
             <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
-              <Link className="text-white! hover:text-white! text-[20px]! font-bold!" to="/settings/robot/create">
-                Add Robot
+              <Link
+                className="text-white! hover:text-white! text-[20px]! font-bold!"
+                to="/settings/robot/create"
+              >
+                {t("button_add_robot")}
               </Link>
             </Button>
           )}
@@ -224,10 +229,10 @@ export default function Robot() {
       </div>
 
       <CustomModal
-        title={`Delete ${selectedRecord?.deviceName ?? "Robot"}`}
+        title={`${t("robot_delete_title")} ${selectedRecord?.deviceName ?? t("page_robot")}`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            Are you sure you want to delete this robot?
+            {t("robot_delete_confirm")}
           </p>
         }
         open={isModalOpen}
@@ -235,8 +240,8 @@ export default function Robot() {
         onCancel={handleCancel}
         icon={DeleteIcon}
         useIcon
-        okText="Delete"
-        cancelText="Cancel"
+        okText={t("table_delete")}
+        cancelText={t("button_cancel")}
       />
     </>
   );

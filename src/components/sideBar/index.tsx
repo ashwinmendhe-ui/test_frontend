@@ -4,8 +4,17 @@ import { UserOutlined } from "@ant-design/icons";
 import { menuItems } from "../../constants/menu";
 import LogoutIcon from "../../assets/logout-icon.svg";
 import { useAuthStore } from "../../stores/authStore";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useUserStore } from "@/stores/userStore";
+import { useTranslation } from "react-i18next";
+
+type MenuItem = {
+  key: string;
+  icon?: React.ReactNode;
+  label?: React.ReactNode;
+  labelKey?: string;
+  children?: MenuItem[];
+};
 
 export default function Sidebar({
   collapsed,
@@ -16,6 +25,7 @@ export default function Sidebar({
   width: number;
   setWidth: (w: number) => void;
 }) {
+  const { t } = useTranslation();
   const { detailUserLogin, getDetailUserLogin } = useUserStore();
   const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
@@ -24,26 +34,19 @@ export default function Sidebar({
   const userRole = detailUserLogin?.roles?.[0];
 
   const filterMenuByRole = (items: typeof menuItems, role?: number) => {
-    // System Administrator -> all menus
-    if (role === 1) {
-      return items;
-    }
+    if (role === 1) return items;
 
-    // Company Admin -> all except Company Management
     if (role === 2) {
       return items
         .map((item) => {
           if (item.key === "/settings" && item.children) {
-            const filteredChildren = item.children.filter(
-              (child) => child.key !== "/settings/company"
-            );
-
             return {
               ...item,
-              children: filteredChildren,
+              children: item.children.filter(
+                (child) => child.key !== "/settings/company"
+              ),
             };
           }
-
           return item;
         })
         .filter((item) => {
@@ -54,28 +57,21 @@ export default function Sidebar({
         });
     }
 
-    // Operator -> only mission and robot under Settings
     if (role === 3) {
       return items
         .map((item) => {
           if (item.key === "/settings" && item.children) {
-            const filteredChildren = item.children.filter((child) =>
-              ["/settings/mission", "/settings/robot"].includes(child.key)
-            );
-
             return {
               ...item,
-              children: filteredChildren,
+              children: item.children.filter((child) =>
+                ["/settings/mission", "/settings/robot"].includes(child.key)
+              ),
             };
           }
-
           return item;
         })
         .filter((item) => {
-          // Keep normal top-level menus like dashboard/stream
           if (item.key !== "/settings") return true;
-
-          // Keep settings only if allowed children exist
           return !!item.children && item.children.length > 0;
         });
     }
@@ -83,7 +79,22 @@ export default function Sidebar({
     return items;
   };
 
-  const filteredMenuItems = filterMenuByRole(menuItems, userRole);
+  const translateMenu = (items: MenuItem[]): MenuItem[] =>
+    items.map((item) => ({
+      ...item,
+      label: item.labelKey ? t(item.labelKey) : item.label,
+      children: item.children ? translateMenu(item.children) : undefined,
+    }));
+
+  const filteredMenuItems = useMemo(
+    () => filterMenuByRole(menuItems, userRole),
+    [userRole]
+  );
+
+  const translatedMenuItems = useMemo(
+    () => translateMenu(filteredMenuItems as MenuItem[]),
+    [filteredMenuItems, t]
+  );
 
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 600;
@@ -123,12 +134,12 @@ export default function Sidebar({
 
   const roleLabel =
     currentRole === 1
-      ? "System Administrator"
+      ? t("role_system_administrator")
       : currentRole === 2
-      ? "Company Admin"
+      ? t("role_company_admin")
       : currentRole === 3
-      ? "Company User"
-      : "No role";
+      ? t("role_company_user")
+      : t("role_none");
 
   return (
     <div
@@ -140,21 +151,21 @@ export default function Sidebar({
           <Avatar shape="square" size={40} icon={<UserOutlined />} />
           {!collapsed && (
             <div className="ml-3 font-bold text-[#757575] text-base">
-              {detailUserLogin?.user?.username || "Guest"}
+              {detailUserLogin?.user?.username || t("common_guest")}
             </div>
           )}
         </div>
 
         {!collapsed && (
-            <div className="flex items-center justify-center mt-3.5">
-              <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
-                Role
-              </span>
-              <span className="font-semibold text-[#333D4B] text-xs ml-4">
-                {roleLabel}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center justify-center mt-3.5">
+            <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
+              {t("common_role")}
+            </span>
+            <span className="font-semibold text-[#333D4B] text-xs ml-4">
+              {roleLabel}
+            </span>
+          </div>
+        )}
 
         {!collapsed && (
           <Button
@@ -162,7 +173,7 @@ export default function Sidebar({
             icon={<img src={LogoutIcon} alt="logout" />}
             onClick={handleLogout}
           >
-            Logout
+            {t("button_logout")}
           </Button>
         )}
       </div>
@@ -171,7 +182,7 @@ export default function Sidebar({
         mode="inline"
         selectedKeys={[location.pathname]}
         onClick={(e) => navigate(e.key)}
-        items={filteredMenuItems}
+        items={translatedMenuItems}
         className="
           mt-6
           [&_.ant-menu-item]:h-[50px]

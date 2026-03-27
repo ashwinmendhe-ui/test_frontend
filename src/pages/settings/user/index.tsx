@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
 import { useUserStore } from "@/stores/userStore";
+import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -27,6 +28,7 @@ interface UserRow {
 }
 
 export default function User() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { loading, list, getList, deleteUser } = useUserStore();
 
@@ -59,13 +61,13 @@ export default function User() {
 
   const columns = [
     {
-      title: "ID",
+      title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
       render: (_: unknown, __: UserRow, index: number) => index + 1,
     },
     {
-      title: "Name",
+      title: t("user_table_name"),
       dataIndex: "username",
       key: "username",
       enableSort: true,
@@ -74,7 +76,7 @@ export default function User() {
       ),
     },
     {
-      title: "Company",
+      title: t("user_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
@@ -83,7 +85,7 @@ export default function User() {
       ),
     },
     {
-      title: "Phone Number",
+      title: t("user_table_phone"),
       dataIndex: "phone",
       key: "phone",
       enableSort: true,
@@ -92,7 +94,7 @@ export default function User() {
       ),
     },
     {
-      title: "Email",
+      title: t("user_form_email"),
       dataIndex: "email",
       key: "email",
       enableSort: true,
@@ -101,13 +103,13 @@ export default function User() {
       ),
     },
     {
-      title: "Created Date",
+      title: t("user_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
     {
-      title: "Role",
+      title: t("user_form_role"),
       dataIndex: "role",
       key: "role",
       enableSort: true,
@@ -116,7 +118,7 @@ export default function User() {
       ),
     },
     {
-      title: "Status",
+      title: t("table_status"),
       dataIndex: "isActive",
       key: "isActive",
       enableSort: true,
@@ -178,7 +180,9 @@ export default function User() {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
 
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
@@ -187,12 +191,12 @@ export default function User() {
               className="min-w-[300px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={["From", "To"]}
+              placeholder={[t("common_from"), t("common_to")]}
             />
 
             <Search
               size="large"
-              placeholder="Search User"
+              placeholder={t("user_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -200,12 +204,12 @@ export default function User() {
             />
           </div>
 
-          <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
-            <span
-              className="text-white! hover:text-white! text-[20px]! font-bold! cursor-pointer"
-              onClick={() => navigate("/settings/user/create")}
-            >
-              Add User
+          <Button
+            className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!"
+            onClick={() => navigate("/settings/user/create")}
+          >
+            <span className="text-white! hover:text-white! text-[20px]! font-bold! cursor-pointer">
+              {t("button_add_user")}
             </span>
           </Button>
         </div>
@@ -214,10 +218,10 @@ export default function User() {
       </div>
 
       <CustomModal
-        title={`Delete ${selectedRecord?.username ?? "User"}`}
+        title={`${t("user_delete_title")} ${selectedRecord?.username ?? t("page_user")}`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            Are you sure you want to delete this user?
+            {t("user_delete_confirm")}
           </p>
         }
         open={isModalOpen}
@@ -225,8 +229,8 @@ export default function User() {
         onCancel={handleCancel}
         icon={DeleteIcon}
         useIcon
-        okText="Delete"
-        cancelText="Cancel"
+        okText={t("table_delete")}
+        cancelText={t("button_cancel")}
       />
     </>
   );

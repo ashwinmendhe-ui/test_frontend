@@ -11,11 +11,13 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
 export default function Mission() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { loading, list, getList, deleteMission } = useMissionStore();
   const { detailUserLogin } = useUserStore();
@@ -23,7 +25,8 @@ export default function Mission() {
   const userRole = detailUserLogin?.roles?.[0];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<MissionManagementTable | null>(null);
+  const [selectedRecord, setSelectedRecord] =
+    useState<MissionManagementTable | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
 
@@ -57,48 +60,58 @@ export default function Mission() {
 
   const columns = [
     {
-      title: "ID",
+      title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
       render: (_: unknown, __: MissionManagementTable, index: number) => index + 1,
     },
     {
-      title: "Mission Name",
+      title: t("mission_table_name"),
       dataIndex: "missionName",
       key: "missionName",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-      title: "Company",
+      title: t("mission_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-      title: "Site",
+      title: t("mission_table_site"),
       dataIndex: "siteName",
       key: "siteName",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-      title: "Device Type",
+      title: t("mission_table_device_type"),
       dataIndex: "deviceType",
       key: "deviceType",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-      title: "Mission Type",
+      title: t("mission_table_mission_type"),
       dataIndex: "missionType",
       key: "missionType",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
-      title: "File",
+      title: t("mission_table_file"),
       dataIndex: "file",
       key: "file",
       enableSort: true,
@@ -109,7 +122,7 @@ export default function Mission() {
       ),
     },
     {
-      title: "Created Date",
+      title: t("mission_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
@@ -174,7 +187,9 @@ export default function Mission() {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">Loading...</div>}
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
 
         <div className="flex justify-between items-center mt-[26px] mb-[22px]">
           <div className="flex gap-4 w-1/2">
@@ -183,11 +198,11 @@ export default function Mission() {
               className="min-w-[300px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={["From", "To"]}
+              placeholder={[t("common_from"), t("common_to")]}
             />
             <Search
               size="large"
-              placeholder="Search Mission"
+              placeholder={t("mission_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -197,8 +212,11 @@ export default function Mission() {
 
           {userRole !== 3 && (
             <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
-              <Link className="text-white! hover:text-white! text-[20px]! font-bold!" to="/settings/mission/create">
-                Add Mission
+              <Link
+                className="text-white! hover:text-white! text-[20px]! font-bold!"
+                to="/settings/mission/create"
+              >
+                {t("button_add_mission")}
               </Link>
             </Button>
           )}
@@ -208,10 +226,12 @@ export default function Mission() {
       </div>
 
       <CustomModal
-        title={`Delete ${selectedRecord?.missionName ?? "Mission"}`}
+        title={`${t("mission_delete_title")} ${
+          selectedRecord?.missionName ?? t("page_mission")
+        }`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            Are you sure you want to delete this mission?
+            {t("mission_delete_confirm")}
           </p>
         }
         open={isModalOpen}
@@ -219,8 +239,8 @@ export default function Mission() {
         onCancel={handleCancel}
         icon={DeleteIcon}
         useIcon
-        okText="Delete"
-        cancelText="Cancel"
+        okText={t("table_delete")}
+        cancelText={t("button_cancel")}
       />
     </>
   );
