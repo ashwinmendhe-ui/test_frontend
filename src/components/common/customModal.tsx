@@ -1,5 +1,6 @@
 import { Button, Modal } from "antd";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 interface CustomModalProps {
   type?: string;
@@ -22,12 +23,14 @@ const CustomModal: React.FC<CustomModalProps> = ({
   open,
   useIcon,
   icon,
-  okText = "OK",
-  cancelText = "Cancel",
+  okText,
+  cancelText,
   onOk,
   onCancel,
   customClassName,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <Modal
       className={`custom-modal min-w-[522px] ${customClassName || ""}`}
@@ -39,7 +42,7 @@ const CustomModal: React.FC<CustomModalProps> = ({
           key="cancel"
           onClick={onCancel}
         >
-          {cancelText}
+          {cancelText || t("button_cancel")}
         </Button>,
         <Button
           className={`border! border-[#DDE0E5]! w-40! h-16! rounded-[13px]! ${
@@ -49,7 +52,7 @@ const CustomModal: React.FC<CustomModalProps> = ({
           type="primary"
           onClick={onOk}
         >
-          {okText}
+          {okText || t("button_ok")}
         </Button>,
       ]}
     >

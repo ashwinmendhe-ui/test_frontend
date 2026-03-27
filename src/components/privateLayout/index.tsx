@@ -2,10 +2,26 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "../sideBar";
 import Header from "../header";
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useUserStore } from "@/stores/userStore";
+import { hasAccess } from "@/utils/roleAccess";
 
 export default function PrivateLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { detailUserLogin } = useUserStore();
+
+  const currentRole = detailUserLogin?.roles?.[0];
+  useEffect(() => {
+    if (!currentRole) return;
+
+    if (!hasAccess(currentRole, location.pathname)) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [currentRole, location.pathname, navigate]);
 
   return (
     <div className="flex h-screen overflow-hidden">

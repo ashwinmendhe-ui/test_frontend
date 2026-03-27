@@ -4,44 +4,33 @@ import ActionMenu from "@/components/common/actionMenu";
 import CustomModal from "@/components/common/customModal";
 import StatusBadge from "@/components/common/statusBadge";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
+import { useSiteStore, type SiteManagementTable } from "@/stores/siteStore";
 import { Button, DatePicker, Dropdown, Input } from "antd";
 import type { Dayjs } from "dayjs";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
-import { useUserStore } from "@/stores/userStore";
 import { useTranslation } from "react-i18next";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
-interface UserRow {
-  id: string;
-  username: string;
-  companyName: string;
-  phone: string;
-  email: string;
-  createdAt: string;
-  role: string;
-  isActive: boolean;
-}
-
-export default function User() {
+export default function Site() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { loading, list, getList, deleteUser } = useUserStore();
+  const { loading, list, getList, deleteSite } = useSiteStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<UserRow | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<SiteManagementTable | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
 
-  const handleEdit = (record: UserRow) => {
-    navigate(`/settings/user/${record.id}/edit`);
+  const handleEdit = (record: SiteManagementTable) => {
+    navigate(`/settings/site/${record.siteId}/edit`);
   };
 
-  const handleDelete = (record: UserRow) => {
+  const handleDelete = (record: SiteManagementTable) => {
     setSelectedRecord(record);
     setIsModalOpen(true);
   };
@@ -49,7 +38,7 @@ export default function User() {
   const confirmDelete = async () => {
     if (!selectedRecord) return;
 
-    await deleteUser(selectedRecord.id);
+    await deleteSite(selectedRecord.siteId);
     setIsModalOpen(false);
     setSelectedRecord(null);
   };
@@ -64,19 +53,19 @@ export default function User() {
       title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
-      render: (_: unknown, __: UserRow, index: number) => index + 1,
+      render: (_: unknown, __: SiteManagementTable, index: number) => index + 1,
     },
     {
-      title: t("user_table_name"),
-      dataIndex: "username",
-      key: "username",
+      title: t("site_table_name"),
+      dataIndex: "name",
+      key: "name",
       enableSort: true,
       render: (value: string) => (
         <HighlightText text={value} query={searchKeyword} />
       ),
     },
     {
-      title: t("user_table_company"),
+      title: t("site_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
@@ -85,49 +74,45 @@ export default function User() {
       ),
     },
     {
-      title: t("user_table_phone"),
-      dataIndex: "phone",
-      key: "phone",
+      title: t("site_table_registered_drone"),
+      dataIndex: "deviceCount",
+      key: "deviceCount",
       enableSort: true,
-      render: (value: string) => (
-        <HighlightText text={value} query={searchKeyword} />
-      ),
     },
     {
-      title: t("user_form_email"),
-      dataIndex: "email",
-      key: "email",
+      title: t("site_table_online_drone"),
+      dataIndex: "deviceOnlineCount",
+      key: "deviceOnlineCount",
       enableSort: true,
-      render: (value: string) => (
-        <HighlightText text={value} query={searchKeyword} />
-      ),
     },
     {
-      title: t("user_table_created_date"),
+      title: t("site_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
     {
-      title: t("user_form_role"),
-      dataIndex: "role",
-      key: "role",
+      title: t("site_table_address"),
+      dataIndex: "address",
+      key: "address",
       enableSort: true,
       render: (value: string) => (
-        <HighlightText text={value} query={searchKeyword} />
+        <div className="truncate max-w-[250px]" title={value}>
+          <HighlightText text={value} query={searchKeyword} />
+        </div>
       ),
     },
     {
       title: t("table_status"),
-      dataIndex: "isActive",
-      key: "isActive",
+      dataIndex: "status",
+      key: "status",
       enableSort: true,
-      render: (item: boolean) => <StatusBadge status={item} />,
+      render: (item: string) => <StatusBadge status={item} />,
     },
     {
       title: "",
       key: "action",
-      render: (_: unknown, record: UserRow) => (
+      render: (_: unknown, record: SiteManagementTable) => (
         <Dropdown
           className="relative"
           trigger={["hover"]}
@@ -144,14 +129,14 @@ export default function User() {
         </Dropdown>
       ),
     },
-  ] satisfies SortableTableColumn<UserRow>[];
+  ] satisfies SortableTableColumn<SiteManagementTable>[];
 
   const searchFilteredList = filterByQuery(list, searchKeyword, [
-    "username",
-    "email",
+    "name",
     "companyName",
-    "phone",
-    "role",
+    "phoneNumber",
+    "email",
+    "address",
   ]);
 
   const filteredList = searchFilteredList.filter((item) => {
@@ -193,10 +178,9 @@ export default function User() {
               value={dateRange}
               placeholder={[t("common_from"), t("common_to")]}
             />
-
             <Search
               size="large"
-              placeholder={t("user_search_placeholder")}
+              placeholder={t("site_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1 rounded-[7px]"
@@ -204,24 +188,24 @@ export default function User() {
             />
           </div>
 
-          <Button
-            className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!"
-            onClick={() => navigate("/settings/user/create")}
-          >
-            <span className="text-white! hover:text-white! text-[20px]! font-bold! cursor-pointer">
-              {t("button_add_user")}
-            </span>
+          <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
+            <Link
+              className="text-white! hover:text-white! text-[20px]! font-bold!"
+              to="/settings/site/create"
+            >
+              {t("button_add_site")}
+            </Link>
           </Button>
         </div>
 
-        <SortableTable columns={columns} data={filteredList} />
+        <SortableTable columns={columns} data={filteredList} rowKey="siteId" />
       </div>
 
       <CustomModal
-        title={`${t("user_delete_title")} ${selectedRecord?.username ?? t("page_user")}`}
+        title={`${t("site_delete_title")} ${selectedRecord?.name ?? t("page_site")}`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
-            {t("user_delete_confirm")}
+            {t("site_delete_confirm")}
           </p>
         }
         open={isModalOpen}
