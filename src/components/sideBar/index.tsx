@@ -143,12 +143,12 @@ export default function Sidebar({
 
   return (
     <div
-      style={{ width: collapsed ? 80 : width }}
+      style={{ width: collapsed ? 92 : width }}
       className="bg-white border-r border-[#E5E7EB] min-h-screen px-[16px] py-[40px] relative transition-all duration-300"
     >
-      <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-8 gap-4">
+      <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-4 gap-2">
         <div className="flex items-center">
-          <Avatar shape="square" size={40} icon={<UserOutlined />} />
+          <Avatar shape="square" size={42} icon={<UserOutlined />} />
           {!collapsed && (
             <div className="ml-3 font-bold text-[#757575] text-base">
               {detailUserLogin?.user?.username || t("common_guest")}
@@ -157,7 +157,7 @@ export default function Sidebar({
         </div>
 
         {!collapsed && (
-          <div className="flex items-center justify-center mt-3.5">
+          <div className="flex items-center justify-center mt-2">
             <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
               {t("common_role")}
             </span>
@@ -169,7 +169,7 @@ export default function Sidebar({
 
         {!collapsed && (
           <Button
-            className="mt-6 mb-6 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
+            className="mt-3 mb-3 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
             icon={<img src={LogoutIcon} alt="logout" />}
             onClick={handleLogout}
           >
