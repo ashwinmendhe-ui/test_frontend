@@ -104,10 +104,12 @@ export default function History() {
           trigger={["hover"]}
           popupRender={() => (
             <ActionMenu
-              isShowDownload={true}
-              isShowDelete={false}
               onEdit={() => handleView(record)}
               onDownload={() => handleDownload(record)}
+              isShowEdit={true}
+              isShowDownload={true}
+              isShowDelete={false}
+              editLabel={t("history_view_report")}
             />
           )}
         >
@@ -153,7 +155,10 @@ export default function History() {
   return (
     <>
       <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>}
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
+
         <div className="flex gap-4 mt-[26px] mb-[22px] w-1/2">
           <RangePicker
             size="large"

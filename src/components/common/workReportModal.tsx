@@ -160,7 +160,7 @@ export default function WorkReportModal({
       footer={null}
       width={1000}
       className="work-report-modal"
-      destroyOnClose
+      destroyOnHidden
     >
       <div ref={pdfRef} className="bg-white p-4">
         <div className="flex items-start justify-between border-b pb-4 mb-6">

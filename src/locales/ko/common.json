@@ -496,6 +496,8 @@
   "stream_ai_no_hardhat": "No HardHat",
   "stream_ai_no_safety_vest": "No Safety Vest",
   "stream_ai_no_mask": "No Mask",
-  "history_stream_context": "스트림 세션 정보"
+  "history_stream_context": "스트림 세션 정보",
+  "history_view_report": "리포트 보기",
+  "playback_selected_video": "선택된 영상"
 
 }

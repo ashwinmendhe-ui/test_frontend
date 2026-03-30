@@ -80,10 +80,10 @@ export default function Sidebar({
   };
 
   const translateMenu = (items: MenuItem[]): MenuItem[] =>
-    items.map((item) => ({
-      ...item,
-      label: item.labelKey ? t(item.labelKey) : item.label,
-      children: item.children ? translateMenu(item.children) : undefined,
+    items.map(({ labelKey, children, ...rest }) => ({
+      ...rest,
+      label: labelKey ? t(labelKey) : rest.label,
+      children: children ? translateMenu(children) : undefined,
     }));
 
   const filteredMenuItems = useMemo(

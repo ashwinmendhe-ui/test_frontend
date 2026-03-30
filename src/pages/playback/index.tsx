@@ -300,16 +300,12 @@ export default function Playback() {
 
   return (
     <div className="w-full h-full flex gap-[11px]">
-      <div className="w-2/3 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-3 rounded-[10px]">
-        <div className="w-full flex justify-between">
-          <Form
-            layout="vertical"
-            form={form}
-            className="flex flex-row w-full gap-2"
-          >
+      <div className="w-2/3 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px]">
+        <Form layout="vertical" form={form}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <Form.Item
               name="company"
-              className="w-1/5 mb-0!"
+              className="mb-0"
               rules={[
                 {
                   required: true,
@@ -330,14 +326,14 @@ export default function Playback() {
                       ]
                 }
                 disabled={userRole !== 1}
-                className="w-full! h-[41px]"
+                className="h-[48px]"
                 onChange={(value) => handleSelectChange("company", value)}
               />
             </Form.Item>
 
             <Form.Item
               name="site"
-              className="w-1/5 mb-0!"
+              className="mb-0"
               rules={[
                 {
                   required: true,
@@ -349,14 +345,14 @@ export default function Playback() {
                 placeholder={t("stream_select_site")}
                 options={siteOptions}
                 disabled={!values?.company}
-                className="w-full! h-[41px]"
+                className="h-[48px]"
                 onChange={(value) => handleSelectChange("site", value)}
               />
             </Form.Item>
 
             <Form.Item
               name="device"
-              className="w-1/5 mb-0!"
+              className="mb-0"
               rules={[
                 {
                   required: true,
@@ -368,14 +364,14 @@ export default function Playback() {
                 placeholder={t("stream_select_device")}
                 options={deviceOptions}
                 disabled={!values?.site}
-                className="w-full! h-[41px]"
+                className="h-[48px]"
                 onChange={(value) => handleSelectChange("device", value)}
               />
             </Form.Item>
 
             <Form.Item
               name="mission"
-              className="w-1/5 mb-0!"
+              className="mb-0"
               rules={[
                 {
                   required: true,
@@ -387,18 +383,18 @@ export default function Playback() {
                 placeholder={t("stream_select_mission")}
                 options={missionOptions}
                 disabled={!values?.device}
-                className="w-full! h-[41px]"
+                className="h-[48px]"
                 onChange={(value) => handleSelectChange("mission", value)}
               />
             </Form.Item>
 
-            <div className="w-1/3 mb-0!">
+            <div>
               <Select
                 mode="multiple"
                 maxCount={2}
                 options={videoOptions}
                 value={selectedVideos}
-                className="w-full! h-[41px] flex! items-center!"
+                className="w-full h-[48px]"
                 onChange={handleVideoSelectionChange}
                 placeholder={t("playback_select_video")}
                 disabled={!values?.mission}
@@ -406,27 +402,25 @@ export default function Playback() {
                 maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
               />
             </div>
-          </Form>
-        </div>
+          </div>
+        </Form>
 
-        <div className="w-full flex flex-col gap-3">
+        <div className="bg-[#364152] rounded-[10px] overflow-hidden min-h-[430px] relative">
           {selectedVideos.length === 0 ? (
-            <div className="relative bg-[#333D4B] rounded-[10px] h-[400px] flex items-center justify-center overflow-hidden">
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-[#D5D7D8] bg-[#333D4B]">
-                <img src={NoVideoIcon} alt="No video available" />
-                <p className="text-sm">{t("playback_no_video")}</p>
-              </div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-[#D5D7D8]">
+              <img src={NoVideoIcon} alt="No video available" className="w-24 h-24" />
+              <p className="text-base">{t("playback_no_video")}</p>
             </div>
           ) : (
             <div
-              className={`grid gap-2 ${
+              className={`grid gap-2 p-2 h-full ${
                 selectedVideos.length === 1 ? "grid-cols-1" : "grid-cols-2"
               }`}
             >
               {selectedVideoItems.map((video, index) => (
                 <div
                   key={video.value}
-                  className="relative bg-black rounded-[10px] h-[360px] overflow-hidden"
+                  className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center"
                 >
                   <div className="absolute top-3 left-3 z-10 bg-white/90 rounded-full px-3 py-1 text-xs font-semibold text-[#333D4B]">
                     {index === 0
@@ -434,68 +428,68 @@ export default function Playback() {
                       : t("playback_secondary_video")}
                   </div>
 
-                  <div className="absolute inset-0 flex items-center justify-center text-white text-lg">
+                  <div className="text-white text-lg text-center px-4">
                     {video.label}
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
 
-          <div className="w-full mt-1 rounded-[10px] bg-white px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
-                type="button"
-                onClick={handlePrevious}
-                disabled={selectedVideos.length === 0}
-              >
-                <img src={PrevIcon} alt="Previous" className="w-4 h-4" />
-              </button>
+        <div className="w-full rounded-[10px] bg-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
+              type="button"
+              onClick={handlePrevious}
+              disabled={selectedVideos.length === 0}
+            >
+              <img src={PrevIcon} alt="Previous" className="w-4 h-4" />
+            </button>
 
-              <button
-                className="w-12 h-12 rounded-full bg-primary flex items-center justify-center"
-                type="button"
-                onClick={handlePlayPause}
-                disabled={selectedVideos.length === 0}
-              >
-                <img
-                  src={isPlaying ? PauseIcon : PlayIcon}
-                  alt="Play pause"
-                  className="w-4 h-4"
-                />
-              </button>
-
-              <button
-                className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
-                type="button"
-                onClick={handleNext}
-                disabled={selectedVideos.length === 0}
-              >
-                <img src={NextIcon} alt="Next" className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 px-6">
-              <Slider
-                value={currentTime}
-                min={0}
-                max={mainDuration || 0}
-                onChange={handleSliderChange}
-                disabled={selectedVideos.length === 0}
-                tooltip={{
-                  formatter: (value) => formatSeconds(value || 0),
-                }}
+            <button
+              className="w-12 h-12 rounded-full bg-primary flex items-center justify-center"
+              type="button"
+              onClick={handlePlayPause}
+              disabled={selectedVideos.length === 0}
+            >
+              <img
+                src={isPlaying ? PauseIcon : PlayIcon}
+                alt="Play pause"
+                className="w-4 h-4"
               />
-            </div>
+            </button>
 
-            <div className="text-sm text-[#333D4B] font-medium min-w-[110px] text-right">
-              {formatSeconds(currentTime)} / {formatSeconds(mainDuration)}
-            </div>
+            <button
+              className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
+              type="button"
+              onClick={handleNext}
+              disabled={selectedVideos.length === 0}
+            >
+              <img src={NextIcon} alt="Next" className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 px-6">
+            <Slider
+              value={currentTime}
+              min={0}
+              max={mainDuration || 0}
+              onChange={handleSliderChange}
+              disabled={selectedVideos.length === 0}
+              tooltip={{
+                formatter: (value) => formatSeconds(value || 0),
+              }}
+            />
+          </div>
+
+          <div className="text-sm text-[#333D4B] font-medium min-w-[110px] text-right">
+            {formatSeconds(currentTime)} / {formatSeconds(mainDuration)}
           </div>
         </div>
 
-        <div className="w-full bg-white rounded-[10px] p-6">
+        <div className="bg-white rounded-[10px] p-6">
           <h2 className="text-[20px] font-bold mb-4">{t("stream_device_info")}</h2>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -530,61 +524,57 @@ export default function Playback() {
       </div>
 
       <div className="w-1/3 px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
-        <div className="w-full p-8 bg-white rounded-[10px]">
-          <h2 className="text-[20px]! font-bold">{t("playback_select_video")}</h2>
+        <div className="w-full p-6 bg-white rounded-[10px]">
+          <h2 className="text-[20px] font-bold mb-4">{t("playback_selected_video")}</h2>
 
-          <div className="mt-6 space-y-3">
-            {selectedVideoItems[0] ? (
-              <div className="flex items-center justify-between bg-[#F6F7F9] border border-[#DDE0E5] rounded-lg px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <img src={FolderIcon} alt="Folder Icon" />
-                  <span className="text-sm font-semibold text-gray-800 truncate max-w-[200px] ml-2">
-                    {selectedVideoItems[0].label}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleRemoveVideo(0)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <img src={XIcon} alt="Remove Icon" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center bg-[#F6F7F9] border border-dashed border-[#DDE0E5] rounded-lg px-4 py-3 text-gray-400 text-sm">
+          <div className="space-y-3">
+            {selectedVideoItems.length === 0 ? (
+              <div className="flex items-center justify-center bg-[#F6F7F9] border border-dashed border-[#DDE0E5] rounded-lg px-4 py-5 text-gray-400 text-sm">
                 <img src={SelectIcon} alt="Select Icon" className="mr-2" />
                 {t("playback_select_first_video")}
               </div>
-            )}
-
-            {selectedVideoItems[1] && (
-              <div className="flex items-center justify-between bg-[#F6F7F9] border border-[#DDE0E5] rounded-lg px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <img src={FolderIcon} alt="Folder Icon" />
-                  <span className="text-sm font-semibold text-gray-800 truncate max-w-[200px] ml-2">
-                    {selectedVideoItems[1].label}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleRemoveVideo(1)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+            ) : (
+              selectedVideoItems.map((video, index) => (
+                <div
+                  key={video.value}
+                  className="flex items-center justify-between bg-[#F6F7F9] border border-[#DDE0E5] rounded-lg px-4 py-3"
                 >
-                  <img src={XIcon} alt="Remove Icon" />
-                </button>
-              </div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img src={FolderIcon} alt="Folder Icon" />
+                    <div className="min-w-0">
+                      <div className="text-xs text-[#8E8E93] mb-1">
+                        {index === 0
+                          ? t("playback_primary_video")
+                          : t("playback_secondary_video")}
+                      </div>
+                      <div className="text-sm font-semibold text-gray-800 truncate max-w-[210px]">
+                        {video.label}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleRemoveVideo(index)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <img src={XIcon} alt="Remove Icon" />
+                  </button>
+                </div>
+              ))
             )}
           </div>
         </div>
 
-        <div className="w-full p-8 h-[350px] bg-white rounded-[10px]">
-          <h2 className="text-[20px]! font-bold mb-6">{t("stream_ai_module")}</h2>
+        <div className="w-full p-6 h-[350px] bg-white rounded-[10px]">
+          <h2 className="text-[20px] font-bold mb-5">{t("stream_ai_module")}</h2>
 
-          <div className="flex gap-3 h-[calc(100%-50px)]">
+          <div className="flex gap-3 h-[calc(100%-36px)]">
             <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[16px] font-semibold">
+              <div className="flex items-start justify-between mb-3">
+                <div className="text-[16px] font-bold leading-[1.05]">
                   {t("stream_ai_common")}
-                </span>
-                <span className="text-[14px] text-gray-500">
+                </div>
+                <div className="text-[13px] text-gray-500 flex items-center">
                   <Switch
                     size="small"
                     checked={selectedCommonCount === commonCount}
@@ -592,10 +582,10 @@ export default function Playback() {
                     className="mr-1!"
                   />
                   ({selectedCommonCount}/{commonCount})
-                </span>
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-1 pr-2 border border-[#DDE0E5] bg-[#F6F7F9] p-1.5">
+              <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
                 {aiModules
                   .filter((item) => item.type === "common")
                   .map((item) => {
@@ -604,7 +594,7 @@ export default function Playback() {
                     return (
                       <div
                         key={item.value}
-                        className="relative bg-white border border-gray-200 rounded-lg p-3"
+                        className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
                       >
                         <div className="absolute top-0 right-2">
                           <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
@@ -614,10 +604,10 @@ export default function Playback() {
 
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="text-[9px] text-gray-500 mb-1">
+                            <div className="text-[10px] text-gray-400 mb-1">
                               {item.category}
                             </div>
-                            <div className="text-[12px] font-semibold text-gray-800">
+                            <div className="text-[12px] font-bold text-[#333] leading-tight">
                               {item.label}
                             </div>
                           </div>
@@ -639,11 +629,11 @@ export default function Playback() {
             </div>
 
             <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[16px] font-semibold">
+              <div className="flex items-start justify-between mb-3">
+                <div className="text-[16px] font-bold leading-[1.05]">
                   {t("stream_ai_danger")}
-                </span>
-                <span className="text-[14px] text-gray-500">
+                </div>
+                <div className="text-[13px] text-gray-500 flex items-center">
                   <Switch
                     size="small"
                     checked={selectedDangerCount === dangerCount}
@@ -651,10 +641,10 @@ export default function Playback() {
                     className="mr-1!"
                   />
                   ({selectedDangerCount}/{dangerCount})
-                </span>
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-1 pr-2 border border-[#DDE0E5] bg-[#F6F7F9] p-1.5">
+              <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
                 {aiModules
                   .filter((item) => item.type === "danger")
                   .map((item) => {
@@ -663,7 +653,7 @@ export default function Playback() {
                     return (
                       <div
                         key={item.value}
-                        className="relative bg-white border border-gray-200 rounded-lg p-3"
+                        className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
                       >
                         <div className="absolute top-0 right-2">
                           <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
@@ -673,10 +663,10 @@ export default function Playback() {
 
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="text-[9px] text-gray-500 mb-1">
+                            <div className="text-[10px] text-gray-400 mb-1">
                               {item.category}
                             </div>
-                            <div className="text-[12px] font-semibold text-gray-800">
+                            <div className="text-[12px] font-bold text-[#333] leading-tight">
                               {item.label}
                             </div>
                           </div>
@@ -699,8 +689,8 @@ export default function Playback() {
           </div>
         </div>
 
-        <div className="w-full p-8 bg-white rounded-[10px]">
-          <h2 className="text-[20px]! font-bold mb-6">{t("playback_route_map")}</h2>
+        <div className="w-full p-6 bg-white rounded-[10px]">
+          <h2 className="text-[20px] font-bold mb-6">{t("playback_route_map")}</h2>
           <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] flex items-center justify-center text-[#8E8E93]">
             {t("playback_map_placeholder")}
           </div>

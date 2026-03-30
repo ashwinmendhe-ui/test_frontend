@@ -401,7 +401,7 @@
   "stream_ai_no_hardhat": "No HardHat",
   "stream_ai_no_safety_vest": "No Safety Vest",
   "stream_ai_no_mask": "No Mask",
-  "history_stream_context": "Stream Session Context"
-
-  
+  "history_stream_context": "Stream Session Context",
+  "history_view_report": "View Report",
+  "playback_selected_video": "Selected Video"
 }
