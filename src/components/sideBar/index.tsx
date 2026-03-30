@@ -80,10 +80,10 @@ export default function Sidebar({
   };
 
   const translateMenu = (items: MenuItem[]): MenuItem[] =>
-    items.map((item) => ({
-      ...item,
-      label: item.labelKey ? t(item.labelKey) : item.label,
-      children: item.children ? translateMenu(item.children) : undefined,
+    items.map(({ labelKey, children, ...rest }) => ({
+      ...rest,
+      label: labelKey ? t(labelKey) : rest.label,
+      children: children ? translateMenu(children) : undefined,
     }));
 
   const filteredMenuItems = useMemo(
@@ -143,12 +143,12 @@ export default function Sidebar({
 
   return (
     <div
-      style={{ width: collapsed ? 80 : width }}
-      className="bg-white border-r border-[#E5E7EB] min-h-screen px-[16px] py-[40px] relative transition-all duration-300"
+      style={{ width: collapsed ? 100 : width }}
+      className="bg-white border-r border-[#E5E7EB] min-h-screen px-[8px] py-[24px] relative transition-all duration-300"
     >
-      <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-8 gap-4">
+      <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-4 gap-2">
         <div className="flex items-center">
-          <Avatar shape="square" size={40} icon={<UserOutlined />} />
+          <Avatar shape="square" size={42} icon={<UserOutlined />} />
           {!collapsed && (
             <div className="ml-3 font-bold text-[#757575] text-base">
               {detailUserLogin?.user?.username || t("common_guest")}
@@ -157,7 +157,7 @@ export default function Sidebar({
         </div>
 
         {!collapsed && (
-          <div className="flex items-center justify-center mt-3.5">
+          <div className="flex items-center justify-center mt-2">
             <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
               {t("common_role")}
             </span>
@@ -169,7 +169,7 @@ export default function Sidebar({
 
         {!collapsed && (
           <Button
-            className="mt-6 mb-6 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
+            className="mt-3 mb-3 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
             icon={<img src={LogoutIcon} alt="logout" />}
             onClick={handleLogout}
           >
@@ -179,24 +179,74 @@ export default function Sidebar({
       </div>
 
       <Menu
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        onClick={(e) => navigate(e.key)}
-        items={translatedMenuItems}
-        className="
-          mt-6
-          [&_.ant-menu-item]:h-[50px]
-          [&_.ant-menu-item]:flex
-          [&_.ant-menu-item]:items-center
-          [&_.ant-menu-item]:gap-2
-          [&_.ant-menu-submenu-title]:h-[50px]
-          [&_.ant-menu-title-content]:truncate
-        "
-        style={{
-          borderInlineEnd: 0,
-          backgroundColor: "transparent",
-        }}
-      />
+  mode="inline"
+  inlineCollapsed={collapsed}
+  selectedKeys={[location.pathname]}
+  onClick={(e) => navigate(e.key)}
+  items={translatedMenuItems}
+  className={`
+    mt-6
+    [&_.ant-menu-item]:h-[50px]
+    [&_.ant-menu-item]:flex
+    [&_.ant-menu-item]:items-center
+    [&_.ant-menu-item]:gap-2
+    [&_.ant-menu-item]:px-3
+    [&_.ant-menu-item]:rounded-[10px]
+    [&_.ant-menu-item]:text-[#4B5563]
+    [&_.ant-menu-item]:font-medium
+    [&_.ant-menu-item]:transition-all
+    [&_.ant-menu-item]:duration-200
+
+    [&_.ant-menu-submenu-title]:h-[50px]
+    [&_.ant-menu-submenu-title]:flex
+    [&_.ant-menu-submenu-title]:items-center
+    [&_.ant-menu-submenu-title]:px-3
+    [&_.ant-menu-submenu-title]:rounded-[10px]
+    [&_.ant-menu-submenu-title]:text-[#4B5563]
+    [&_.ant-menu-submenu-title]:font-medium
+    [&_.ant-menu-submenu-title]:transition-all
+    [&_.ant-menu-submenu-title]:duration-200
+
+    [&_.ant-menu-title-content]:truncate
+
+    [&_.ant-menu-item-icon]:min-w-[24px]
+    [&_.ant-menu-item-icon]:flex
+    [&_.ant-menu-item-icon]:items-center
+    [&_.ant-menu-item-icon]:justify-center
+
+    [&_.ant-menu-item:hover]:bg-[#F3F7FF]
+    [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
+
+    [&_.ant-menu-item-selected]:bg-[#EAF3FF]
+    [&_.ant-menu-item-selected]:text-[#1677FF]
+    [&_.ant-menu-item-selected]:font-semibold
+
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
+
+    ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
+
+    ${
+      collapsed
+        ? `
+          [&_.ant-menu-item]:justify-center
+          [&_.ant-menu-submenu-title]:justify-center
+          [&_.ant-menu-item]:px-0
+          [&_.ant-menu-submenu-title]:px-0
+          [&_.ant-menu-item]:mx-auto
+          [&_.ant-menu-submenu-title]:mx-auto
+          [&_.ant-menu-item]:w-[52px]
+          [&_.ant-menu-submenu-title]:w-[52px]
+        `
+        : ""
+    }
+  `}
+  style={{
+    borderInlineEnd: 0,
+    backgroundColor: "transparent",
+  }}
+/>
 
       {!collapsed && (
         <div

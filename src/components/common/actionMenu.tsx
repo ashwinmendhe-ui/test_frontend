@@ -10,6 +10,7 @@ interface ActionMenuProps {
   isShowEdit?: boolean;
   isShowDownload?: boolean;
   isShowDelete?: boolean;
+  editLabel?: string;
 }
 
 export default function ActionMenu({
@@ -19,11 +20,12 @@ export default function ActionMenu({
   isShowEdit = true,
   isShowDownload = false,
   isShowDelete = true,
+  editLabel,
 }: ActionMenuProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="absolute top-0 right-8 bg-white rounded-xl shadow-[4px_4px_4px_0px_#0000000D] overflow-hidden w-[113px]">
+    <div className="absolute top-0 right-8 bg-white rounded-xl shadow-[4px_4px_4px_0px_#0000000D] overflow-hidden w-[140px]">
       {isShowEdit && (
         <button
           onClick={onEdit}
@@ -31,7 +33,7 @@ export default function ActionMenu({
         >
           <img src={EditIcon} alt="Edit icon" />
           <span className="text-xs font-semibold text-[#374151]">
-            {t("table_edit")}
+            {editLabel || t("table_edit")}
           </span>
         </button>
       )}

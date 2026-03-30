@@ -150,9 +150,17 @@ export default function StreamDetail() {
   };
 
   const handleStopStream = () => {
-    setIsStreaming(false);
-    setIsPlaying(false);
-    setIsReportOpen(true);
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setIsReportOpen(true);
+};
+  const handleReportOk = () => {
+    setIsReportOpen(false);
+    navigate("/history");
+  };
+
+  const handleReportCancel = () => {
+    setIsReportOpen(false);
   };
 
   return (
@@ -477,9 +485,11 @@ export default function StreamDetail() {
           </p>
         }
         open={isReportOpen}
-        onOk={() => setIsReportOpen(false)}
-        onCancel={() => setIsReportOpen(false)}
-      />
+        onOk={handleReportOk}
+        onCancel={handleReportCancel}
+        okText={t("stream_go_history")}
+        cancelText={t("button_close")}
+/>
     </>
   );
 }

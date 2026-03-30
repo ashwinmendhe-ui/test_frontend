@@ -17,7 +17,7 @@ i18n.use(initReactI18next).init({
   resources,
   lng: localStorage.getItem("lang") || "ko", // default Korean
   fallbackLng: "ko",
-  debug: import.meta.env.DEV,
+  debug: false,
   interpolation: {
     escapeValue: false,
   },

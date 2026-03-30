@@ -62,7 +62,7 @@
   "history_mission_name": "Mission Name",
   "history_robot_name": "Robot Name",
   "history_worker_name": "Worker",
-  "history_total_recognition": "Total Recognition",
+  "history_total_recognition": "Total Number of Recognitions",
 
   "work_report_title": "Work Report",
   "work_report_created_at": "Report Created",
@@ -373,8 +373,35 @@
   "playback_validation_select_company": "Please select company",
   "playback_validation_select_site": "Please select site",
   "playback_validation_select_device": "Please select device",
-  "playback_validation_select_mission": "Please select mission"
+  "playback_validation_select_mission": "Please select mission",
 
+  "stream_go_history": "Go to History",
+  "button_close": "Close",
+  "stream_start_work": "Start work",
+  "stream_stop_work": "Stop work",
+  "stream_waiting_activation": "It will be activated after the task starts.",
 
-  
+  "stream_robot_status": "Robot status",
+  "stream_operation_information": "Operation Information",
+  "stream_robot_situation": "situation",
+  "stream_robot_battery": "battery",
+  "stream_robot_network": "Network Century",
+  "stream_robot_gps": "GPS Century",
+
+  "stream_info_altitude": "altitude",
+  "stream_info_speed": "speed",
+  "stream_info_operating_hours": "Operating hours",
+
+  "stream_ai_general_detection": "General detection",
+  "stream_ai_risk_detection": "Risk detection",
+
+  "stream_ai_construction": "Construction",
+  "stream_ai_hardhat": "HardHat",
+  "stream_ai_machinery": "Machinery",
+  "stream_ai_no_hardhat": "No HardHat",
+  "stream_ai_no_safety_vest": "No Safety Vest",
+  "stream_ai_no_mask": "No Mask",
+  "history_stream_context": "Stream Session Context",
+  "history_view_report": "View Report",
+  "playback_selected_video": "Selected Video"
 }
