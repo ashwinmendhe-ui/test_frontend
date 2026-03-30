@@ -143,8 +143,8 @@ export default function Sidebar({
 
   return (
     <div
-      style={{ width: collapsed ? 92 : width }}
-      className="bg-white border-r border-[#E5E7EB] min-h-screen px-[16px] py-[40px] relative transition-all duration-300"
+      style={{ width: collapsed ? 100 : width }}
+      className="bg-white border-r border-[#E5E7EB] min-h-screen px-[8px] py-[24px] relative transition-all duration-300"
     >
       <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-4 gap-2">
         <div className="flex items-center">
@@ -179,24 +179,74 @@ export default function Sidebar({
       </div>
 
       <Menu
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        onClick={(e) => navigate(e.key)}
-        items={translatedMenuItems}
-        className="
-          mt-6
-          [&_.ant-menu-item]:h-[50px]
-          [&_.ant-menu-item]:flex
-          [&_.ant-menu-item]:items-center
-          [&_.ant-menu-item]:gap-2
-          [&_.ant-menu-submenu-title]:h-[50px]
-          [&_.ant-menu-title-content]:truncate
-        "
-        style={{
-          borderInlineEnd: 0,
-          backgroundColor: "transparent",
-        }}
-      />
+  mode="inline"
+  inlineCollapsed={collapsed}
+  selectedKeys={[location.pathname]}
+  onClick={(e) => navigate(e.key)}
+  items={translatedMenuItems}
+  className={`
+    mt-6
+    [&_.ant-menu-item]:h-[50px]
+    [&_.ant-menu-item]:flex
+    [&_.ant-menu-item]:items-center
+    [&_.ant-menu-item]:gap-2
+    [&_.ant-menu-item]:px-3
+    [&_.ant-menu-item]:rounded-[10px]
+    [&_.ant-menu-item]:text-[#4B5563]
+    [&_.ant-menu-item]:font-medium
+    [&_.ant-menu-item]:transition-all
+    [&_.ant-menu-item]:duration-200
+
+    [&_.ant-menu-submenu-title]:h-[50px]
+    [&_.ant-menu-submenu-title]:flex
+    [&_.ant-menu-submenu-title]:items-center
+    [&_.ant-menu-submenu-title]:px-3
+    [&_.ant-menu-submenu-title]:rounded-[10px]
+    [&_.ant-menu-submenu-title]:text-[#4B5563]
+    [&_.ant-menu-submenu-title]:font-medium
+    [&_.ant-menu-submenu-title]:transition-all
+    [&_.ant-menu-submenu-title]:duration-200
+
+    [&_.ant-menu-title-content]:truncate
+
+    [&_.ant-menu-item-icon]:min-w-[24px]
+    [&_.ant-menu-item-icon]:flex
+    [&_.ant-menu-item-icon]:items-center
+    [&_.ant-menu-item-icon]:justify-center
+
+    [&_.ant-menu-item:hover]:bg-[#F3F7FF]
+    [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
+
+    [&_.ant-menu-item-selected]:bg-[#EAF3FF]
+    [&_.ant-menu-item-selected]:text-[#1677FF]
+    [&_.ant-menu-item-selected]:font-semibold
+
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
+    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
+
+    ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
+
+    ${
+      collapsed
+        ? `
+          [&_.ant-menu-item]:justify-center
+          [&_.ant-menu-submenu-title]:justify-center
+          [&_.ant-menu-item]:px-0
+          [&_.ant-menu-submenu-title]:px-0
+          [&_.ant-menu-item]:mx-auto
+          [&_.ant-menu-submenu-title]:mx-auto
+          [&_.ant-menu-item]:w-[52px]
+          [&_.ant-menu-submenu-title]:w-[52px]
+        `
+        : ""
+    }
+  `}
+  style={{
+    borderInlineEnd: 0,
+    backgroundColor: "transparent",
+  }}
+/>
 
       {!collapsed && (
         <div
