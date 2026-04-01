@@ -7,7 +7,10 @@ import CompanyIcon from "../assets/company.svg";
 import SiteIcon from "../assets/site.svg";
 import MissionIcon from "../assets/mission.svg";
 import RobotIcon from "../assets/robot-icon.svg";
-import HistoryIcon from "../assets/file-icon.svg";
+// import HistoryIcon from "../assets/file-icon.svg";
+import HistoryIcon from "../assets/log.svg";
+
+import KPIIcon from "../assets/log.svg";
 
 export const menuItems = [
   {
@@ -24,6 +27,11 @@ export const menuItems = [
     key: "/playback",
     icon: <img src={PlaybackIcon} alt="" className="w-6 h-6 object-contain" />,
     labelKey: "menu_playback",
+  },
+  {
+    key: "/kpi",
+    icon: <img src={KPIIcon} alt="" className="w-6 h-6 object-contain" />,
+    labelKey: "menu_kpi_dashboard",
   },
   {
     key: "/history",

@@ -20,6 +20,7 @@ import Robot from "@/pages/settings/robot";
 import RobotCreateForm from "@/pages/settings/robot/create";
 import RobotEditForm from "@/pages/settings/robot/[id]/edit";
 import History from "./pages/history";
+import KPI from "./pages/kpi";
 
 import Stream from "./pages/stream";
 import StreamDetail from "./pages/stream/[id]";
@@ -69,6 +70,7 @@ export default function AppRouter() {
         { path: "settings/robot/create", element: <RobotCreateForm /> },
         { path: "settings/robot/:id/edit", element: <RobotEditForm /> },
         { path: "history", element: <History /> },
+        { path: "kpi", element: <KPI /> },
         { path: "stream", element: <Stream /> },
         { path: "stream/:id", element: <StreamDetail /> },
         { path: "playback", element: <Playback /> },

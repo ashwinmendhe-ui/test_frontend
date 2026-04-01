@@ -19,3 +19,6 @@ npm install i18next react-i18next
 
 ## 7. for pdf and view support
 npm install jspdf html2canvas
+
+## 8. for charts
+npm install recharts
