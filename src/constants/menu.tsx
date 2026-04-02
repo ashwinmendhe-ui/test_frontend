@@ -10,7 +10,7 @@ import RobotIcon from "../assets/robot-icon.svg";
 // import HistoryIcon from "../assets/file-icon.svg";
 import HistoryIcon from "../assets/log.svg";
 
-import KPIIcon from "../assets/log.svg";
+import KPIIcon from "../assets/dashboard.svg";
 
 export const menuItems = [
   {
