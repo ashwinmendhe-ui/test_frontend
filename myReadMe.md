@@ -41,3 +41,7 @@ curl -X GET \
   -H 'accept: application/json' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJlbWFpbCI6InN5c2FkbWluQGRoaXZlLnZuIiwianRpIjoiM2JlMzQyNjUtN2QxOS00NDAyLWE1YjctNzllYzQ4ZmIyN2UzIiwiY29tcGFueUlkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwicm9sZXMiOlsiU1lTX0FETUlOIl0sImlhdCI6MTc3NTQ1NzgwNiwiZXhwIjoxNzc1NzE3MDA2fQ.UX3FYmmG-BiEfzEexyeTSlSNLgUbXMBJqCeXv2DvdN8'
 
+
+  ## for API integration install axios
+  npm i axios
+

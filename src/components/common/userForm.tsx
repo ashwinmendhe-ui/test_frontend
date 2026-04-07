@@ -1,4 +1,4 @@
-import { Button, Form, Input, Select, Dropdown, Checkbox } from "antd";
+import { Button, Form, Input, Select, Dropdown, Checkbox, message } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomModal from "./customModal";
@@ -7,6 +7,7 @@ import ActionMenu from "./actionMenu";
 import ActionIcon from "@/assets/table-action-icon.svg";
 import { useUserStore } from "@/stores/userStore";
 import { useTranslation } from "react-i18next";
+import { companyApi } from "@/api";
 
 export interface UserFormValue {
   role?: number;
@@ -75,10 +76,12 @@ export default function UserForm({
     { value: 3, label: t("role_company_user") },
   ];
 
-  const companyOptions = [
-    { value: "1", label: "Dhive" },
-    { value: "2", label: "Test Company" },
-  ];
+  const [companyOptions, setCompanyOptions] = useState<
+    { value: string; label: string }[]
+    >([]);
+  const [companyLoading, setCompanyLoading] = useState(mode === "edit");
+  const [companyReady, setCompanyReady] = useState(mode === "add");
+  
 
   const missionOptions = [
     { value: "mission-1", label: "Mission 1" },
@@ -98,21 +101,116 @@ export default function UserForm({
     { value: "site-3", label: "Site 3" },
   ];
 
-  useEffect(() => {
-    if (initialValues) {
-      form.setFieldsValue(initialValues);
-    }
-  }, [initialValues, form]);
+useEffect(() => {
+  let isMounted = true;
 
-  const handleFinish = async (values: UserFormValue) => {
-    const res = await onSubmit(values);
-
-    if (res && (res.code === -1 || res.code === "BAD_REQUEST")) {
-      return;
+  const fetchCompanies = async () => {
+    if (mode === "edit") {
+      setCompanyLoading(true);
+      setCompanyReady(false);
     }
 
-    navigate("/settings/user");
+    try {
+      const res = await companyApi.getList();
+
+      const mapped = Array.isArray(res)
+        ? res
+            .map((item: any) => ({
+              value: item.companyId ?? item.id ?? "",
+              label: item.companyName ?? item.name ?? "",
+            }))
+            .filter((item) => item.value && item.label)
+        : [];
+
+      const currentSelected =
+        initialValues?.companyId && initialValues?.companyName
+          ? [
+              {
+                value: initialValues.companyId,
+                label: initialValues.companyName,
+              },
+            ]
+          : [];
+
+      const merged = [...currentSelected, ...mapped].filter(
+        (item, index, self) =>
+          self.findIndex((x) => x.value === item.value) === index
+      );
+
+      if (!isMounted) return;
+
+      setCompanyOptions(merged);
+    } catch (error) {
+      console.error("Failed to load companies:", error);
+
+      if (!isMounted) return;
+
+      if (initialValues?.companyId && initialValues?.companyName) {
+        setCompanyOptions([
+          {
+            value: initialValues.companyId,
+            label: initialValues.companyName,
+          },
+        ]);
+      } else {
+        setCompanyOptions([]);
+      }
+    } finally {
+      if (!isMounted) return;
+
+      setCompanyLoading(false);
+      setCompanyReady(true);
+    }
   };
+
+  fetchCompanies();
+
+  return () => {
+    isMounted = false;
+  };
+}, [mode, initialValues?.companyId, initialValues?.companyName]);
+
+
+useEffect(() => {
+  if (!initialValues) return;
+
+  if (mode === "edit" && !companyReady) return;
+
+  form.setFieldsValue(initialValues);
+}, [initialValues, mode, companyReady, form]);
+
+
+const handleFinish = async (values: UserFormValue) => {
+  console.log("user form submit values:", JSON.stringify(values, null, 2));
+
+  const res = await onSubmit(values);
+
+  console.log("user form submit response:", JSON.stringify(res, null, 2));
+
+  if (!res) return;
+
+  if (
+    res.code === -1 ||
+    res.code === "BAD_REQUEST" ||
+    res.code === "ERROR" ||
+    res.code === 400 ||
+    res.code === 403 ||
+    res.code === 500
+  ) {
+    message.error(res.message || t("common_save_failed"));
+    return;
+  }
+
+  message.success(
+    mode === "add"
+      ? t("user_create_success", "User created successfully")
+      : t("user_update_success", "User updated successfully")
+  );
+
+  setTimeout(() => {
+    navigate("/settings/user");
+  }, 500);
+};
 
   const handleAssignSiteSubmit = async (values: { siteName: string }) => {
     const selectedSite = siteOptions.find(
@@ -387,11 +485,16 @@ export default function UserForm({
                 },
               ]}
             >
+              {mode === "edit" && !companyReady ? (
+              <div className="h-[41px] rounded-[6px] border border-[#d9d9d9] bg-[#fafafa]" />
+            ) : (
               <Select
                 placeholder={t("user_placeholder_select_company")}
                 className="h-[41px]"
                 options={companyOptions}
+                loading={companyLoading}
               />
+            )}
             </Form.Item>
 
             <Form.Item
