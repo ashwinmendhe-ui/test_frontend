@@ -1,11 +1,5 @@
 import axiosClient from "./axiosClient";
-
-export interface CompanyOption {
-  companyId?: string;
-  id?: string;
-  name?: string;
-  companyName?: string;
-}
+import type { CompanyFormValue } from "@/stores/companyStore";
 
 export const companyApi = {
   getList: async (param?: string, from?: string, to?: string) => {
@@ -24,6 +18,42 @@ export const companyApi = {
     const res = await axiosClient.get(
       `/v1/companies/search${queryString ? `?${queryString}` : ""}`
     );
+    return res.data;
+  },
+
+  getDetail: async (id: string) => {
+    const res = await axiosClient.get(`/v1/companies/${id}`);
+    return res.data;
+  },
+
+  createCompany: async (data: CompanyFormValue) => {
+    const payload = {
+      name: data.name,
+      phoneNumber: data.phoneNumber,
+      email: data.email,
+      address: data.address,
+      description: data.description ?? "",
+    };
+
+    const res = await axiosClient.post("/v1/companies", payload);
+    return res.data;
+  },
+
+  updateCompany: async (id: string, data: CompanyFormValue) => {
+    const payload = {
+      name: data.name,
+      phoneNumber: data.phoneNumber,
+      email: data.email,
+      address: data.address,
+      description: data.description ?? "",
+    };
+
+    const res = await axiosClient.post(`/v1/companies/update/${id}`, payload);
+    return res.data;
+  },
+
+  deleteCompany: async (id: string) => {
+    const res = await axiosClient.post(`/v1/companies/delete/${id}`);
     return res.data;
   },
 };

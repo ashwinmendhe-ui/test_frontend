@@ -1,4 +1,4 @@
-import { Button, Form, Input } from "antd";
+import { Button, Form, Input, message } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CompanyFormValue } from "@/stores/companyStore";
@@ -32,13 +32,35 @@ export default function CompanyForm({
   }, [initialValues, form]);
 
   const handleSubmit = async (values: CompanyFormValue) => {
+    console.log("company form submit values:", JSON.stringify(values, null, 2));
+
     const res = await onSubmit(values);
 
-    if (res?.code === -1 || res?.code === "BAD_REQUEST") {
+    console.log("company form submit response:", JSON.stringify(res, null, 2));
+
+    if (!res) return;
+
+    if (
+      res.code === -1 ||
+      res.code === "BAD_REQUEST" ||
+      res.code === "ERROR" ||
+      res.code === 400 ||
+      res.code === 403 ||
+      res.code === 500
+    ) {
+      message.error(res.message || t("common_save_failed"));
       return;
     }
 
-    navigate("/settings/company");
+    message.success(
+      mode === "add"
+        ? t("company_create_success", "Company created successfully")
+        : t("company_update_success", "Company updated successfully")
+    );
+
+    setTimeout(() => {
+      navigate("/settings/company");
+    }, 500);
   };
 
   return (
