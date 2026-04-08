@@ -593,6 +593,12 @@
     "empty": "표시할 KPI 데이터가 없습니다.",
     "loading": "KPI 대시보드를 불러오는 중입니다..."
   },
-  "menu_kpi_dashboard": "KPI 대시보드"
+  "menu_kpi_dashboard": "KPI 대시보드",
+  "robot_create_success": "로봇이 성공적으로 생성되었습니다",
+  "robot_create_failed": "로봇 생성에 실패했습니다",
+  "robot_update_success": "로봇이 성공적으로 수정되었습니다",
+  "robot_update_failed": "로봇 수정에 실패했습니다",
+  "robot_delete_success": "로봇이 성공적으로 삭제되었습니다",
+  "robot_delete_failed": "로봇 삭제에 실패했습니다"
 
 }

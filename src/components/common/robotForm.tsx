@@ -2,7 +2,7 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useSiteStore } from "@/stores/siteStore";
 import { useUserStore } from "@/stores/userStore";
 import type { DetailDevice } from "@/stores/robotStore";
-import { Button, Form, Input, Select } from "antd";
+import { Button, Form, Input, Select, message } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -27,6 +27,7 @@ export default function RobotForm({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<DetailDevice>();
+  const [messageApi, contextHolder] = message.useMessage();
 
   const robotTypeOptions = [
     { value: "Drone", label: t("robot_type_drone") },
@@ -70,30 +71,55 @@ export default function RobotForm({
   }, [detailUserLogin, form, getListSite, userRole]);
 
   const handleSubmit = async (values: DetailDevice) => {
-    const newValues = {
-      ...values,
-      companyId:
-        userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
-      companyName:
-        userRole !== 1
-          ? detailUserLogin?.user?.companyName || ""
-          : values.companyName,
-      siteName:
-        listSite.find((site) => site.siteId === values.siteId)?.name ||
-        values.siteName,
-    };
+    try {
+      const newValues = {
+        ...values,
+        companyId:
+          userRole !== 1
+            ? detailUserLogin?.user?.companyId || ""
+            : values.companyId,
+        companyName:
+          userRole !== 1
+            ? detailUserLogin?.user?.companyName || ""
+            : values.companyName,
+        siteName:
+          listSite.find((site) => site.siteId === values.siteId)?.name ||
+          values.siteName,
+      };
 
-    const res = await onSubmit(newValues);
+      const res = await onSubmit(newValues);
 
-    if (res?.code === -1 || res?.code === "BAD_REQUEST") {
-      return;
+      if (res?.code === -1 || res?.code === "BAD_REQUEST") {
+        messageApi.error(
+          mode === "add"
+            ? t("robot_create_failed")
+            : t("robot_update_failed")
+        );
+        return;
+      }
+
+      await messageApi.success(
+        mode === "add"
+          ? t("robot_create_success")
+          : t("robot_update_success"),
+        2
+      );
+
+      navigate("/settings/robot");
+    } catch (error: any) {
+      messageApi.error(
+        error?.response?.data?.message ||
+          (mode === "add"
+            ? t("robot_create_failed")
+            : t("robot_update_failed"))
+      );
     }
-
-    navigate("/settings/robot");
   };
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
+      {contextHolder}
+
       <Form
         layout="vertical"
         form={form}

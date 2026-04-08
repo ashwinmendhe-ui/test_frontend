@@ -502,5 +502,11 @@
   "menu_kpi_dashboard": "KPI Dashboard",
   "file_upload_title": "Click or drag file to this area to upload",
   "file_upload_hint": "Support for a single file upload. Maximum size 10MB.",
-  "upload_failed_title": "File upload failed"
+  "upload_failed_title": "File upload failed",
+  "robot_create_success": "Robot created successfully",
+  "robot_create_failed": "Failed to create robot",
+  "robot_update_success": "Robot updated successfully",
+  "robot_update_failed": "Failed to update robot",
+  "robot_delete_success": "Robot deleted successfully",
+  "robot_delete_failed": "Failed to delete robot"
 }

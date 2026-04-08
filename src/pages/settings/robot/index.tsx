@@ -6,7 +6,7 @@ import StatusBadge from "@/components/common/statusBadge";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
 import { useRobotStore, type RobotManagementTable } from "@/stores/robotStore";
 import { useUserStore } from "@/stores/userStore";
-import { Button, DatePicker, Dropdown, Input } from "antd";
+import { Button, DatePicker, Dropdown, Input, message } from "antd";
 import type { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -29,7 +29,7 @@ export default function Robot() {
   const [selectedRecord, setSelectedRecord] = useState<RobotManagementTable | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
-
+  const [messageApi, contextHolder] = message.useMessage();
   const handleEdit = (record: RobotManagementTable) => {
     navigate(`/settings/robot/${record.deviceId}/edit`);
   };
@@ -40,12 +40,19 @@ export default function Robot() {
   };
 
   const confirmDelete = async () => {
-    if (!selectedRecord) return;
+  if (!selectedRecord) return;
 
+  try {
     await deleteRobot(selectedRecord.deviceId);
+    messageApi.success(t("robot_delete_success"));
     setIsModalOpen(false);
     setSelectedRecord(null);
-  };
+  } catch (error: any) {
+    messageApi.error(
+      error?.response?.data?.message || t("robot_delete_failed")
+    );
+  }
+};
 
   const handleCancel = () => {
     setIsModalOpen(false);
@@ -191,6 +198,7 @@ export default function Robot() {
 
   return (
     <>
+    {contextHolder}
       <div className="w-full relative">
         {loading && <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>}
 
