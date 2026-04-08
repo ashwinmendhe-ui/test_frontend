@@ -217,6 +217,12 @@
   "mission_table_created_date": "Created Date",
   "mission_delete_title": "Delete",
   "mission_delete_confirm": "Are you sure you want to delete this mission?",
+  "mission_create_success": "Mission created successfully",
+  "mission_create_failed": "Failed to create mission",
+  "mission_update_success": "Mission updated successfully",
+  "mission_update_failed": "Failed to update mission",
+  "mission_delete_success": "Mission deleted successfully",
+  "mission_delete_failed": "Failed to delete mission",
 
   "mission_form_name": "Mission Name",
   "mission_form_company": "Company",
@@ -403,5 +409,104 @@
   "stream_ai_no_mask": "No Mask",
   "history_stream_context": "Stream Session Context",
   "history_view_report": "View Report",
-  "playback_selected_video": "Selected Video"
+  "playback_selected_video": "Selected Video",
+  "page_kpi_dashboard": "KPI Dashboard",
+  "kpi": {
+    "comparison": {
+      "weekly": "Compared to Last Week",
+      "monthly": "Compared to Last Month",
+      "yearly": "Compared to Last Year",
+      "all": "All Time"
+    },
+    "sections": {
+      "deployment": "Site Deployment Cost & Time",
+      "operation": "Operational Usability & Safety",
+      "reliability": "Reliability"
+    },
+    "cards": {
+      "setupTime": "Initial Setup Time",
+      "setupManpower": "Initial Setup Required Manpower",
+      "autonomousTransitionTime": "Time to Unmanned Operation Transition",
+      "missionSuccessRate": "Average Mission Success Rate",
+      "remoteInterventionSuccessRate": "Remote Intervention Success Rate",
+      "fieldDispatchRate": "Field Dispatch Rate",
+      "remoteInterventionEventFrequency": "Remote Intervention Event Frequency",
+      "interventionTimePerRemoteIntervention": "Intervention Time per Remote Intervention",
+      "remoteInterventionFrequencyTimeline": "Remote Intervention Frequency & Timeline",
+      "avgRobotsPerOperator": "Average Robots per Operator",
+      "maxRobotsPerOperator": "Maximum Robots per Operator",
+      "totalDrivingTime": "Total Cumulative Driving Time",
+      "mtbf": "System Reliability (MTBF)"
+    },
+    "labels": {
+      "sitePlaceholder": "Select site",
+      "downloadPdf": "Download PDF",
+      "interruptEvents": "Interrupt Events",
+      "interruptEventTotal": "Interrupt Events",
+      "robotOperatingStatus": "Robot Operating Status",
+      "comparedValue": "Change"
+    },
+    "change": {
+      "comparedToLastWeek": "Compared to Last Week",
+      "comparedToLastMonth": "Compared to Last Month",
+      "comparedToLastYear": "Compared to Last Year",
+      "comparedToAllTime": "Compared to All Time"
+    },
+    "reliabilityRange": {
+      "daily": "Daily Avg",
+      "weekly": "Weekly Avg",
+      "monthly": "Monthly Avg",
+      "yearly": "Yearly Avg"
+    },
+    "robotStatus": {
+      "runningTime": "Running Time",
+      "idleTime": "Idle Time",
+      "downTime": "Down Time"
+    },
+    "interrupts": {
+      "obstacleAvoidanceFailure": "Obstacle Avoidance Failure",
+      "unstableLocalization": "Unstable Localization",
+      "communicationFailure": "Communication Failure",
+      "emergencyStop": "Emergency Stop",
+      "batteryDischarge": "Battery Discharge",
+      "breakdown": "Breakdown"
+    },
+    "units": {
+      "day": "day",
+      "person": "person",
+      "percent": "%",
+      "case": "case",
+      "minute": "min",
+      "robot": "robot",
+      "hour": "hour",
+      "hourMinute": "hourMinute"
+    },
+    "tooltips": {
+      "setupTime": "Time required from onboarding a new site to the first autonomous mission.",
+      "setupManpower": "Manpower required from onboarding a new site to the first autonomous mission.",
+      "autonomousTransitionTime": "Time required after the first mission until operation without on-site safety personnel.",
+      "missionSuccessRate": "Ratio of missions completed successfully without intervention out of all missions.",
+      "remoteInterventionSuccessRate": "Intervention success / (Intervention success + Intervention failure).",
+      "fieldDispatchRate": "Failed missions / total missions regardless of intervention success.",
+      "remoteInterventionEventFrequency": "Total intervention count / number of missions with intervention.",
+      "interventionTimePerRemoteIntervention": "Total intervention time / total intervention count.",
+      "remoteInterventionFrequencyTimeline": "Field dispatch count / remote resolution count.",
+      "avgRobotsPerOperator": "Average number of robots managed by one operator.",
+      "maxRobotsPerOperator": "Maximum number of robots managed by one operator.",
+      "totalDrivingTime": "Total cumulative robot driving time.",
+      "mtbf": "MTBF = total operating time / breakdown count. Frequency = 1 / MTBF."
+    },
+    "empty": "No KPI data available.",
+    "loading": "Loading KPI dashboard..."
+  },
+  "menu_kpi_dashboard": "KPI Dashboard",
+  "file_upload_title": "Click or drag file to this area to upload",
+  "file_upload_hint": "Support for a single file upload. Maximum size 10MB.",
+  "upload_failed_title": "File upload failed",
+  "robot_create_success": "Robot created successfully",
+  "robot_create_failed": "Failed to create robot",
+  "robot_update_success": "Robot updated successfully",
+  "robot_update_failed": "Failed to update robot",
+  "robot_delete_success": "Robot deleted successfully",
+  "robot_delete_failed": "Failed to delete robot"
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { userApi } from "@/api";
 import type { UserFormValue } from "@/components/common/userForm";
 
 export interface UserManagementTable {
@@ -47,10 +48,10 @@ interface Store {
   detail: UserDetail | null;
   detailUserLogin: UserLoginDetail | null;
 
-  getListRole: () => void;
-  getList: (param?: string, from?: string, to?: string) => void;
-  getDetail: (id: string) => void;
-  getDetailUserLogin: (id?: string) => void;
+  getListRole: () => Promise<void>;
+  getList: (param?: string, from?: string, to?: string) => Promise<void>;
+  getDetail: (id: string) => Promise<UserDetail | null>;
+  getDetailUserLogin: (id?: string) => Promise<UserLoginDetail | null>;
   createUser: (
     param: UserFormValue
   ) => Promise<{ code?: number | string; message?: string }>;
@@ -63,212 +64,211 @@ interface Store {
   ) => Promise<{ code?: number | string; message?: string }>;
 }
 
-const mockDetailUserLogin: UserLoginDetail = {
-  roles: [1],
-  user: {
-    id: "1",
-    username: "AshwinM",
-    email: "ashwin@test.com",
-    companyId: "1",
-    companyName: "Dhive",
-    phone: "9876543210",
-    description: "Admin user",
-    isActive: true,
-  },
-};
 
-const mockRoles: RoleOption[] = [
-  { id: 1, description: "System Administrator", roleKey: "admin" },
-  { id: 2, description: "Company Admin", roleKey: "company_admin" },
-  { id: 3, description: "Company User", roleKey: "operator" },
-];
 
-const mockUsers: UserManagementTable[] = [
-  {
-    id: "1",
-    username: "Ashwin",
-    companyName: "Dhive",
-    phone: "9876543210",
-    email: "ashwin@test.com",
-    createdAt: "2026-03-24 10:00",
-    role: "System Administrator",
-    isActive: true,
-  },
-  {
-    id: "2",
-    username: "John",
-    companyName: "Dhive",
-    phone: "9123456780",
-    email: "john@test.com",
-    createdAt: "2026-03-20 14:30",
-    role: "Company User",
-    isActive: false,
-  },
-];
 
-const roleIdToLabel = (role?: number) => {
-  if (role === 1) return "System Administrator";
-  if (role === 2) return "Company Admin";
-  if (role === 3) return "Company User";
+const roleIdToLabel = (role?: number | string) => {
+  if (role === 1 || role === "1" ) return "System Administrator";
+  if (role === 2 || role === "2" ) return "Company Admin";
+  if (role === 3 || role === "3" ) return "Company User";
   return "";
 };
 
-const companyIdToLabel = (companyId?: string) => {
-  if (companyId === "1") return "Dhive";
-  if (companyId === "2") return "Test Company";
+const roleNameToLabel = (roleName?: string) => {
+  if (!roleName) return "";
+
+  const upper = roleName.toUpperCase();
+
+  if (upper === "SYS_ADMIN" || upper === "SYSTEM_ADMIN" || upper === "SYSTEM ADMINISTRATOR") {
+    return "System Administrator";
+  }
+  if (upper === "COMP_ADMIN" || upper === "COMPANY_ADMIN" || upper === "COMPANY ADMIN") {
+    return "Company Admin";
+  }
+  if (upper === "USER" || upper === "COMP_USER" || upper === "COMPANY_USER") {
+    return "Company User";
+  }
+
+  return roleName;
+};
+
+const mapRoleLabel = (item: any) => {
+  if (Array.isArray(item.roleNames) && item.roleNames.length > 0) {
+    return roleNameToLabel(item.roleNames[0]);
+  }
+
+  if (Array.isArray(item.roleIds) && item.roleIds.length > 0) {
+    return roleIdToLabel(item.roleIds[0]);
+  }
+
   return "";
 };
 
-export const useUserStore = create<Store>((set, get) => ({
+const mapUserListItem = (item: any): UserManagementTable => ({
+  id: item.userId ?? String(item.id ?? ""),
+  username: item.username ?? "",
+  companyName: item.companyName ?? "",
+  phone: item.phone ?? "",
+  email: item.email ?? "",
+  createdAt: item.createdAt ?? "",
+  role: mapRoleLabel(item),
+  isActive: Boolean(item.isActive),
+});
+
+
+
+
+
+
+
+export const useUserStore = create<Store>((set) => ({
   loading: false,
-  list: mockUsers,
-  listRole: mockRoles,
+  list: [],
+  listRole: [],
   detail: null,
-  detailUserLogin: mockDetailUserLogin,
+  detailUserLogin: null,
 
-  getDetailUserLogin: () => {
-    set({ detailUserLogin: mockDetailUserLogin });
-  },
-
-  getListRole: () => {
-    set({ listRole: mockRoles });
-  },
-
-  getList: (param, from, to) => {
+  getListRole: async () => {
     set({ loading: true });
-
-    const allUsers = get().list;
-    let filtered = [...allUsers];
-
-    if (param?.trim()) {
-      const q = param.trim().toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.username.toLowerCase().includes(q) ||
-          item.email.toLowerCase().includes(q) ||
-          item.companyName.toLowerCase().includes(q) ||
-          item.phone.toLowerCase().includes(q) ||
-          item.role.toLowerCase().includes(q)
-      );
-    }
-
-    if (from && to) {
-      const fromTime = new Date(from).getTime();
-      const toTime = new Date(to).getTime();
-
-      filtered = filtered.filter((item) => {
-        const itemTime = new Date(item.createdAt).getTime();
-        return itemTime >= fromTime && itemTime <= toTime;
+    try {
+      const data = await userApi.getListRole();
+      
+      
+      set({
+        listRole: Array.isArray(data) ? data : [],
+        loading: false,
       });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
     }
-
-    set({ loading: false, list: filtered });
   },
 
-  getDetail: (id) => {
+  getList: async (param, from, to) => {
     set({ loading: true });
-
-    const found = get().list.find((item) => item.id === id);
-
-    if (!found) {
-      set({ loading: false, detail: null });
-      return;
+    try {
+      const data = await userApi.getList(param, from, to);
+      
+      const mappedList = Array.isArray(data) ? data.map(mapUserListItem) : [];
+      console.log("191 in userStore - get list: ", data[0], "mapped: ", mappedList[0]);
+      
+      set({
+        list: mappedList,
+        loading: false,
+      });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
     }
+  },
 
-    const roleId =
-      found.role === "System Administrator" ? 1 : found.role === "Company Admin" ? 2 : 3;
-
-    set({
-      loading: false,
-      detail: {
-        user: {
-          id: found.id,
-          role: roleId,
-          email: found.email,
-          companyId: found.companyName === "Dhive" ? "1" : "2",
-          username: found.username,
-          phone: found.phone,
-          description: "",
-          createdAt: found.createdAt,
-          isActive: found.isActive,
-        },
+  getDetail: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await userApi.getDetail(id);
+      // console.log("169 in userStore - user detail api response: ", JSON.stringify(res, null, 2));
+      
+      const mapped: UserDetail = {
+  user: {
+    id: res?.user?.userId ?? res?.user?.id ?? "",
+    role:
+      Array.isArray(res?.roles) && typeof res.roles[0] === "number"
+        ? res.roles[0]
+            : Array.isArray(res?.user?.roleIds) && typeof res.user.roleIds[0] === "number"
+            ? res.user.roleIds[0]
+            : undefined,
+        email: res?.user?.email ?? "",
+        companyId: res?.user?.companyId ?? "",
+        companyName: res?.user?.companyName ?? "",
+        username: res?.user?.username ?? "",
+        phone: res?.user?.phone ?? "",
+        description: res?.user?.description ?? "",
+        createdAt: res?.user?.createdAt ?? "",
+        isActive: res?.user?.isActive ?? false,
       },
-    });
+    };
+      console.log("mapped detail: ", mapped);
+      
+
+      set({ detail: mapped, loading: false });
+      return mapped;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
+
+  getDetailUserLogin: async (id) => {
+    const userId = id || localStorage.getItem("userId");
+    if (!userId) return null;
+
+    set({ loading: true });
+    try {
+      const res = await userApi.getDetail(userId);
+
+      const mapped: UserLoginDetail = {
+        roles: Array.isArray(res?.roles) ? res.roles : [],
+        user: {
+          id: res?.user?.userId ?? res?.user?.id ?? "",
+          username: res?.user?.username ?? "",
+          email: res?.user?.email ?? "",
+          companyId: res?.user?.companyId ?? "",
+          companyName: res?.user?.companyName ?? "",
+          phone: res?.user?.phone ?? "",
+          description: res?.user?.description ?? "",
+          isActive: res?.user?.isActive ?? false,
+        },
+      };
+
+      set({ detailUserLogin: mapped, loading: false });
+      return mapped;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   createUser: async (param) => {
     set({ loading: true });
-
-    const newUser: UserManagementTable = {
-      id: Date.now().toString(),
-      username: param.username,
-      companyName: companyIdToLabel(param.companyId),
-      phone: param.phone,
-      email: param.email,
-      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-      role: roleIdToLabel(param.role),
-      isActive: true,
-    };
-
-    set((state) => ({
-      loading: false,
-      list: [newUser, ...state.list],
-    }));
-
-    return { code: 0 };
+    try {
+      const res = await userApi.createUser(param);
+      set({ loading: false });
+      return res;
+    } catch (error: any) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   updateUser: async (id, param) => {
-  set({ loading: true });
-
-  set((state) => {
-    const updatedList = state.list.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            username: param.username,
-            companyName: companyIdToLabel(param.companyId),
-            phone: param.phone,
-            email: param.email,
-            role: roleIdToLabel(param.role),
-          }
-        : item
-    );
-
-    const shouldUpdateLoggedInUser =
-      state.detailUserLogin?.user?.id === id;
-
-    return {
-      loading: false,
-      list: updatedList,
-      detailUserLogin: shouldUpdateLoggedInUser
-        ? {
-            ...state.detailUserLogin!,
-            roles: param.role ? [param.role] : state.detailUserLogin?.roles || [],
-            user: {
-              ...state.detailUserLogin!.user,
-              username: param.username,
-              email: param.email,
-              phone: param.phone,
-              companyId: param.companyId,
-              companyName: companyIdToLabel(param.companyId),
-            },
-          }
-        : state.detailUserLogin,
-    };
-  });
-
-  return { code: 0 };
-},
+    set({ loading: true });
+    try {
+      console.log("updateUser payload:", JSON.stringify(param, null, 2));
+      const res = await userApi.updateUser(id, param);
+      console.log("updateUser response:", JSON.stringify(res, null, 2));
+      set({ loading: false });
+      return res;
+    } catch (error: any) {
+      console.error("updateUser error:", error?.response?.data || error);
+      set({ loading: false });
+      throw error;
+    }
+  },
 
   deleteUser: async (id) => {
     set({ loading: true });
+    try {
+      const res = await userApi.deleteUser(id);
 
-    set((state) => ({
-      loading: false,
-      list: state.list.filter((item) => item.id !== id),
-    }));
+      set((state) => ({
+        loading: false,
+        list: state.list.filter((item) => item.id !== id),
+      }));
 
-    return { code: 0 };
+      return res;
+    } catch (error: any) {
+      set({ loading: false });
+      throw error;
+    }
   },
 }));

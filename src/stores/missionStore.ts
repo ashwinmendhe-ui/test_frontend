@@ -1,3 +1,4 @@
+import { missionApi } from "@/api";
 import { create } from "zustand";
 
 export interface MissionManagementTable {
@@ -31,194 +32,182 @@ interface Store {
   list: MissionManagementTable[];
   listBySite: MissionManagementTable[];
   detail: MissionFormValue;
-
-  getList: (param?: string, from?: string, to?: string) => void;
-  getListByCompany: (companyId?: string) => void;
-  getListBySite: (siteId?: string) => void;
-  getDetail: (id: string) => void;
-  createMission: (param: MissionFormValue) => Promise<{ code?: number; uploadUrl?: string; objectKey?: string } | void>;
-  updateMission: (id: string, param: MissionFormValue) => Promise<{ code?: number; uploadUrl?: string; objectKey?: string } | void>;
-  deleteMission: (id: string) => Promise<{ code?: number | string; message?: string }>;
+  getList: (param?: string, from?: string, to?: string) => Promise<void>;
+  getListByCompany: (companyId?: string) => Promise<void>;
+  getListBySite: (siteId?: string) => Promise<void>;
+  getDetail: (id: string) => Promise<MissionFormValue | void>;
+  createMission: (
+    param: MissionFormValue
+  ) => Promise<{ code?: number; uploadUrl?: string; objectKey?: string } | void>;
+  updateMission: (
+    id: string,
+    param: MissionFormValue
+  ) => Promise<{ code?: number; uploadUrl?: string; objectKey?: string } | void>;
+  deleteMission: (
+    id: string
+  ) => Promise<{ code?: number | string; message?: string } | undefined>;
 }
 
-const mockMissions: MissionManagementTable[] = [
-  {
-    missionId: "1",
-    missionName: "Alpha Patrol",
-    companyId: "1",
-    companyName: "Dhive",
-    siteId: "1",
-    siteName: "Site Alpha",
-    deviceType: "Drone",
-    missionType: "Patrol",
-    file: "alpha-plan.zip",
-    createdAt: "2026-03-21 10:00",
-    downloadUrl: "https://example.com/file-1",
-  },
-  {
-    missionId: "2",
-    missionName: "Beta Monitoring",
-    companyId: "2",
-    companyName: "Test Company",
-    siteId: "2",
-    siteName: "Site Beta",
-    deviceType: "Robot",
-    missionType: "Monitoring",
-    file: "beta-plan.zip",
-    createdAt: "2026-03-23 14:20",
-  },
-];
+const defaultDetail: MissionFormValue = {
+  companyId: "",
+  companyName: "",
+  siteId: "",
+  missionName: "",
+  missionType: "",
+  file: "",
+  downloadUrl: "",
+  deviceType: "",
+  description: "",
+};
+
+const mapMissionListItem = (item: any): MissionManagementTable => ({
+  missionId: item.missionId || item.id || "",
+  missionName: item.missionName || item.name || "",
+  companyId: item.companyId || item.company?.companyId || item.company?.id || "",
+  companyName: item.companyName || item.company?.name || "",
+  siteId: item.siteId || item.site?.siteId || item.site?.id || "",
+  siteName: item.siteName || item.site?.name || "",
+  deviceType: item.deviceType || "",
+  missionType: item.missionType || item.category || "",
+  file: item.file || item.fileName || "",
+  createdAt: item.createdAt || item.createdDate || "",
+  downloadUrl: item.downloadUrl || "",
+});
+
+const mapMissionDetail = (item: any): MissionFormValue => ({
+  companyId: item.companyId || item.company?.companyId || item.company?.id || "",
+  companyName: item.companyName || item.company?.name || "",
+  siteId: item.siteId || item.site?.siteId || item.site?.id || "",
+  missionName: item.missionName || item.name || "",
+  missionType: item.missionType || item.category || "",
+  file: item.file || item.fileName || "",
+  downloadUrl: item.downloadUrl || "",
+  deviceType: item.deviceType || "",
+  description: item.description || "",
+});
 
 export const useMissionStore = create<Store>((set, get) => ({
   loading: false,
-  list: mockMissions,
+  list: [],
   listBySite: [],
-  detail: {
-    companyId: "",
-    companyName: "",
-    siteId: "",
-    missionName: "",
-    missionType: "",
-    file: "",
-    deviceType: "",
-    description: "",
-  },
+  detail: defaultDetail,
 
-  getList: (param, from, to) => {
+    getList: async (param, from, to) => {
+      set({ loading: true });
+      try {
+        const res = await missionApi.getList(param, from, to);
+        const data = Array.isArray(res) ? res : res?.data || res?.content || [];
+        set({
+          loading: false,
+          list: data.map(mapMissionListItem),
+        });
+      } catch (error) {
+        console.error("Mission list fetch failed:", error);
+        set({ loading: false, list: [] });
+      }
+    },
+
+  getListByCompany: async (companyId) => {
     set({ loading: true });
-
-    let filtered = [...get().list];
-
-    if (param?.trim()) {
-      const q = param.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.missionName.toLowerCase().includes(q) ||
-          item.companyName.toLowerCase().includes(q) ||
-          item.siteName.toLowerCase().includes(q) ||
-          item.deviceType.toLowerCase().includes(q) ||
-          item.missionType.toLowerCase().includes(q) ||
-          item.file.toLowerCase().includes(q)
-      );
-    }
-
-    if (from && to) {
-      const fromTime = new Date(from).getTime();
-      const toTime = new Date(to).getTime();
-
-      filtered = filtered.filter((item) => {
-        const itemTime = new Date(item.createdAt).getTime();
-        return itemTime >= fromTime && itemTime <= toTime;
+    try {
+      const res = await missionApi.getListByCompany(companyId);
+      const data = Array.isArray(res) ? res : res?.data || res?.content || [];
+      set({
+        loading: false,
+        list: data.map(mapMissionListItem),
       });
+    } catch (error) {
+      set({ loading: false, list: [] });
+      throw error;
     }
-
-    set({ loading: false, list: filtered });
   },
 
-  getListByCompany: (companyId) => {
+  getListBySite: async (siteId) => {
     set({ loading: true });
-
-    const filtered = companyId
-      ? mockMissions.filter((item) => item.companyId === companyId)
-      : mockMissions;
-
-    set({ loading: false, list: filtered });
-  },
-
-  getListBySite: (siteId) => {
-    set({ loading: true });
-
-    const filtered = siteId
-      ? mockMissions.filter((item) => item.siteId === siteId)
-      : [];
-
-    set({ loading: false, listBySite: filtered });
-  },
-
-  getDetail: (id) => {
-    set({ loading: true });
-
-    const found = get().list.find((item) => item.missionId === id);
-
-    if (!found) {
-      set({ loading: false });
-      return;
+    try {
+      const res = await missionApi.getListBySite(siteId);
+      const data = Array.isArray(res) ? res : res?.data || res?.content || [];
+      set({
+        loading: false,
+        listBySite: data.map(mapMissionListItem),
+      });
+    } catch (error) {
+      set({ loading: false, listBySite: [] });
+      throw error;
     }
+  },
 
-    set({
-      loading: false,
-      detail: {
-        companyId: found.companyId,
-        companyName: found.companyName,
-        siteId: found.siteId,
-        missionName: found.missionName,
-        missionType: found.missionType,
-        file: found.file,
-        downloadUrl: found.downloadUrl,
-        deviceType: found.deviceType,
-        description: "",
-      },
-    });
+  getDetail: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await missionApi.getDetail(id);
+      const mapped = mapMissionDetail(res?.data || res);
+      set({
+        loading: false,
+        detail: mapped,
+      });
+      return mapped;
+    } catch (error) {
+      set({ loading: false, detail: defaultDetail });
+      throw error;
+    }
   },
 
   createMission: async (param) => {
-    set({ loading: true });
-
-    const newMission: MissionManagementTable = {
-      missionId: Date.now().toString(),
-      missionName: param.missionName,
+  set({ loading: true });
+  try {
+    const payload = {
       companyId: param.companyId || "",
-      companyName: param.companyName || "Dhive",
       siteId: param.siteId,
-      siteName: param.siteId === "1" ? "Site Alpha" : param.siteId === "2" ? "Site Beta" : "Selected Site",
-      deviceType: param.deviceType,
+      missionName: param.missionName,
       missionType: param.missionType,
       file: param.file || "",
-      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-      downloadUrl: param.downloadUrl,
+      downloadUrl: param.downloadUrl || "",
+      deviceType: param.deviceType,
+      description: param.description || "",
     };
 
-    set((state) => ({
-      loading: false,
-      list: [newMission, ...state.list],
-    }));
-
-    return { code: 0 };
-  },
+    const res = await missionApi.createMission(payload);
+    await get().getList();
+    return res;
+  } catch (error) {
+    set({ loading: false });
+    throw error;
+  }
+},
 
   updateMission: async (id, param) => {
-    set({ loading: true });
+  set({ loading: true });
+  try {
+    const payload = {
+      companyId: param.companyId || "",
+      siteId: param.siteId,
+      missionName: param.missionName,
+      missionType: param.missionType,
+      file: param.file || "",
+      downloadUrl: param.downloadUrl || "",
+      deviceType: param.deviceType,
+      description: param.description || "",
+    };
 
-    set((state) => ({
-      loading: false,
-      list: state.list.map((item) =>
-        item.missionId === id
-          ? {
-              ...item,
-              companyId: param.companyId || item.companyId,
-              companyName: param.companyName || item.companyName,
-              siteId: param.siteId,
-              missionName: param.missionName,
-              missionType: param.missionType,
-              file: param.file || item.file,
-              downloadUrl: param.downloadUrl || item.downloadUrl,
-              deviceType: param.deviceType,
-            }
-          : item
-      ),
-    }));
-
-    return { code: 0 };
-  },
+    const res = await missionApi.updateMission(id, payload);
+    await get().getList();
+    return res;
+  } catch (error) {
+    set({ loading: false });
+    throw error;
+  }
+},
 
   deleteMission: async (id) => {
-    set({ loading: true });
-
-    set((state) => ({
-      loading: false,
-      list: state.list.filter((item) => item.missionId !== id),
-    }));
-
-    return { code: 0 };
-  },
+  set({ loading: true });
+  try {
+    const res = await missionApi.deleteMission(id);
+    await get().getList();
+    return res;
+  } catch (error) {
+    set({ loading: false });
+    throw error;
+  }
+},
 }));

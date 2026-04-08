@@ -3,6 +3,7 @@ export const breadcrumbNameMap: Record<string, string> = {
   "/dashboard": "page_dashboard",
   "/stream": "page_stream",
   "/history": "page_history",
+  "/kpi": "page_kpi_dashboard",
   "/settings": "page_settings",
 
   "/settings/company": "page_company",
@@ -26,5 +27,4 @@ export const breadcrumbNameMap: Record<string, string> = {
   "/settings/robot/edit": "page_edit",
 
   "/playback": "page_playback",
-  
 };

@@ -5,7 +5,7 @@ import CustomModal from "@/components/common/customModal";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
 import { useMissionStore, type MissionManagementTable } from "@/stores/missionStore";
 import { useUserStore } from "@/stores/userStore";
-import { Button, DatePicker, Dropdown, Input } from "antd";
+import { Button, DatePicker, Dropdown, Input , message} from "antd";
 import type { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -44,13 +44,21 @@ export default function Mission() {
     setSelectedRecord(record);
     setIsModalOpen(true);
   };
+  const [messageApi, contextHolder] = message.useMessage();
 
   const confirmDelete = async () => {
     if (!selectedRecord) return;
 
-    await deleteMission(selectedRecord.missionId);
-    setIsModalOpen(false);
-    setSelectedRecord(null);
+    try {
+      await deleteMission(selectedRecord.missionId);
+      messageApi.success(t("mission_delete_success"));
+      setIsModalOpen(false);
+      setSelectedRecord(null);
+    } catch (error: any) {
+      messageApi.error(
+        error?.response?.data?.message || t("mission_delete_failed")
+      );
+    }
   };
 
   const handleCancel = () => {
@@ -179,13 +187,13 @@ export default function Mission() {
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
     setDateRange(dates);
   };
-
   useEffect(() => {
     getList();
   }, [getList]);
 
   return (
     <>
+    {contextHolder}
       <div className="w-full relative">
         {loading && (
           <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>

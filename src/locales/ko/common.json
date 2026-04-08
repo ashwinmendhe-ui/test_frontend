@@ -356,7 +356,12 @@
   "mission_type_monitoring": "모니터링",
   "mission_type_delivery": "배송",
   "mission_type_cleaning": "청소",
-
+  "mission_create_success": "미션이 성공적으로 생성되었습니다",
+  "mission_create_failed": "미션 생성에 실패했습니다",
+  "mission_update_success": "미션이 성공적으로 수정되었습니다",
+  "mission_update_failed": "미션 수정에 실패했습니다",
+  "mission_delete_success": "미션이 성공적으로 삭제되었습니다",
+  "mission_delete_failed": "미션 삭제에 실패했습니다",
   "robot_search_placeholder": "로봇 검색",
   "robot_table_company": "회사",
   "robot_table_site": "사이트",
@@ -498,6 +503,102 @@
   "stream_ai_no_mask": "No Mask",
   "history_stream_context": "스트림 세션 정보",
   "history_view_report": "리포트 보기",
-  "playback_selected_video": "선택된 영상"
+  "playback_selected_video": "선택된 영상",
+  "page_kpi_dashboard": "KPI 대시보드",
+  "kpi": {
+    "comparison": {
+      "weekly": "지난주 대비",
+      "monthly": "지난달 대비",
+      "yearly": "작년 대비",
+      "all": "전체 기간"
+    },
+    "sections": {
+      "deployment": "현장 도입 비용 및 시간",
+      "operation": "운영 편의성 및 안전성",
+      "reliability": "신뢰성"
+    },
+    "cards": {
+      "setupTime": "초기 셋업 소요 시간",
+      "setupManpower": "초기 셋업 필요 인력",
+      "autonomousTransitionTime": "무인 운영 전환 소요 시간",
+      "missionSuccessRate": "평균 미션 성공률",
+      "remoteInterventionSuccessRate": "원격 개입 성공률",
+      "fieldDispatchRate": "현장 출동률",
+      "remoteInterventionEventFrequency": "원격 개입 이벤트 빈도",
+      "interventionTimePerRemoteIntervention": "원격 개입 당 개입 시간",
+      "remoteInterventionFrequencyTimeline": "원격 개입 빈도 및 타임라인",
+      "avgRobotsPerOperator": "운영자 1명당 평균 로봇 대수",
+      "maxRobotsPerOperator": "운영자 1명당 최대 로봇 대수",
+      "totalDrivingTime": "전체 누적 주행시간",
+      "mtbf": "시스템 신뢰성 (MTBF)"
+    },
+    "labels": {
+      "sitePlaceholder": "현장 선택",
+      "downloadPdf": "PDF 다운로드",
+      "interruptEvents": "중단 이벤트",
+      "interruptEventTotal": "중단 이벤트",
+      "robotOperatingStatus": "로봇 가동 상태",
+      "comparedValue": "변화량"
+    },
+    "change": {
+      "comparedToLastWeek": "지난주 대비",
+      "comparedToLastMonth": "지난달 대비",
+      "comparedToLastYear": "작년 대비",
+      "comparedToAllTime": "전체 기간 대비"
+    },
+    "reliabilityRange": {
+      "daily": "일 평균",
+      "weekly": "주 평균",
+      "monthly": "월 평균",
+      "yearly": "연 평균"
+    },
+    "robotStatus": {
+      "runningTime": "주행 시간",
+      "idleTime": "유휴 시간",
+      "downTime": "다운 타임"
+    },
+    "interrupts": {
+      "obstacleAvoidanceFailure": "장애물 회피불가",
+      "unstableLocalization": "위치추정 불안",
+      "communicationFailure": "통신장애",
+      "emergencyStop": "비상정지",
+      "batteryDischarge": "배터리 방전",
+      "breakdown": "고장"
+    },
+    "units": {
+      "day": "일",
+      "person": "명",
+      "percent": "%",
+      "case": "건",
+      "minute": "분",
+      "robot": "대",
+      "hour": "시간",
+      "hourMinute": "시간분"
+    },
+    "tooltips": {
+      "setupTime": "신규 현장에서 첫 주행까지 걸리는 시간입니다.",
+      "setupManpower": "신규 현장에서 첫 주행까지 필요한 인력입니다.",
+      "autonomousTransitionTime": "첫 주행 이후 현장에서 안전 요원 없이 주행하기까지 걸리는 시간입니다.",
+      "missionSuccessRate": "모든 미션 수 대비 개입 없이 성공한 미션 수 비율입니다.",
+      "remoteInterventionSuccessRate": "(개입 후 성공한 미션 수) ÷ (개입 후 성공 + 개입 후 실패 미션 수)입니다.",
+      "fieldDispatchRate": "실패한 미션 수 ÷ 전체 미션 수입니다.",
+      "remoteInterventionEventFrequency": "전체 개입 수 ÷ 개입한 미션 수입니다.",
+      "interventionTimePerRemoteIntervention": "전체 개입 시간의 합 ÷ 전체 개입 수입니다.",
+      "remoteInterventionFrequencyTimeline": "현장 출동 수 ÷ 원격 해결 수입니다.",
+      "avgRobotsPerOperator": "운영자 1명당 평균 관리 로봇 대수입니다.",
+      "maxRobotsPerOperator": "운영자 1명당 최대 관리 로봇 대수입니다.",
+      "totalDrivingTime": "전체 누적 로봇 주행 시간입니다.",
+      "mtbf": "MTBF = 총 운영 시간 ÷ 고장 횟수, 빈도 = 1 ÷ MTBF 입니다."
+    },
+    "empty": "표시할 KPI 데이터가 없습니다.",
+    "loading": "KPI 대시보드를 불러오는 중입니다..."
+  },
+  "menu_kpi_dashboard": "KPI 대시보드",
+  "robot_create_success": "로봇이 성공적으로 생성되었습니다",
+  "robot_create_failed": "로봇 생성에 실패했습니다",
+  "robot_update_success": "로봇이 성공적으로 수정되었습니다",
+  "robot_update_failed": "로봇 수정에 실패했습니다",
+  "robot_delete_success": "로봇이 성공적으로 삭제되었습니다",
+  "robot_delete_failed": "로봇 삭제에 실패했습니다"
 
 }
