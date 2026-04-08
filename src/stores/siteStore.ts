@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { siteApi } from "@/api";
 
 export interface SiteManagementTable {
   siteId: string;
@@ -30,52 +31,55 @@ interface Store {
   loading: boolean;
   list: SiteManagementTable[];
   detail: SiteFormValue;
-  getList: (param?: string, from?: string, to?: string) => void;
-  getListByCompany: (companyId?: string) => void;
-  getDetail: (id: string) => void;
-  createSite: (param: SiteFormValue) => Promise<{ code?: number | string; message?: string }>;
-  updateSite: (id: string, param: SiteFormValue) => Promise<{ code?: number | string; message?: string }>;
-  deleteSite: (id: string) => Promise<{ code?: number | string; message?: string }>;
+  getList: (param?: string, from?: string, to?: string) => Promise<void>;
+  getListByCompany: (companyId?: string) => Promise<void>;
+  getDetail: (id: string) => Promise<SiteFormValue | void>;
+  createSite: (
+    param: SiteFormValue
+  ) => Promise<{ code?: number | string; message?: string }>;
+  updateSite: (
+    id: string,
+    param: SiteFormValue
+  ) => Promise<{ code?: number | string; message?: string }>;
+  deleteSite: (
+    id: string
+  ) => Promise<{ code?: number | string; message?: string }>;
 }
 
-const mockSites: SiteManagementTable[] = [
-  {
-    siteId: "1",
-    name: "Site Alpha",
-    companyId: "1",
-    companyName: "Dhive",
-    phoneNumber: "9876543210",
-    email: "alpha@dhive.com",
-    address: "Seoul",
-    createdAt: "2026-03-20 10:00",
-    deviceCount: 8,
-    deviceOnlineCount: 5,
-    status: "active",
-  },
-  {
-    siteId: "2",
-    name: "Site Beta",
-    companyId: "2",
-    companyName: "Test Company",
-    phoneNumber: "9123456780",
-    email: "beta@test.com",
-    address: "India",
-    createdAt: "2026-03-22 12:00",
-    deviceCount: 4,
-    deviceOnlineCount: 1,
-    status: "offline",
-  },
-];
+const mapSiteListItem = (item: any): SiteManagementTable => ({
+  siteId: item.siteId ?? item.id ?? "",
+  name: item.name ?? "",
+  companyId: item.companyId ?? "",
+  companyName: item.companyName ?? "",
+  phoneNumber: item.phoneNumber ?? "",
+  email: item.email ?? "",
+  address: item.address ?? "",
+  createdAt: item.createdAt ?? "",
+  deviceCount: Number(item.deviceCount ?? item.registeredDroneCount ?? 0),
+  deviceOnlineCount: Number(item.deviceOnlineCount ?? item.onlineDroneCount ?? 0),
+  status:
+    typeof item.status === "string"
+      ? item.status
+      : item.isActive
+      ? "active"
+      : "inactive",
+});
 
-const companyIdToLabel = (companyId?: string) => {
-  if (companyId === "1") return "Dhive";
-  if (companyId === "2") return "Test Company";
-  return "";
-};
+const mapSiteDetail = (item: any): SiteFormValue => ({
+  id: item.id ?? item.siteId ?? "",
+  siteId: item.siteId ?? item.id ?? "",
+  name: item.name ?? "",
+  address: item.address ?? "",
+  description: item.description ?? "",
+  companyId: item.companyId ?? "",
+  companyName: item.companyName ?? "",
+  phoneNumber: item.phoneNumber ?? "",
+  email: item.email ?? "",
+});
 
-export const useSiteStore = create<Store>((set, get) => ({
+export const useSiteStore = create<Store>((set) => ({
   loading: false,
-  list: mockSites,
+  list: [],
   detail: {
     id: "",
     siteId: "",
@@ -88,128 +92,79 @@ export const useSiteStore = create<Store>((set, get) => ({
     email: "",
   },
 
-  getList: (param, from, to) => {
+  getList: async (param, from, to) => {
     set({ loading: true });
-
-    let filtered = [...mockSites];
-
-    if (param?.trim()) {
-      const q = param.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.name.toLowerCase().includes(q) ||
-          item.companyName.toLowerCase().includes(q) ||
-          item.phoneNumber.toLowerCase().includes(q) ||
-          item.email.toLowerCase().includes(q) ||
-          item.address.toLowerCase().includes(q)
-      );
+    try {
+      const data = await siteApi.getList(param, from, to);
+      const mappedList = Array.isArray(data) ? data.map(mapSiteListItem) : [];
+      set({ loading: false, list: mappedList });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
     }
-
-    if (from && to) {
-      const fromTime = new Date(from).getTime();
-      const toTime = new Date(to).getTime();
-
-      filtered = filtered.filter((item) => {
-        const itemTime = new Date(item.createdAt).getTime();
-        return itemTime >= fromTime && itemTime <= toTime;
-      });
-    }
-
-    set({ loading: false, list: filtered });
   },
 
-  getListByCompany: (companyId) => {
+  getListByCompany: async (companyId) => {
     set({ loading: true });
-
-    const filtered = companyId
-      ? mockSites.filter((item) => item.companyId === companyId)
-      : mockSites;
-
-    set({ loading: false, list: filtered });
+    try {
+      const data = await siteApi.getListByCompany(companyId);
+      const mappedList = Array.isArray(data) ? data.map(mapSiteListItem) : [];
+      set({ loading: false, list: mappedList });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
-  getDetail: (id) => {
-  set({ loading: true });
-
-  const found = get().list.find((item) => item.siteId === id);
-
-      if (!found) {
-        set({ loading: false });
-        return;
-      }
-
-      set({
-        loading: false,
-        detail: {
-          id: found.siteId,
-          siteId: found.siteId,
-          name: found.name,
-          address: found.address,
-          description: "",
-          companyId: found.companyId,
-          companyName: found.companyName,
-          phoneNumber: found.phoneNumber,
-          email: found.email,
-        },
-      });
-    },
+  getDetail: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await siteApi.getDetail(id);
+      const mapped = mapSiteDetail(res);
+      set({ loading: false, detail: mapped });
+      return mapped;
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
 
   createSite: async (param) => {
     set({ loading: true });
-
-    const newSite: SiteManagementTable = {
-      siteId: Date.now().toString(),
-      name: param.name,
-      companyId: param.companyId || "",
-      companyName: param.companyName || companyIdToLabel(param.companyId),
-      phoneNumber: param.phoneNumber,
-      email: param.email,
-      address: param.address,
-      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-      deviceCount: 0,
-      deviceOnlineCount: 0,
-      status: "active",
-    };
-
-    set((state) => ({
-      loading: false,
-      list: [newSite, ...state.list],
-    }));
-
-    return { code: 0 };
+    try {
+      const res = await siteApi.createSite(param);
+      set({ loading: false });
+      return res;
+    } catch (error: any) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   updateSite: async (id, param) => {
     set({ loading: true });
-
-    set((state) => ({
-      loading: false,
-      list: state.list.map((item) =>
-        item.siteId === id
-          ? {
-              ...item,
-              name: param.name,
-              companyId: param.companyId || item.companyId,
-              companyName: param.companyName || companyIdToLabel(param.companyId) || item.companyName,
-              phoneNumber: param.phoneNumber,
-              email: param.email,
-              address: param.address,
-            }
-          : item
-      ),
-    }));
-
-    return { code: 0 };
+    try {
+      const res = await siteApi.updateSite(id, param);
+      set({ loading: false });
+      return res;
+    } catch (error: any) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   deleteSite: async (id) => {
     set({ loading: true });
-
-    set((state) => ({
-      loading: false,
-      list: state.list.filter((item) => item.siteId !== id),
-    }));
-
-    return { code: 0 };
+    try {
+      const res = await siteApi.deleteSite(id);
+      set((state) => ({
+        loading: false,
+        list: state.list.filter((item) => item.siteId !== id),
+      }));
+      return res;
+    } catch (error: any) {
+      set({ loading: false });
+      throw error;
+    }
   },
 }));

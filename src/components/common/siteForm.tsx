@@ -1,7 +1,7 @@
 import { useCompanyStore } from "@/stores/companyStore";
 import { useUserStore } from "@/stores/userStore";
 import type { SiteFormValue } from "@/stores/siteStore";
-import { Button, Form, Input, Select } from "antd";
+import { Button, Form, Input, Select, message } from "antd";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -52,22 +52,41 @@ export default function SiteForm({
   }, [detailUserLogin, form, userRole]);
 
   const handleSubmit = async (values: SiteFormValue) => {
-    const newValues = {
-      ...values,
-      companyId:
-        userRole !== 1 ? detailUserLogin?.user?.companyId : values.companyId,
-      companyName:
-        userRole !== 1 ? detailUserLogin?.user?.companyName : values.companyName,
-    };
-
-    const res = await onSubmit(newValues);
-
-    if (res?.code === -1 || res?.code === "BAD_REQUEST") {
-      return;
-    }
-
-    navigate("/settings/site");
+  const newValues = {
+    ...values,
+    companyId:
+      userRole !== 1 ? detailUserLogin?.user?.companyId : values.companyId,
+    companyName:
+      userRole !== 1 ? detailUserLogin?.user?.companyName : values.companyName,
   };
+
+  console.log("site form submit values:", JSON.stringify(newValues, null, 2));
+
+  const res = await onSubmit(newValues);
+
+  console.log("site form submit response:", JSON.stringify(res, null, 2));
+
+  if (!res) return;
+
+  if (
+    res.code === -1 ||
+    res.code === "BAD_REQUEST" ||
+    res.code === "ERROR" ||
+    res.code === 400 ||
+    res.code === 403 ||
+    res.code === 500
+  ) {
+    message.error(res.message || t("common_save_failed"));
+    return;
+  }
+
+  await message.success(
+    mode === "add"
+      ? t("site_create_success", "Site created successfully")
+      : t("site_update_success", "Site updated successfully"),2
+  );
+    navigate("/settings/site");
+};
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">

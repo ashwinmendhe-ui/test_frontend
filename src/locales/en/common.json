@@ -217,6 +217,12 @@
   "mission_table_created_date": "Created Date",
   "mission_delete_title": "Delete",
   "mission_delete_confirm": "Are you sure you want to delete this mission?",
+  "mission_create_success": "Mission created successfully",
+  "mission_create_failed": "Failed to create mission",
+  "mission_update_success": "Mission updated successfully",
+  "mission_update_failed": "Failed to update mission",
+  "mission_delete_success": "Mission deleted successfully",
+  "mission_delete_failed": "Failed to delete mission",
 
   "mission_form_name": "Mission Name",
   "mission_form_company": "Company",
@@ -493,5 +499,8 @@
     "empty": "No KPI data available.",
     "loading": "Loading KPI dashboard..."
   },
-  "menu_kpi_dashboard": "KPI Dashboard"
+  "menu_kpi_dashboard": "KPI Dashboard",
+  "file_upload_title": "Click or drag file to this area to upload",
+  "file_upload_hint": "Support for a single file upload. Maximum size 10MB.",
+  "upload_failed_title": "File upload failed"
 }

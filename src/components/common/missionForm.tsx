@@ -2,17 +2,18 @@ import { useCompanyStore } from "@/stores/companyStore";
 import { useSiteStore } from "@/stores/siteStore";
 import { useUserStore } from "@/stores/userStore";
 import type { MissionFormValue } from "@/stores/missionStore";
-import { Button, Form, Input, Select } from "antd";
-import { useEffect } from "react";
+import { Button, Form, Input, Select, message } from "antd";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import FileUpload, { type FileUploadRef } from "./fileUpload";
 
 interface Props {
   mode: "add" | "edit";
   initialValues?: MissionFormValue;
   onSubmit: (
     values: MissionFormValue
-  ) => Promise<{ code?: number; uploadUrl?: string } | void>;
+  ) => Promise<{ code?: number; uploadUrl?: string; objectKey?: string } | void>;
   onCancel?: () => void;
   loading: boolean;
 }
@@ -27,6 +28,8 @@ export default function MissionForm({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [form] = Form.useForm<MissionFormValue>();
+  const [messageApi, contextHolder] = message.useMessage();
+  const fileUploadRef = useRef<FileUploadRef>(null);
 
   const deviceTypeOptions = [
     { value: "Drone", label: t("mission_device_type_drone") },
@@ -69,30 +72,79 @@ export default function MissionForm({
     if (userRole !== 1) {
       form.setFieldValue("companyName", detailUserLogin?.user?.companyName);
       form.setFieldValue("companyId", detailUserLogin?.user?.companyId);
+
       if (detailUserLogin?.user?.companyId) {
         getListByCompany(detailUserLogin.user.companyId);
       }
     }
   }, [detailUserLogin, form, getListByCompany, userRole]);
 
+  const handleFileChange = (file: File | null, fileName?: string | null) => {
+    if (file && fileName) {
+      form.setFieldValue("file", fileName);
+    } else {
+      form.setFieldValue("file", "");
+      form.setFieldValue("downloadUrl", "");
+    }
+  };
+
   const handleSubmit = async (values: MissionFormValue) => {
-    const newValues = {
-      ...values,
-      companyId:
-        userRole !== 1 ? detailUserLogin?.user?.companyId || "" : values.companyId,
-      companyName:
-        userRole !== 1 ? detailUserLogin?.user?.companyName || "" : values.companyName,
-    };
+    try {
+      const newValues = {
+        ...values,
+        companyId:
+          userRole !== 1
+            ? detailUserLogin?.user?.companyId || ""
+            : values.companyId,
+        companyName:
+          userRole !== 1
+            ? detailUserLogin?.user?.companyName || ""
+            : values.companyName,
+      };
 
-    const res = await onSubmit(newValues);
+      const res = await onSubmit(newValues);
 
-    if (res?.code === 1) return;
+      if (res?.code === 1) {
+        messageApi.error(
+          mode === "add"
+            ? t("mission_create_failed")
+            : t("mission_update_failed")
+        );
+        return;
+      }
 
-    navigate("/settings/mission");
+      if (res?.uploadUrl && fileUploadRef.current?.hasNewFile()) {
+        try {
+          await fileUploadRef.current.uploadToS3(res.uploadUrl);
+        } catch (error) {
+          messageApi.error(t("upload_failed_title"));
+          return;
+        }
+      }
+
+      await messageApi.success(
+        mode === "add"
+          ? t("mission_create_success")
+          : t("mission_update_success"),2
+      );
+
+      
+        navigate("/settings/mission");
+      
+    } catch (error: any) {
+      messageApi.error(
+        error?.response?.data?.message ||
+          (mode === "add"
+            ? t("mission_create_failed")
+            : t("mission_update_failed"))
+      );
+    }
   };
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
+      {contextHolder}
+
       <Form
         layout="vertical"
         form={form}
@@ -202,9 +254,13 @@ export default function MissionForm({
               }
               name="file"
             >
-              <Input
-                placeholder={t("mission_placeholder_file")}
-                className="h-[41px]"
+              <FileUpload
+                ref={fileUploadRef}
+                onFileChange={handleFileChange}
+                downloadUrl={values?.downloadUrl}
+                value={values?.file}
+                accept="*"
+                maxSize={10}
               />
             </Form.Item>
 

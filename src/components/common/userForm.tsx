@@ -201,15 +201,15 @@ const handleFinish = async (values: UserFormValue) => {
     return;
   }
 
-  message.success(
+  await message.success(
     mode === "add"
       ? t("user_create_success", "User created successfully")
-      : t("user_update_success", "User updated successfully")
+      : t("user_update_success", "User updated successfully"),2
   );
 
-  setTimeout(() => {
+  
     navigate("/settings/user");
-  }, 500);
+  
 };
 
   const handleAssignSiteSubmit = async (values: { siteName: string }) => {

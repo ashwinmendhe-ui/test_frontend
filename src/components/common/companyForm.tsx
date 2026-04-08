@@ -52,15 +52,15 @@ export default function CompanyForm({
       return;
     }
 
-    message.success(
+    await message.success(
       mode === "add"
         ? t("company_create_success", "Company created successfully")
-        : t("company_update_success", "Company updated successfully")
+        : t("company_update_success", "Company updated successfully"),2
     );
 
-    setTimeout(() => {
+    
       navigate("/settings/company");
-    }, 500);
+    
   };
 
   return (

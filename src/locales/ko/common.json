@@ -356,7 +356,12 @@
   "mission_type_monitoring": "모니터링",
   "mission_type_delivery": "배송",
   "mission_type_cleaning": "청소",
-
+  "mission_create_success": "미션이 성공적으로 생성되었습니다",
+  "mission_create_failed": "미션 생성에 실패했습니다",
+  "mission_update_success": "미션이 성공적으로 수정되었습니다",
+  "mission_update_failed": "미션 수정에 실패했습니다",
+  "mission_delete_success": "미션이 성공적으로 삭제되었습니다",
+  "mission_delete_failed": "미션 삭제에 실패했습니다",
   "robot_search_placeholder": "로봇 검색",
   "robot_table_company": "회사",
   "robot_table_site": "사이트",
