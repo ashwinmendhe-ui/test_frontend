@@ -1,6 +1,18 @@
 import axiosClient from "./axiosClient";
 import type { DetailDevice } from "@/stores/robotStore";
 
+const mapDeviceType = (value?: string) => {
+  if (!value) return "";
+
+  const typeMap: Record<string, string> = {
+    Drone: "DRONE",
+    Robot: "ROBOT",
+    Dock: "DOCK",
+  };
+
+  return typeMap[value] || value.toUpperCase();
+};
+
 export const robotApi = {
   getList: async (param?: string, from?: string, to?: string) => {
     const queryParams = new URLSearchParams();
@@ -32,7 +44,7 @@ export const robotApi = {
       siteId: data.siteId ?? "",
       deviceId: data.deviceId,
       deviceName: data.deviceName ?? "",
-      deviceType: data.deviceType,
+      deviceType: mapDeviceType(data.deviceType),
       brandName: data.brandName ?? "",
       model: data.model ?? "",
       deviceSn: data.deviceSn ?? "",
@@ -43,25 +55,25 @@ export const robotApi = {
     return res.data;
   },
 
-  updateRobot: async (id: string, data: DetailDevice) => {
+  updateRobot: async (deviceId: string, data: DetailDevice) => {
     const payload = {
       companyId: data.companyId ?? "",
       siteId: data.siteId ?? "",
       deviceId: data.deviceId,
       deviceName: data.deviceName ?? "",
-      deviceType: data.deviceType,
+      deviceType: mapDeviceType(data.deviceType),
       brandName: data.brandName ?? "",
       model: data.model ?? "",
       deviceSn: data.deviceSn ?? "",
       description: data.description ?? "",
     };
 
-    const res = await axiosClient.put(`/v1/devices/${id}`, payload);
+    const res = await axiosClient.post(`/v1/devices/update/${deviceId}`, payload);
     return res.data;
   },
 
-  deleteRobot: async (id: string) => {
-    const res = await axiosClient.delete(`/v1/devices/${id}`);
+  deleteRobot: async (deviceId: string) => {
+    const res = await axiosClient.post(`/v1/devices/delete/${deviceId}`);
     return res.data;
   },
 };
