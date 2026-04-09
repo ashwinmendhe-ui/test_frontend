@@ -180,7 +180,8 @@ export const useRobotStore = create<Store>((set, get) => ({
       const payload = {
         ...param,
       };
-
+      console.log("183 in robotStore", payload);
+      
       const res = await robotApi.createRobot(payload);
       await get().getList();
       return res;

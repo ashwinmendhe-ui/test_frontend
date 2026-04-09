@@ -35,7 +35,7 @@ curl -X GET \
 {"roles":[1],"user":{"deviceIds":[],"companyName":"D.Hive Corporation","fullName":"System Administrator","sites":[],"missionIds":[],"isActive":true,"userId":"11111111-1111-1111-1111-111111111111","createdAt":"2026-01-09 19:08:40","companyId":"00000000-0000-0000-0000-000000000000","roleIds":[1],"phone":"+84-90-1111-1111","id":12,"roleNames":["SYS_ADMIN"],"email":"sysadmin@dhive.vn","username":"sysadmin","updatedAt":"2026-04-06 15:43:26"}}
 
 
-# url for compnay admin
+# url for compnay admin, here token is used of system administrator to access company details 
 curl -X GET \
   'http://52.64.157.221:6789/api/v1/users/2859f21a-1acb-4309-8344-2f294c49789d' \
   -H 'accept: application/json' \
@@ -45,7 +45,7 @@ curl -X GET \
   ## for API integration install axios
   npm i axios
 
-
+Some examples of API endpoints 
 ## company search GET API
 http://52.64.157.221:6789/api/v1/companies/search
 

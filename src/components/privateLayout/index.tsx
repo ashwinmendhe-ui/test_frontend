@@ -1,9 +1,8 @@
 import { Outlet } from "react-router-dom";
 import Sidebar from "../sideBar";
 import Header from "../header";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 import { useUserStore } from "@/stores/userStore";
 import { hasAccess } from "@/utils/roleAccess";
 
@@ -15,6 +14,7 @@ export default function PrivateLayout() {
   const { detailUserLogin } = useUserStore();
 
   const currentRole = detailUserLogin?.roles?.[0];
+
   useEffect(() => {
     if (!currentRole) return;
 
@@ -25,23 +25,18 @@ export default function PrivateLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
       <Sidebar
         collapsed={collapsed}
         width={sidebarWidth}
         setWidth={setSidebarWidth}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        
-        {/* Top Bar (Toggle only) */}
-        <div className="h-14 bg-white flex items-center px-4 border-b">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="h-14 shrink-0 bg-white flex items-center px-4 border-b">
           <button
             onClick={() => {
               setCollapsed(!collapsed);
 
-              // Reset width when collapsing
               if (!collapsed) {
                 setSidebarWidth(240);
               }
@@ -52,10 +47,11 @@ export default function PrivateLayout() {
           </button>
         </div>
 
-        {/* Page Content */}
-        <div className="px-6 py-4 bg-[#F5F7FA] flex-1 overflow-auto">
+        <div className="px-6 py-4 bg-[#F5F7FA] flex-1 min-w-0 overflow-auto">
           <Header />
-          <Outlet />
+          <div className="min-w-0">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

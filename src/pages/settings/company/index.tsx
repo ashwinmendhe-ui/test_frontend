@@ -109,6 +109,7 @@ export default function Company() {
     {
       title: "",
       key: "action",
+      width: 72,
       render: (_: unknown, record: CompanyManagementTable) => (
         <Dropdown
           className="relative"
@@ -165,11 +166,11 @@ export default function Company() {
           <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
         )}
 
-        <div className="flex justify-between items-center mt-[26px] mb-[22px]">
-          <div className="flex gap-4 w-1/2">
+        <div className="flex flex-wrap justify-between items-start gap-4 mt-[26px] mb-[22px]">
+          <div className="flex flex-wrap gap-4 w-full xl:w-1/2">
             <RangePicker
               size="large"
-              className="min-w-[300px]"
+              className="w-full sm:w-auto min-w-[240px]"
               onChange={handleDateRangeChange}
               value={dateRange}
               placeholder={[t("common_from"), t("common_to")]}
@@ -179,12 +180,12 @@ export default function Company() {
               placeholder={t("company_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              className="flex-1 rounded-[7px]"
+              className="min-w-[220px] flex-1 rounded-[7px]"
               allowClear
             />
           </div>
 
-          <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
+          <Button className="shrink-0 bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
             <Link
               className="text-white! hover:text-white! text-[20px]! font-bold!"
               to="/settings/company/create"

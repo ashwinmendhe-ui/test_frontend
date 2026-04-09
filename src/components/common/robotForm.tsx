@@ -86,7 +86,8 @@ export default function RobotForm({
           listSite.find((site) => site.siteId === values.siteId)?.name ||
           values.siteName,
       };
-
+      console.log("in robotForm 89 - robot create/update payload", newValues);
+      
       const res = await onSubmit(newValues);
 
       if (res?.code === -1 || res?.code === "BAD_REQUEST") {

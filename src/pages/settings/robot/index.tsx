@@ -26,10 +26,12 @@ export default function Robot() {
   const userRole = detailUserLogin?.roles?.[0];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<RobotManagementTable | null>(null);
+  const [selectedRecord, setSelectedRecord] =
+    useState<RobotManagementTable | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
+
   const handleEdit = (record: RobotManagementTable) => {
     navigate(`/settings/robot/${record.deviceId}/edit`);
   };
@@ -40,19 +42,19 @@ export default function Robot() {
   };
 
   const confirmDelete = async () => {
-  if (!selectedRecord) return;
+    if (!selectedRecord) return;
 
-  try {
-    await deleteRobot(selectedRecord.deviceId);
-    messageApi.success(t("robot_delete_success"));
-    setIsModalOpen(false);
-    setSelectedRecord(null);
-  } catch (error: any) {
-    messageApi.error(
-      error?.response?.data?.message || t("robot_delete_failed")
-    );
-  }
-};
+    try {
+      await deleteRobot(selectedRecord.deviceId);
+      messageApi.success(t("robot_delete_success"));
+      setIsModalOpen(false);
+      setSelectedRecord(null);
+    } catch (error: any) {
+      messageApi.error(
+        error?.response?.data?.message || t("robot_delete_failed")
+      );
+    }
+  };
 
   const handleCancel = () => {
     setIsModalOpen(false);
@@ -71,14 +73,18 @@ export default function Robot() {
       dataIndex: "deviceName",
       key: "deviceName",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
       title: t("robot_table_company"),
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
       title: t("robot_table_site"),
@@ -96,7 +102,9 @@ export default function Robot() {
       dataIndex: "deviceType",
       key: "deviceType",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
       title: t("robot_table_brand"),
@@ -124,7 +132,9 @@ export default function Robot() {
       dataIndex: "deviceId",
       key: "deviceId",
       enableSort: true,
-      render: (value: string) => <HighlightText text={value} query={searchKeyword} />,
+      render: (value: string) => (
+        <HighlightText text={value} query={searchKeyword} />
+      ),
     },
     {
       title: t("robot_table_created_date"),
@@ -142,6 +152,7 @@ export default function Robot() {
     {
       title: "",
       key: "action",
+      width: 72,
       render: (_: unknown, record: RobotManagementTable) =>
         userRole !== 3 ? (
           <Dropdown
@@ -198,15 +209,18 @@ export default function Robot() {
 
   return (
     <>
-    {contextHolder}
-      <div className="w-full relative">
-        {loading && <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>}
+      {contextHolder}
 
-        <div className="flex justify-between items-center mt-[26px] mb-[22px]">
-          <div className="flex gap-4 w-1/2">
+      <div className="w-full relative min-w-0">
+        {loading && (
+          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+        )}
+
+        <div className="flex flex-wrap justify-between items-start gap-4 mt-[26px] mb-[22px]">
+          <div className="flex flex-wrap gap-4 w-full xl:w-1/2">
             <RangePicker
               size="large"
-              className="min-w-[300px]"
+              className="w-full sm:w-auto min-w-[240px]"
               onChange={handleDateRangeChange}
               value={dateRange}
               placeholder={[t("common_from"), t("common_to")]}
@@ -216,13 +230,13 @@ export default function Robot() {
               placeholder={t("robot_search_placeholder")}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              className="flex-1 rounded-[7px]"
+              className="min-w-[220px] flex-1 rounded-[7px]"
               allowClear
             />
           </div>
 
           {userRole !== 3 && (
-            <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
+            <Button className="shrink-0 bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
               <Link
                 className="text-white! hover:text-white! text-[20px]! font-bold!"
                 to="/settings/robot/create"
@@ -233,11 +247,15 @@ export default function Robot() {
           )}
         </div>
 
-        <SortableTable columns={columns} data={filteredList} rowKey="deviceId" />
+        <div className="w-full min-w-0 overflow-x-auto">
+          <SortableTable columns={columns} data={filteredList} rowKey="deviceId" />
+        </div>
       </div>
 
       <CustomModal
-        title={`${t("robot_delete_title")} ${selectedRecord?.deviceName ?? t("page_robot")}`}
+        title={`${t("robot_delete_title")} ${
+          selectedRecord?.deviceName ?? t("page_robot")
+        }`}
         content={
           <p className="whitespace-pre-line font-medium text-[16px]">
             {t("robot_delete_confirm")}

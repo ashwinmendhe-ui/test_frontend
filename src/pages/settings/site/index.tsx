@@ -112,6 +112,7 @@ export default function Site() {
     {
       title: "",
       key: "action",
+      width: 72,
       render: (_: unknown, record: SiteManagementTable) => (
         <Dropdown
           className="relative"
@@ -164,13 +165,13 @@ export default function Site() {
 
   return (
     <>
-      <div className="w-full relative">
+      <div className="w-full relative min-w-0">
         {loading && (
           <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
         )}
 
-        <div className="flex justify-between items-center mt-[26px] mb-[22px]">
-          <div className="flex gap-4 w-1/2">
+        <div className="flex flex-wrap justify-between items-start gap-4 mt-[26px] mb-[22px]">
+          <div className="flex flex-wrap gap-4 w-full xl:w-1/2">
             <RangePicker
               size="large"
               className="min-w-[300px]"
@@ -188,7 +189,7 @@ export default function Site() {
             />
           </div>
 
-          <Button className="bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
+          <Button className=" shrink-0 bg-primary! hover:bg-primaryDark! hover:text-white! w-40! h-[51px]! rounded-[7px]! text-white! text-xl! font-bold! flex! items-center! justify-center!">
             <Link
               className="text-white! hover:text-white! text-[20px]! font-bold!"
               to="/settings/site/create"
@@ -197,8 +198,9 @@ export default function Site() {
             </Link>
           </Button>
         </div>
-
+        <div className="w-full min-w-0 overflow-x-auto">
         <SortableTable columns={columns} data={filteredList} rowKey="siteId" />
+        </div>
       </div>
 
       <CustomModal

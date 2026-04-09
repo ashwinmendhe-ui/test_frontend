@@ -77,13 +77,16 @@ export function SortableTable<T extends Record<string, any>>({
   });
 
   return (
-    <Table
-      columns={antColumns}
-      dataSource={data}
-      rowKey={rowKey}
-      pagination={pagination}
-      bordered={bordered}
-      locale={{ emptyText: t("table_no_data") }}
-    />
+    <div className="w-full overflow-x-auto">
+      <Table
+        columns={antColumns}
+        dataSource={data}
+        rowKey={rowKey}
+        pagination={pagination}
+        bordered={bordered}
+        locale={{ emptyText: t("table_no_data") }}
+        scroll={{ x: "max-content" }}
+      />
+    </div>
   );
 }
