@@ -1,4 +1,7 @@
-import UserForm, { type UserFormValue } from "@/components/common/userForm";
+import UserForm, {
+  type AssignedSiteRow,
+  type UserFormValue,
+} from "@/components/common/userForm";
 import { useUserStore } from "@/stores/userStore";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -8,7 +11,7 @@ export default function UserEditForm() {
   const { detail, getDetail, updateUser, loading } = useUserStore();
 
   const [initialValues, setInitialValues] = useState<UserFormValue | undefined>(
-    detail?.user
+    undefined
   );
 
   const handleUpdate = async (values: UserFormValue) => {
@@ -24,7 +27,20 @@ export default function UserEditForm() {
 
   useEffect(() => {
     if (detail?.user) {
-      setInitialValues(detail.user);
+      const user = detail.user as UserFormValue & {
+        role?: number | string;
+        missionIds?: string[];
+        deviceIds?: string[];
+        sites?: AssignedSiteRow[];
+      };
+
+      setInitialValues({
+        ...user,
+        role: user.role !== undefined ? Number(user.role) : undefined,
+        missionIds: user.missionIds ?? [],
+        deviceIds: user.deviceIds ?? [],
+        sites: user.sites ?? [],
+      });
     }
   }, [detail]);
 

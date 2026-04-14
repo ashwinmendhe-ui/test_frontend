@@ -4,11 +4,23 @@ import PauseIcon from "@/assets/pause-button-icon.svg";
 import PrevIcon from "@/assets/prev-button-icon.svg";
 import NextIcon from "@/assets/next-button-icon.svg";
 import CustomModal from "@/components/common/customModal";
+import DeviceStatusInfo, {
+  type DeviceData,
+} from "@/components/common/deviceStatusInfo";
 import { Button, Form, Select, Switch } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
 import { useNavigate } from "react-router-dom";
+import { useCompanyStore } from "@/stores/companyStore";
+import { useSiteStore } from "@/stores/siteStore";
+import { useMissionStore } from "@/stores/missionStore";
+import { useRobotStore } from "@/stores/robotStore";
+import { useStreamStore } from "@/stores/streamStore";
+import { streamApi } from "@/api";
+import { showNotification } from "@/utils/notification";
+import { formatDateTime } from "@/utils/date";
+import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
 
 type StreamFormValues = {
   company?: string;
@@ -29,51 +41,90 @@ type AIModuleItem = {
 
 export default function StreamIndex() {
   const { t } = useTranslation();
-   const navigate = useNavigate();
+  const navigate = useNavigate();
   const { detailUserLogin } = useUserStore();
+
+  const { list: companyList, getList: getCompanyList } = useCompanyStore();
+  const { list: siteList, getListByCompany: getSiteListByCompany } = useSiteStore();
+  const { listBySite: missionList, getListBySite: getMissionListBySite } =
+    useMissionStore();
+  const {
+    list: robotList,
+    detail: selectedRobotDetail,
+    getListBySite: getRobotListBySite,
+    getDetail: getRobotDetail,
+  } = useRobotStore();
+  const { startStream, heartBeat, createReport } = useStreamStore();
+
   const [form] = Form.useForm<StreamFormValues>();
+  const values = Form.useWatch([], form);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [streamPlaybackUrl, setStreamPlaybackUrl] = useState("");
+  const [streamMapUrl, setStreamMapUrl] = useState("");
 
   const userRole = detailUserLogin?.roles?.[0];
-  const values = Form.useWatch([], form);
 
-  const companyOptions = useMemo(
-    () => [
-      { value: "company-1", label: "Dhive" },
-      { value: "company-2", label: "Test Company" },
-    ],
-    []
-  );
+  const companyOptions = useMemo(() => {
+    if (userRole === 1) {
+      return companyList.map((item) => ({
+        value: item.companyId,
+        label: item.name,
+      }));
+    }
+
+    return [
+      {
+        value: detailUserLogin?.user?.companyId || "",
+        label: detailUserLogin?.user?.companyName || "",
+      },
+    ];
+  }, [companyList, detailUserLogin, userRole]);
 
   const siteOptions = useMemo(
-    () => [
-      { value: "site-1", label: "Seoul Site A" },
-      { value: "site-2", label: "Busan Site B" },
-      { value: "site-3", label: "Incheon Site C" },
-    ],
-    []
+    () =>
+      siteList.map((item) => ({
+        value: item.siteId,
+        label: item.name,
+      })),
+    [siteList]
   );
 
   const deviceOptions = useMemo(
-    () => [
-      { value: "device-1", label: "Drone Alpha" },
-      { value: "device-2", label: "Robot Bravo" },
-      { value: "device-3", label: "Drone Charlie" },
-    ],
-    []
+    () =>
+      robotList.map((item) => ({
+        value: item.deviceId,
+        label: item.deviceName,
+      })),
+    [robotList]
   );
 
-  const missionOptions = useMemo(
-    () => [
-      { value: "mission-1", label: "Patrol Mission" },
-      { value: "mission-2", label: "Monitoring Mission" },
-      { value: "mission-3", label: "Delivery Mission" },
-    ],
-    []
-  );
+  const missionOptions = useMemo(() => {
+    if (!values?.device) {
+      return missionList.map((item) => ({
+        value: item.missionId,
+        label: item.missionName,
+      }));
+    }
+
+    const selectedDevice = robotList.find(
+      (item) => item.deviceId === values.device
+    );
+
+    const filteredMissions = missionList.filter((item) => {
+      if (!selectedDevice?.deviceType) return true;
+      return item.deviceType === selectedDevice.deviceType;
+    });
+
+    return filteredMissions.map((item) => ({
+      value: item.missionId,
+      label: item.missionName,
+    }));
+  }, [missionList, robotList, values?.device]);
 
   const aiModules: AIModuleItem[] = useMemo(
     () => [
@@ -152,7 +203,10 @@ export default function StreamIndex() {
     dangerModules.some((item) => item.value === value)
   ).length;
 
-  const handleSelectChange = (fieldName: keyof StreamFormValues, value: string) => {
+  const handleSelectChange = async (
+    fieldName: keyof StreamFormValues,
+    value: string
+  ) => {
     form.setFieldValue(fieldName, value);
 
     if (fieldName === "company") {
@@ -163,6 +217,10 @@ export default function StreamIndex() {
       });
       setIsStreaming(false);
       setIsPlaying(false);
+      setStreamPlaybackUrl("");
+      setStreamMapUrl("");
+
+      await getSiteListByCompany(value);
     } else if (fieldName === "site") {
       form.setFieldsValue({
         device: undefined,
@@ -170,10 +228,21 @@ export default function StreamIndex() {
       });
       setIsStreaming(false);
       setIsPlaying(false);
+      setStreamPlaybackUrl("");
+      setStreamMapUrl("");
+
+      await Promise.all([
+        getRobotListBySite(value),
+        getMissionListBySite(value),
+      ]);
     } else if (fieldName === "device") {
       form.setFieldValue("mission", undefined);
       setIsStreaming(false);
       setIsPlaying(false);
+      setStreamPlaybackUrl("");
+      setStreamMapUrl("");
+
+      await getRobotDetail(value);
     }
   };
 
@@ -203,21 +272,144 @@ export default function StreamIndex() {
     }
   };
 
+  const streamPayload = useMemo(() => {
+  return {
+    deviceSn: selectedRobotDetail?.deviceSn || "",
+    urlType: 1,
+    videoId: {
+      droneSn: selectedRobotDetail?.droneSn || "1581F7FVC25A700DF473",
+      payloadIndex: {
+        type: selectedRobotDetail?.subDeviceInfo?.type || 99,
+        subType: selectedRobotDetail?.subDeviceInfo?.subType || 0,
+        position: 0,
+      },
+      videoType: "normal",
+    },
+    videoQuality: 0,
+    videoType: "zoom",
+    missionId: values?.mission || "",
+  };
+}, [selectedRobotDetail, values?.mission]);
+
   const handleStartWork = async () => {
     try {
       await form.validateFields();
+
+      // if (!streamPayload.deviceSn || !streamPayload.videoId.droneSn) {
+      //   showNotification(
+      //     "error",
+      //     "Device data missing",
+      //     "Selected device does not have enough streaming information."
+      //   );
+      //   return;
+      // }
+
+      setIsLoading(true);
+
+      const res = await streamApi.start(streamPayload);
+
+      if (res?.code === -1) {
+        showNotification(
+          "error",
+          "Start stream failed",
+          res?.message || "Unable to start stream."
+        );
+        return;
+      }
+
+      if (res?.data?.streamId) {
+        const streamInfo = await startStream(res.data.streamId);
+        const playbackUrl = streamInfo?.playback_url || "";
+        const mapUrl = streamInfo?.map_url || "";
+
+        setStreamPlaybackUrl(playbackUrl);
+        setStreamMapUrl(mapUrl);
+      }
+
+      if (res?.data?.sessionId) {
+        setSessionId(res.data.sessionId);
+        await heartBeat(res.data.sessionId);
+      }
+
       setIsStreaming(true);
       setIsPlaying(true);
-    } catch {
-      // validation errors are already shown by antd form
+
+      showNotification("success", "Stream started", "Live stream started successfully.");
+    } catch (error: any) {
+      showNotification(
+        "error",
+        "Start stream failed",
+        error?.message || "Validation or API error."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleStopWork = () => {
-    setIsStreaming(false);
-    setIsPlaying(false);
-    setIsReportOpen(true);
+  const handleStopWork = async () => {
+    try {
+      setIsLoading(true);
+
+      await streamApi.stop(streamPayload);
+
+      if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
+        await createReport({
+          deviceSn: selectedRobotDetail.deviceSn,
+          playbackUrl: streamPlaybackUrl,
+          missionId: values.mission,
+        });
+      }
+
+      setIsStreaming(false);
+      setIsPlaying(false);
+      setSessionId(null);
+      setIsReportOpen(true);
+
+      showNotification("success", "Stream stopped", "Work session stopped successfully.");
+    } catch (error: any) {
+      showNotification(
+        "error",
+        "Stop stream failed",
+        error?.message || "Unable to stop stream."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleReportOk = () => {
+    setIsReportOpen(false);
+    navigate("/history");
+  };
+
+  const handleReportCancel = () => {
+    setIsReportOpen(false);
+  };
+
+  useEffect(() => {
+    if (userRole === 1) {
+      getCompanyList();
+    }
+  }, [getCompanyList, userRole]);
+
+  useEffect(() => {
+    if (userRole !== 1 && detailUserLogin?.user?.companyId) {
+      form.setFieldValue("company", detailUserLogin.user.companyId);
+      getSiteListByCompany(detailUserLogin.user.companyId);
+    }
+  }, [detailUserLogin, form, getSiteListByCompany, userRole]);
+
+  useEffect(() => {
+    if (!sessionId || !isStreaming) return;
+
+    const interval = setInterval(() => {
+      heartBeat(sessionId).catch((error) => {
+        console.error("Heartbeat failed:", error);
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [heartBeat, isStreaming, sessionId]);
 
   const selectedCompanyLabel =
     companyOptions.find((item) => item.value === values?.company)?.label ||
@@ -232,16 +424,26 @@ export default function StreamIndex() {
 
   const selectedMissionLabel =
     missionOptions.find((item) => item.value === values?.mission)?.label || "-";
- 
-  
-  const handleReportOk = () => {
-      setIsReportOpen(false);
-      navigate("/history");
-    };
 
-const handleReportCancel = () => {
-  setIsReportOpen(false);
-};
+  const deviceData: DeviceData = {
+    status: isStreaming
+      ? selectedRobotDetail?.status || "active"
+      : undefined,
+    battery: undefined,
+    network: undefined,
+    gps:
+      selectedRobotDetail?.siteName ||
+      (selectedRobotDetail?.siteId ? "Connected" : undefined),
+    altitude: undefined,
+    speed: undefined,
+    operatingHour: isStreaming ? "00:00:00" : undefined,
+    startTime: isStreaming ? formatDateTime(Date.now(), true) : undefined,
+    latitude: undefined,
+    longitude: undefined,
+  };
+
+  const isConnected = Boolean(isStreaming && selectedRobotDetail?.deviceId);
+
   return (
     <>
       <div className="w-full flex gap-[11px]">
@@ -261,17 +463,7 @@ const handleReportCancel = () => {
                 >
                   <Select
                     placeholder={t("stream_select_company")}
-                    options={
-                      userRole === 1
-                        ? companyOptions
-                        : [
-                            {
-                              value: detailUserLogin?.user?.companyId || "company-1",
-                              label:
-                                detailUserLogin?.user?.companyName || "Dhive",
-                            },
-                          ]
-                    }
+                    options={companyOptions}
                     disabled={userRole !== 1}
                     className="h-[48px]"
                     onChange={(value) => handleSelectChange("company", value)}
@@ -339,6 +531,7 @@ const handleReportCancel = () => {
                   {!isStreaming ? (
                     <Button
                       type="primary"
+                      loading={isLoading}
                       onClick={handleStartWork}
                       className="w-full h-[48px] rounded-[8px] bg-primary! border-none text-white! font-bold! text-[18px]!"
                     >
@@ -347,6 +540,7 @@ const handleReportCancel = () => {
                   ) : (
                     <Button
                       danger
+                      loading={isLoading}
                       onClick={handleStopWork}
                       className="w-full h-[48px] rounded-[8px] font-bold! text-[18px]!"
                     >
@@ -363,18 +557,31 @@ const handleReportCancel = () => {
                 {isStreaming ? t("status_active").toUpperCase() : "OFFLINE"}
               </div>
 
-              {isStreaming ? (
-                <div className="absolute inset-0 flex items-center justify-center text-white text-xl">
-                  {t("stream_video_placeholder")}
-                </div>
+              {isStreaming && streamPlaybackUrl ? (
+                <HLSPlayer videoUrl={streamPlaybackUrl} />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-                  <img src={NoVideoIcon} alt="No video" className="w-28 h-28 opacity-90" />
+                  <img
+                    src={NoVideoIcon}
+                    alt="No video"
+                    className="w-28 h-28 opacity-90"
+                  />
                   <p className="text-white text-[18px]">
                     {t("stream_waiting_activation")}
                   </p>
                 </div>
-              )}
+              )}: (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
+                  <img
+                    src={NoVideoIcon}
+                    alt="No video"
+                    className="w-28 h-28 opacity-90"
+                  />
+                  <p className="text-white text-[18px]">
+                    {t("stream_waiting_activation")}
+                  </p>
+                </div>
+              )
             </div>
 
             <div className="relative bg-[#364152] rounded-[10px] min-h-[210px] overflow-hidden w-1/2">
@@ -384,12 +591,21 @@ const handleReportCancel = () => {
               </div>
 
               {isStreaming ? (
-                <div className="absolute inset-0 flex items-center justify-center text-white text-lg">
-                  {t("stream_secondary_video_placeholder")}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-lg gap-2">
+                  <div>{t("stream_secondary_video_placeholder")}</div>
+                  {streamMapUrl ? (
+                    <div className="text-sm text-gray-300 px-4 text-center break-all">
+                      {streamMapUrl}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <img src={NoVideoIcon} alt="No video" className="w-20 h-20 opacity-90" />
+                  <img
+                    src={NoVideoIcon}
+                    alt="No video"
+                    className="w-20 h-20 opacity-90"
+                  />
                   <p className="text-white text-[16px]">
                     {t("stream_waiting_activation")}
                   </p>
@@ -444,57 +660,7 @@ const handleReportCancel = () => {
         </div>
 
         <div className="w-1/3 bg-[#F6F7F9] px-6 py-7 rounded-[10px] flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
-              <h2 className="text-[20px] font-bold text-[#222] leading-[1.05]">
-                {t("stream_robot_status")}
-              </h2>
-
-              <div className="mt-8 space-y-6 text-[16px] text-[#333]">
-                <div className="flex justify-between">
-                  <span>{t("stream_robot_situation")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{t("stream_robot_battery")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{t("stream_robot_network")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{t("stream_robot_gps")}</span>
-                  <span>-</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
-              <h2 className="text-[20px] font-bold text-[#222] leading-[1.05]">
-                {t("stream_operation_information")}
-              </h2>
-
-              <div className="mt-8 space-y-6 text-[16px] text-[#333]">
-                <div className="flex justify-between gap-2">
-                  <span>{t("stream_info_altitude")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>{t("stream_info_speed")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>{t("stream_info_operating_hours")}</span>
-                  <span>-</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>{t("stream_info_start_time")}</span>
-                  <span>-</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DeviceStatusInfo isConnected={isConnected} deviceData={deviceData} />
 
           <div className="bg-white rounded-[10px] p-6 flex-1 min-h-[350px]">
             <h2 className="text-[20px] font-bold mb-5">{t("stream_ai_module")}</h2>

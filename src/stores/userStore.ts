@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { userApi } from "@/api";
-import type { UserFormValue } from "@/components/common/userForm";
+import type { AssignedSiteRow, UserFormValue } from "@/components/common/userForm";
 
 export interface UserManagementTable {
   id: string;
@@ -150,7 +150,6 @@ export const useUserStore = create<Store>((set) => ({
       const data = await userApi.getList(param, from, to);
       
       const mappedList = Array.isArray(data) ? data.map(mapUserListItem) : [];
-      console.log("191 in userStore - get list: ", data[0], "mapped: ", mappedList[0]);
       
       set({
         list: mappedList,
@@ -166,30 +165,78 @@ export const useUserStore = create<Store>((set) => ({
     set({ loading: true });
     try {
       const res = await userApi.getDetail(id);
-      // console.log("169 in userStore - user detail api response: ", JSON.stringify(res, null, 2));
-      
-      const mapped: UserDetail = {
-  user: {
-    id: res?.user?.userId ?? res?.user?.id ?? "",
-    role:
-      Array.isArray(res?.roles) && typeof res.roles[0] === "number"
-        ? res.roles[0]
-            : Array.isArray(res?.user?.roleIds) && typeof res.user.roleIds[0] === "number"
-            ? res.user.roleIds[0]
-            : undefined,
-        email: res?.user?.email ?? "",
-        companyId: res?.user?.companyId ?? "",
-        companyName: res?.user?.companyName ?? "",
-        username: res?.user?.username ?? "",
-        phone: res?.user?.phone ?? "",
-        description: res?.user?.description ?? "",
-        createdAt: res?.user?.createdAt ?? "",
-        isActive: res?.user?.isActive ?? false,
-      },
-    };
-      console.log("mapped detail: ", mapped);
-      
 
+      const mappedSites: AssignedSiteRow[] = Array.isArray(res?.user?.sites)
+        ? res.user.sites.map((site: any, index: number) => {
+            const missionList = Array.isArray(site?.missionList)
+              ? site.missionList
+                  .map((mission: any) =>
+                    typeof mission === "string"
+                      ? mission
+                      : mission?.missionId ?? mission?.id ?? ""
+                  )
+                  .filter(Boolean)
+              : Array.isArray(site?.missions)
+              ? site.missions
+                  .map((mission: any) => mission?.missionId ?? mission?.id ?? "")
+                  .filter(Boolean)
+              : Array.isArray(site?.missionIds)
+              ? site.missionIds.filter(Boolean)
+              : [];
+
+            const deviceList = Array.isArray(site?.deviceList)
+              ? site.deviceList
+                  .map((device: any) =>
+                    typeof device === "string"
+                      ? device
+                      : device?.deviceId ?? device?.id ?? ""
+                  )
+                  .filter(Boolean)
+              : Array.isArray(site?.devices)
+              ? site.devices
+                  .map((device: any) => device?.deviceId ?? device?.id ?? "")
+                  .filter(Boolean)
+              : Array.isArray(site?.deviceIds)
+              ? site.deviceIds.filter(Boolean)
+              : [];
+
+            return {
+              id: index + 1,
+              siteId: site.siteId ?? site.id ?? "",
+              siteName: site.siteName ?? site.name ?? "",
+              createdAt: site.createdAt ?? "",
+              missionList,
+              deviceList,
+            };
+          })
+        : [];
+            
+      const mapped: UserDetail = {
+        user: {
+          id: res?.user?.userId ?? res?.user?.id ?? "",
+          role:
+            Array.isArray(res?.roles) && typeof res.roles[0] === "number"
+              ? res.roles[0]
+              : Array.isArray(res?.user?.roleIds) &&
+                typeof res.user.roleIds[0] === "number"
+              ? res.user.roleIds[0]
+              : undefined,
+          email: res?.user?.email ?? "",
+          companyId: res?.user?.companyId ?? "",
+          companyName: res?.user?.companyName ?? "",
+          username: res?.user?.username ?? "",
+          phone: res?.user?.phone ?? "",
+          description: res?.user?.description ?? "",
+          createdAt: res?.user?.createdAt ?? "",
+          isActive: res?.user?.isActive ?? false,
+
+          missionIds: Array.isArray(res?.user?.missionIds) ? res.user.missionIds : [],
+          deviceIds: Array.isArray(res?.user?.deviceIds) ? res.user.deviceIds : [],
+          siteIds: mappedSites.map((site) => site.siteId),
+          sites: mappedSites,
+        },
+      };
+      
       set({ detail: mapped, loading: false });
       return mapped;
     } catch (error) {
@@ -243,9 +290,9 @@ export const useUserStore = create<Store>((set) => ({
   updateUser: async (id, param) => {
     set({ loading: true });
     try {
-      console.log("updateUser payload:", JSON.stringify(param, null, 2));
+      // console.log("updateUser payload:", JSON.stringify(param, null, 2));
       const res = await userApi.updateUser(id, param);
-      console.log("updateUser response:", JSON.stringify(res, null, 2));
+      // console.log("updateUser response:", JSON.stringify(res, null, 2));
       set({ loading: false });
       return res;
     } catch (error: any) {

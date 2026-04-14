@@ -33,6 +33,13 @@ export const robotApi = {
     return res.data;
   },
 
+  getListBySite: async (siteId?: string) => {
+    const res = await axiosClient.get(
+      `/v1/devices${siteId ? `?siteId=${siteId}` : ""}`
+    );
+    return res.data;
+  },
+
   getDetail: async (id: string) => {
     const res = await axiosClient.get(`/v1/devices/${id}`);
     return res.data;

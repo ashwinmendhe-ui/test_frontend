@@ -508,5 +508,14 @@
   "robot_update_success": "Robot updated successfully",
   "robot_update_failed": "Failed to update robot",
   "robot_delete_success": "Robot deleted successfully",
-  "robot_delete_failed": "Failed to delete robot"
+  "robot_delete_failed": "Failed to delete robot",
+
+  "stream_device_status": "Device Status",
+  "stream_device_battery": "Battery",
+  "stream_device_network": "Network",
+  "stream_device_gps": "GPS",
+  "stream_device_altitude": "Altitude",
+  "stream_device_speed": "Speed",
+  "stream_device_operating_hour": "Operating Hour",
+  "stream_device_start_time": "Start Time"
 }

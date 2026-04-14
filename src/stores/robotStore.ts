@@ -51,6 +51,7 @@ interface Store {
   list: RobotManagementTable[];
   detail: DetailDevice;
   getList: (param?: string, from?: string, to?: string) => Promise<void>;
+  getListBySite: (siteId?: string) => Promise<void>;
   getDetail: (id: string) => Promise<DetailDevice | void>;
   createRobot: (
     param: DetailDevice
@@ -158,6 +159,22 @@ export const useRobotStore = create<Store>((set, get) => ({
     }
   },
 
+  getListBySite: async (siteId) => {
+    set({ loading: true });
+    try {
+      const res = await robotApi.getListBySite(siteId);
+      const data = Array.isArray(res) ? res : res?.data || res?.content || [];
+      set({
+        loading: false,
+        list: data.map(mapRobotListItem),
+      });
+    } catch (error) {
+      console.error("Robot list by site fetch failed:", error);
+      set({ loading: false, list: [] });
+      throw error;
+    }
+  },
+
   getDetail: async (id) => {
     set({ loading: true });
     try {
@@ -180,8 +197,7 @@ export const useRobotStore = create<Store>((set, get) => ({
       const payload = {
         ...param,
       };
-      console.log("183 in robotStore", payload);
-      
+
       const res = await robotApi.createRobot(payload);
       await get().getList();
       return res;

@@ -43,22 +43,37 @@ export const userApi = {
   },
 
   createUser: async (data: UserFormValue) => {
-    const res = await axiosClient.post("/v1/users", data);
-    return res.data;
-  },
-
-  updateUser: async (id: string, data: UserFormValue) => {
-    const payload = {
+  const payload = {
     role: data.role,
     email: data.email,
+    password: data.password,
+    confirmPassword: data.confirmPassword,
     companyId: data.companyId,
     username: data.username,
     phone: data.phone,
     description: data.description ?? "",
-    deviceIds: [],
-    missionIds: [],
-    siteIds: [],
+    deviceIds: data.deviceIds ?? [],
+    missionIds: data.missionIds ?? [],
+    siteIds: data.siteIds ?? [],
   };
+
+  const res = await axiosClient.post("/v1/users", payload);
+  return res.data;
+  },
+
+  updateUser: async (id: string, data: UserFormValue) => {
+    const payload = {
+      role: data.role,
+      email: data.email,
+      companyId: data.companyId,
+      username: data.username,
+      phone: data.phone,
+      description: data.description ?? "",
+      deviceIds: data.deviceIds ?? [],
+      missionIds: data.missionIds ?? [],
+      siteIds: data.siteIds ?? [],
+    };
+
     const res = await axiosClient.post(`/v1/users/update/${id}`, payload);
     return res.data;
   },

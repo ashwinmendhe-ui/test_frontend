@@ -1,5 +1,5 @@
 import { Button, Form, Input, Select, Dropdown, Checkbox, message } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomModal from "./customModal";
 import { SortableTable, type SortableTableColumn } from "./table";
@@ -8,9 +8,22 @@ import ActionIcon from "@/assets/table-action-icon.svg";
 import { useUserStore } from "@/stores/userStore";
 import { useTranslation } from "react-i18next";
 import { companyApi } from "@/api";
+import { siteApi } from "@/api/siteApi";
+import { missionApi } from "@/api/missionApi";
+import { robotApi } from "@/api/robotApi";
+
+export interface AssignedSiteRow {
+  id: number;
+  siteId: string;
+  siteName: string;
+  createdAt: string;
+  missionList: string[];
+  deviceList: string[];
+}
 
 export interface UserFormValue {
   role?: number;
+  roleIds?: number[];
   email: string;
   password?: string;
   confirmPassword?: string;
@@ -19,6 +32,10 @@ export interface UserFormValue {
   username: string;
   phone: string;
   description?: string;
+  missionIds?: string[];
+  deviceIds?: string[];
+  siteIds?: string[];
+  sites?: AssignedSiteRow[];
 }
 
 interface Props {
@@ -31,17 +48,15 @@ interface Props {
   loading: boolean;
 }
 
-type SiteOption = {
+type SelectOption = {
   value: string;
   label: string;
 };
 
-type AssignedSiteRow = {
-  id: number;
-  siteName: string;
-  createdAt: string;
-  missionList: string[];
-  deviceList: string[];
+type SiteOption = {
+  value: string;
+  label: string;
+  createdAt?: string;
 };
 
 export default function UserForm({
@@ -58,169 +73,265 @@ export default function UserForm({
 
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
   const [formChangePass] = Form.useForm();
+
   const [isAssignSiteOpen, setIsAssignSiteOpen] = useState(false);
-  const [formAssign] = Form.useForm();
+  const [formAssign] = Form.useForm<{ siteId: string }>();
+
+  const [isDeleteSiteOpen, setIsDeleteSiteOpen] = useState(false);
+  const [isEditSiteOpen, setIsEditSiteOpen] = useState(false);
+  const [formEditSite] = Form.useForm<{
+    missionList?: string[];
+    deviceList?: string[];
+  }>();
+
   const [sites, setSites] = useState<AssignedSiteRow[]>([]);
   const [selectedSiteRecord, setSelectedSiteRecord] =
     useState<AssignedSiteRow | null>(null);
-  const [isDeleteSiteOpen, setIsDeleteSiteOpen] = useState(false);
-  const [isEditSiteOpen, setIsEditSiteOpen] = useState(false);
-  const [formEditSite] = Form.useForm();
+
+  const [companyOptions, setCompanyOptions] = useState<SelectOption[]>([]);
+  const [companyLoading, setCompanyLoading] = useState(mode === "edit");
+  const [companyReady, setCompanyReady] = useState(mode === "add");
+
+  const [siteOptions, setSiteOptions] = useState<SiteOption[]>([]);
+  const [siteLoading, setSiteLoading] = useState(false);
+
+  const [missionOptions, setMissionOptions] = useState<SelectOption[]>([]);
+  const [deviceOptions, setDeviceOptions] = useState<SelectOption[]>([]);
+  const [siteResourceLoading, setSiteResourceLoading] = useState(false);
 
   const { detailUserLogin } = useUserStore();
   const userRole = detailUserLogin?.roles?.[0];
 
-  const roleOptions = [
-    { value: 1, label: t("role_system_administrator") },
-    { value: 2, label: t("role_company_admin") },
-    { value: 3, label: t("role_company_user") },
-  ];
-
-  const [companyOptions, setCompanyOptions] = useState<
-    { value: string; label: string }[]
-    >([]);
-  const [companyLoading, setCompanyLoading] = useState(mode === "edit");
-  const [companyReady, setCompanyReady] = useState(mode === "add");
-  
-
-  const missionOptions = [
-    { value: "mission-1", label: "Mission 1" },
-    { value: "mission-2", label: "Mission 2" },
-    { value: "mission-3", label: "Mission 3" },
-  ];
-
-  const deviceOptions = [
-    { value: "device-1", label: "Robot 1" },
-    { value: "device-2", label: "Robot 2" },
-    { value: "device-3", label: "Robot 3" },
-  ];
-
-  const siteOptions: SiteOption[] = [
-    { value: "site-1", label: "Site 1" },
-    { value: "site-2", label: "Site 2" },
-    { value: "site-3", label: "Site 3" },
-  ];
-
-useEffect(() => {
-  let isMounted = true;
-
-  const fetchCompanies = async () => {
-    if (mode === "edit") {
-      setCompanyLoading(true);
-      setCompanyReady(false);
-    }
-
-    try {
-      const res = await companyApi.getList();
-
-      const mapped = Array.isArray(res)
-        ? res
-            .map((item: any) => ({
-              value: item.companyId ?? item.id ?? "",
-              label: item.companyName ?? item.name ?? "",
-            }))
-            .filter((item) => item.value && item.label)
-        : [];
-
-      const currentSelected =
-        initialValues?.companyId && initialValues?.companyName
-          ? [
-              {
-                value: initialValues.companyId,
-                label: initialValues.companyName,
-              },
-            ]
-          : [];
-
-      const merged = [...currentSelected, ...mapped].filter(
-        (item, index, self) =>
-          self.findIndex((x) => x.value === item.value) === index
-      );
-
-      if (!isMounted) return;
-
-      setCompanyOptions(merged);
-    } catch (error) {
-      console.error("Failed to load companies:", error);
-
-      if (!isMounted) return;
-
-      if (initialValues?.companyId && initialValues?.companyName) {
-        setCompanyOptions([
-          {
-            value: initialValues.companyId,
-            label: initialValues.companyName,
-          },
-        ]);
-      } else {
-        setCompanyOptions([]);
-      }
-    } finally {
-      if (!isMounted) return;
-
-      setCompanyLoading(false);
-      setCompanyReady(true);
-    }
-  };
-
-  fetchCompanies();
-
-  return () => {
-    isMounted = false;
-  };
-}, [mode, initialValues?.companyId, initialValues?.companyName]);
-
-
-useEffect(() => {
-  if (!initialValues) return;
-
-  if (mode === "edit" && !companyReady) return;
-
-  form.setFieldsValue(initialValues);
-}, [initialValues, mode, companyReady, form]);
-
-
-const handleFinish = async (values: UserFormValue) => {
-  console.log("user form submit values:", JSON.stringify(values, null, 2));
-
-  const res = await onSubmit(values);
-
-  console.log("user form submit response:", JSON.stringify(res, null, 2));
-
-  if (!res) return;
-
-  if (
-    res.code === -1 ||
-    res.code === "BAD_REQUEST" ||
-    res.code === "ERROR" ||
-    res.code === 400 ||
-    res.code === 403 ||
-    res.code === 500
-  ) {
-    message.error(res.message || t("common_save_failed"));
-    return;
-  }
-
-  await message.success(
-    mode === "add"
-      ? t("user_create_success", "User created successfully")
-      : t("user_update_success", "User updated successfully"),2
+  const roleOptions = useMemo(
+    () => [
+      { value: 1, label: t("role_system_administrator") },
+      { value: 2, label: t("role_company_admin") },
+      { value: 3, label: t("role_company_user") },
+    ],
+    [t]
   );
 
-  
-    navigate("/settings/user");
-  
-};
+  useEffect(() => {
+    let isMounted = true;
 
-  const handleAssignSiteSubmit = async (values: { siteName: string }) => {
+    const fetchCompanies = async () => {
+      if (mode === "edit") {
+        setCompanyLoading(true);
+        setCompanyReady(false);
+      }
+
+      try {
+        const res = await companyApi.getList();
+
+        const mapped = Array.isArray(res)
+          ? res
+              .map((item: any) => ({
+                value: item.companyId ?? item.id ?? "",
+                label: item.companyName ?? item.name ?? "",
+              }))
+              .filter((item) => item.value && item.label)
+          : [];
+
+        const currentSelected =
+          initialValues?.companyId && initialValues?.companyName
+            ? [
+                {
+                  value: initialValues.companyId,
+                  label: initialValues.companyName,
+                },
+              ]
+            : [];
+
+        const merged = [...currentSelected, ...mapped].filter(
+          (item, index, self) =>
+            self.findIndex((x) => x.value === item.value) === index
+        );
+
+        if (!isMounted) return;
+        setCompanyOptions(merged);
+      } catch (error) {
+        console.error("Failed to load companies:", error);
+
+        if (!isMounted) return;
+
+        if (initialValues?.companyId && initialValues?.companyName) {
+          setCompanyOptions([
+            {
+              value: initialValues.companyId,
+              label: initialValues.companyName,
+            },
+          ]);
+        } else {
+          setCompanyOptions([]);
+        }
+      } finally {
+        if (!isMounted) return;
+        setCompanyLoading(false);
+        setCompanyReady(true);
+      }
+    };
+
+    fetchCompanies();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [mode, initialValues?.companyId, initialValues?.companyName]);
+
+  useEffect(() => {
+    if (!initialValues) return;
+    if (mode === "edit" && !companyReady) return;
+
+    form.setFieldsValue({
+      ...initialValues,
+      role: initialValues.role ? Number(initialValues.role) : undefined,
+    });
+  }, [initialValues, mode, companyReady, form]);
+
+  useEffect(() => {
+    if (mode === "edit" && initialValues?.sites && initialValues.sites.length > 0) {
+      setSites(initialValues.sites);
+    }
+  }, [mode, initialValues]);
+
+  useEffect(() => {
+    if (
+      mode !== "edit" ||
+      !initialValues?.sites?.length ||
+      values?.role !== 3
+    ) {
+      return;
+    }
+
+    setSites((prev) =>
+      prev.map((site) => {
+        if (site.missionList.length > 0 || site.deviceList.length > 0) {
+          return site;
+        }
+
+        return {
+          ...site,
+          missionList: initialValues.missionIds ?? [],
+          deviceList: initialValues.deviceIds ?? [],
+        };
+      })
+    );
+  }, [mode, initialValues, values?.role]);
+
+
+  useEffect(() => {
+    const companyId = values?.companyId;
+
+    if (!companyId || values?.role !== 3) {
+      setSiteOptions([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchSites = async () => {
+      setSiteLoading(true);
+      try {
+        const res = await siteApi.getListByCompany(companyId);
+        const mapped = Array.isArray(res)
+          ? res
+              .map((item: any) => ({
+                value: item.siteId ?? item.id ?? "",
+                label: item.name ?? "",
+                createdAt: item.createdAt ?? "",
+              }))
+              .filter((item) => item.value && item.label)
+          : [];
+
+        if (!isMounted) return;
+        setSiteOptions(mapped);
+      } catch (error) {
+        console.error("Failed to load sites:", error);
+        if (!isMounted) return;
+        setSiteOptions([]);
+      } finally {
+        if (!isMounted) return;
+        setSiteLoading(false);
+      }
+    };
+
+    fetchSites();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [values?.companyId, values?.role]);
+
+  useEffect(() => {
+    if (values?.role !== 3) {
+      setSites([]);
+      setSiteOptions([]);
+      setMissionOptions([]);
+      setDeviceOptions([]);
+      form.setFieldsValue({
+        missionIds: [],
+        deviceIds: [],
+        siteIds: [],
+      });
+    }
+  }, [values?.role, form]);
+
+  const handleFinish = async (formValues: UserFormValue) => {
+    const mergedMissionIds = Array.from(
+      new Set(sites.flatMap((site) => site.missionList ?? []))
+    );
+
+    const mergedDeviceIds = Array.from(
+      new Set(sites.flatMap((site) => site.deviceList ?? []))
+    );
+
+    const payload: UserFormValue = {
+      ...formValues,
+      siteIds: values?.role === 3 ? sites.map((site) => site.siteId) : [],
+      missionIds: values?.role === 3 ? mergedMissionIds : [],
+      deviceIds: values?.role === 3 ? mergedDeviceIds : [],
+      sites: values?.role === 3 ? sites : [],
+    };
+
+    console.log("user form submit payload:", JSON.stringify(payload, null, 2));
+
+    const res = await onSubmit(payload);
+
+    console.log("user form submit response:", JSON.stringify(res, null, 2));
+
+    if (!res) return;
+
+    if (
+      res.code === -1 ||
+      res.code === "BAD_REQUEST" ||
+      res.code === "ERROR" ||
+      res.code === 400 ||
+      res.code === 403 ||
+      res.code === 500
+    ) {
+      message.error(res.message || t("common_save_failed"));
+      return;
+    }
+
+    await message.success(
+      mode === "add"
+        ? t("user_create_success", "User created successfully")
+        : t("user_update_success", "User updated successfully"),
+      2
+    );
+
+    navigate("/settings/user");
+  };
+
+  const handleAssignSiteSubmit = async (assignValues: { siteId: string }) => {
     const selectedSite = siteOptions.find(
-      (site) => site.value === values.siteName
+      (site) => site.value === assignValues.siteId
     );
 
     if (!selectedSite) return;
 
     const alreadyExists = sites.some(
-      (site) => site.siteName === selectedSite.label
+      (site) => site.siteId === selectedSite.value
     );
 
     if (alreadyExists) {
@@ -233,8 +344,9 @@ const handleFinish = async (values: UserFormValue) => {
       ...prev,
       {
         id: prev.length + 1,
+        siteId: selectedSite.value,
         siteName: selectedSite.label,
-        createdAt: new Date().toLocaleString(),
+        createdAt: selectedSite.createdAt ?? "",
         missionList: [],
         deviceList: [],
       },
@@ -244,15 +356,79 @@ const handleFinish = async (values: UserFormValue) => {
     formAssign.resetFields();
   };
 
-  const handleEditSite = (record: AssignedSiteRow) => {
-    setSelectedSiteRecord(record);
+  const handleEditSite = async (record: AssignedSiteRow) => {
+  setSelectedSiteRecord(record);
+  setSiteResourceLoading(true);
+
+  try {
+    const missions = await missionApi.getListBySite(record.siteId);
+    const mappedMissions = Array.isArray(missions)
+      ? missions
+          .map((item: any) => ({
+            label: item.missionName ?? "",
+            value: item.missionId ?? item.id ?? "",
+          }))
+          .filter((item) => item.label && item.value)
+      : [];
+    setMissionOptions(mappedMissions);
+
+    const devices = await robotApi.getList();
+    const filteredDevices = Array.isArray(devices)
+      ? devices.filter((item: any) => item.siteId === record.siteId)
+      : [];
+
+    const mappedDevices = filteredDevices
+      .map((item: any) => ({
+        label: item.deviceName ?? "",
+        value: item.deviceId ?? item.id ?? "",
+      }))
+      .filter((item) => item.label && item.value);
+
+    setDeviceOptions(mappedDevices);
+
+    const fallbackMissionList =
+      record.missionList.length > 0
+        ? record.missionList
+        : mappedMissions
+            .filter((mission) =>
+              (initialValues?.missionIds ?? []).includes(mission.value)
+            )
+            .map((mission) => mission.value);
+
+    const fallbackDeviceList =
+      record.deviceList.length > 0
+        ? record.deviceList
+        : mappedDevices
+            .filter((device) =>
+              (initialValues?.deviceIds ?? []).includes(device.value)
+            )
+            .map((device) => device.value);
+
+    // important: update table state too
+    setSites((prev) =>
+      prev.map((item) =>
+        item.siteId === record.siteId
+          ? {
+              ...item,
+              missionList: fallbackMissionList,
+              deviceList: fallbackDeviceList,
+            }
+          : item
+      )
+    );
 
     formEditSite.setFieldsValue({
-      missionList: record.missionList,
-      deviceList: record.deviceList,
+      missionList: fallbackMissionList,
+      deviceList: fallbackDeviceList,
     });
 
     setIsEditSiteOpen(true);
+  } catch (error) {
+    console.error("Failed to load site mission/device list:", error);
+    message.error(t("common_load_failed", "Failed to load data"));
+  } finally {
+    setSiteResourceLoading(false);
+  }
   };
 
   const handleDeleteSite = (record: AssignedSiteRow) => {
@@ -264,13 +440,19 @@ const handleFinish = async (values: UserFormValue) => {
     if (!selectedSiteRecord) return;
 
     setSites((prev) =>
-      prev.filter((item) => item.id !== selectedSiteRecord.id)
+      prev
+        .filter((item) => item.siteId !== selectedSiteRecord.siteId)
+        .map((item, index) => ({
+          ...item,
+          id: index + 1,
+        }))
     );
+
     setIsDeleteSiteOpen(false);
     setSelectedSiteRecord(null);
   };
 
-  const confirmEditSite = (values: {
+  const confirmEditSite = (editValues: {
     missionList?: string[];
     deviceList?: string[];
   }) => {
@@ -278,11 +460,11 @@ const handleFinish = async (values: UserFormValue) => {
 
     setSites((prev) =>
       prev.map((item) =>
-        item.id === selectedSiteRecord.id
+        item.siteId === selectedSiteRecord.siteId
           ? {
               ...item,
-              missionList: values.missionList || [],
-              deviceList: values.deviceList || [],
+              missionList: editValues.missionList ?? [],
+              deviceList: editValues.deviceList ?? [],
             }
           : item
       )
@@ -354,6 +536,7 @@ const handleFinish = async (values: UserFormValue) => {
       ),
     },
   ] satisfies SortableTableColumn<AssignedSiteRow>[];
+
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
@@ -486,15 +669,15 @@ const handleFinish = async (values: UserFormValue) => {
               ]}
             >
               {mode === "edit" && !companyReady ? (
-              <div className="h-[41px] rounded-[6px] border border-[#d9d9d9] bg-[#fafafa]" />
-            ) : (
-              <Select
-                placeholder={t("user_placeholder_select_company")}
-                className="h-[41px]"
-                options={companyOptions}
-                loading={companyLoading}
-              />
-            )}
+                <div className="h-[41px] rounded-[6px] border border-[#d9d9d9] bg-[#fafafa]" />
+              ) : (
+                <Select
+                  placeholder={t("user_placeholder_select_company")}
+                  className="h-[41px]"
+                  options={companyOptions}
+                  loading={companyLoading}
+                />
+              )}
             </Form.Item>
 
             <Form.Item
@@ -599,14 +782,18 @@ const handleFinish = async (values: UserFormValue) => {
           formAssign.resetFields();
         }}
         content={
-          <Form layout="vertical" form={formAssign} onFinish={handleAssignSiteSubmit}>
+          <Form
+            layout="vertical"
+            form={formAssign}
+            onFinish={handleAssignSiteSubmit}
+          >
             <Form.Item
               label={
                 <div className="text-[18px] font-semibold text-[#333D4B]">
                   {t("user_select_site")}
                 </div>
               }
-              name="siteName"
+              name="siteId"
               rules={[
                 { required: true, message: t("user_validation_select_site") },
               ]}
@@ -615,6 +802,8 @@ const handleFinish = async (values: UserFormValue) => {
                 placeholder={t("user_placeholder_select_site")}
                 className="h-[41px]"
                 options={siteOptions}
+                loading={siteLoading}
+                optionFilterProp="label"
               />
             </Form.Item>
           </Form>
@@ -630,8 +819,8 @@ const handleFinish = async (values: UserFormValue) => {
           <Form
             layout="vertical"
             form={formChangePass}
-            onFinish={(values) => {
-              console.log("Password changed:", values);
+            onFinish={(passwordValues) => {
+              console.log("Password changed:", passwordValues);
               setIsChangePassOpen(false);
             }}
           >
@@ -717,7 +906,11 @@ const handleFinish = async (values: UserFormValue) => {
           formEditSite.resetFields();
         }}
         content={
-          <Form layout="vertical" form={formEditSite} onFinish={confirmEditSite}>
+          <Form
+            layout="vertical"
+            form={formEditSite}
+            onFinish={confirmEditSite}
+          >
             <div className="flex gap-4">
               <Form.Item
                 className="w-1/2"
@@ -731,11 +924,15 @@ const handleFinish = async (values: UserFormValue) => {
                 <Checkbox.Group className="w-full">
                   <div className="w-full max-h-[196px] overflow-y-auto bg-[#F6F7F9] px-5 py-2.5 rounded-[7px] border border-[#DDE0E5]">
                     <div className="flex flex-col gap-2">
-                      {missionOptions.map((mission) => (
-                        <Checkbox key={mission.value} value={mission.value}>
-                          {mission.label}
-                        </Checkbox>
-                      ))}
+                      {siteResourceLoading ? (
+                        <div>{t("common_loading", "Loading...")}</div>
+                      ) : (
+                        missionOptions.map((mission) => (
+                          <Checkbox key={mission.value} value={mission.value}>
+                            {mission.label}
+                          </Checkbox>
+                        ))
+                      )}
                     </div>
                   </div>
                 </Checkbox.Group>
@@ -753,11 +950,15 @@ const handleFinish = async (values: UserFormValue) => {
                 <Checkbox.Group className="w-full">
                   <div className="w-full max-h-[196px] overflow-y-auto bg-[#F6F7F9] px-5 py-2.5 rounded-[7px] border border-[#DDE0E5]">
                     <div className="flex flex-col gap-2">
-                      {deviceOptions.map((device) => (
-                        <Checkbox key={device.value} value={device.value}>
-                          {device.label}
-                        </Checkbox>
-                      ))}
+                      {siteResourceLoading ? (
+                        <div>{t("common_loading", "Loading...")}</div>
+                      ) : (
+                        deviceOptions.map((device) => (
+                          <Checkbox key={device.value} value={device.value}>
+                            {device.label}
+                          </Checkbox>
+                        ))
+                      )}
                     </div>
                   </div>
                 </Checkbox.Group>
