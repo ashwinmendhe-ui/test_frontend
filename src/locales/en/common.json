@@ -517,5 +517,9 @@
   "stream_device_altitude": "Altitude",
   "stream_device_speed": "Speed",
   "stream_device_operating_hour": "Operating Hour",
-  "stream_device_start_time": "Start Time"
-}
+  "stream_device_start_time": "Start Time",
+  "stream_video_attachment": "Video Attachment",
+  "stream_select_first_video": "Please select the first video",
+  "stream_movement_route_map": "Movement Route Map",
+  "stream_map_waiting_activation": "It will be activated after video attachment."
+  }

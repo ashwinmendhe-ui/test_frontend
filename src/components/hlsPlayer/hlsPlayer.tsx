@@ -1,38 +1,45 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import Hls from "hls.js";
-
-export type HLSPlayerRef = {
-  play: () => Promise<void>;
-  pause: () => void;
-  seek: (time: number) => void;
-  getCurrentTime: () => number;
-  getDuration: () => number;
-};
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
+import type { HLSPlayerRef } from "./types";
 
 interface HLSPlayerProps {
-  videoUrl?: string;
-  autoPlay?: boolean;
+  src?: string;
   className?: string;
+  autoPlay?: boolean;
+  muted?: boolean;
+  controls?: boolean;
+  onLoadedMetadata?: () => void;
+  onTimeUpdate?: () => void;
+  onEnded?: () => void;
 }
 
 const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
-  ({ videoUrl, autoPlay = true, className }, ref) => {
+  (
+    {
+      src,
+      className,
+      autoPlay = true,
+      muted = true,
+      controls = false,
+      onLoadedMetadata,
+      onTimeUpdate,
+      onEnded,
+    },
+    ref
+  ) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hlsRef = useRef<Hls | null>(null);
 
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    // Initialize HLS
     useEffect(() => {
-      if (!videoUrl || !videoRef.current) return;
-
-      setIsLoading(true);
-      setError(null);
-
       const video = videoRef.current;
 
-      // Clean previous instance
+      if (!video || !src) return;
+
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -40,38 +47,31 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
       if (Hls.isSupported()) {
         const hls = new Hls({
+          enableWorker: true,
           lowLatencyMode: true,
         });
 
-        hlsRef.current = hls;
-
-        hls.loadSource(videoUrl);
+        hls.loadSource(src);
         hls.attachMedia(video);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setIsLoading(false);
+        hls.on(Hls.Events.MANIFEST_PARSED, async () => {
           if (autoPlay) {
-            video.play().catch(() => {});
+            try {
+              await video.play();
+            } catch (error) {
+              console.error("Video autoplay failed:", error);
+            }
           }
         });
 
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          console.error("HLS error:", data);
-          setError("Stream error");
-          setIsLoading(false);
-        });
+        hlsRef.current = hls;
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        // Safari native HLS
-        video.src = videoUrl;
-        video.addEventListener("loadedmetadata", () => {
-          setIsLoading(false);
-          if (autoPlay) {
-            video.play().catch(() => {});
-          }
-        });
-      } else {
-        setError("HLS not supported in this browser");
-        setIsLoading(false);
+        video.src = src;
+        if (autoPlay) {
+          video
+            .play()
+            .catch((error) => console.error("Native HLS autoplay failed:", error));
+        }
       }
 
       return () => {
@@ -80,52 +80,71 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           hlsRef.current = null;
         }
       };
-    }, [videoUrl, autoPlay]);
+    }, [src, autoPlay]);
 
-    // Expose controls
     useImperativeHandle(ref, () => ({
       play: async () => {
-        await videoRef.current?.play();
+        const video = videoRef.current;
+        if (!video) return;
+        await video.play();
       },
       pause: () => {
-        videoRef.current?.pause();
+        const video = videoRef.current;
+        if (!video) return;
+        video.pause();
       },
-      seek: (time: number) => {
-        if (videoRef.current) {
-          videoRef.current.currentTime = time;
+      seekBy: (seconds: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+        const nextTime = video.currentTime + seconds;
+
+        if (duration > 0) {
+          video.currentTime = Math.min(Math.max(nextTime, 0), duration);
+        } else {
+          video.currentTime = Math.max(nextTime, 0);
         }
       },
-      getCurrentTime: () => videoRef.current?.currentTime || 0,
-      getDuration: () => videoRef.current?.duration || 0,
+      seekTo: (seconds: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+
+        if (duration > 0) {
+          video.currentTime = Math.min(Math.max(seconds, 0), duration);
+        } else {
+          video.currentTime = Math.max(seconds, 0);
+        }
+      },
+      getCurrentTime: () => {
+        return videoRef.current?.currentTime ?? 0;
+      },
+      getDuration: () => {
+        const duration = videoRef.current?.duration ?? 0;
+        return Number.isFinite(duration) ? duration : 0;
+      },
+      isPaused: () => {
+        return videoRef.current?.paused ?? true;
+      },
     }));
 
     return (
-      <div className={`relative w-full h-full bg-black ${className || ""}`}>
-        {/* Video */}
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          controls={false}
-          muted
-          playsInline
-        />
-
-        {/* Loading */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center text-white">
-            Loading stream...
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center text-red-400">
-            {error}
-          </div>
-        )}
-      </div>
+      <video
+        ref={videoRef}
+        className={className}
+        muted={muted}
+        controls={controls}
+        playsInline
+        onLoadedMetadata={onLoadedMetadata}
+        onTimeUpdate={onTimeUpdate}
+        onEnded={onEnded}
+      />
     );
   }
 );
+
+HLSPlayer.displayName = "HLSPlayer";
 
 export default HLSPlayer;
