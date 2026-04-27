@@ -12,6 +12,11 @@ export default function Login() {
       password: "123456",
     });
 
+    // const result = await login({
+    //   email: "ashwin.mendhe@dhive.pro",
+    //   password: "Ashwin@11",
+    // });
+
     if (result?.token) {
       navigate("/dashboard");
     } else {

@@ -1,15 +1,20 @@
 import FolderIcon from "@/assets/folder-icon.svg";
 import NoVideoIcon from "@/assets/no-video-icon.svg";
-import PlayIcon from "@/assets/play-button-icon.svg";
-import PauseIcon from "@/assets/pause-button-icon.svg";
-import PrevIcon from "@/assets/prev-button-icon.svg";
-import NextIcon from "@/assets/next-button-icon.svg";
 import SelectIcon from "@/assets/playback-select-icon.svg";
 import XIcon from "@/assets/x-icon.svg";
-import { Button, Form, Select, Slider, Switch } from "antd";
-import { useMemo, useState } from "react";
+import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
+import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
+import { useCompanyStore } from "@/stores/companyStore";
+import { useSiteStore } from "@/stores/siteStore";
+import { useRobotStore } from "@/stores/robotStore";
+import { useMissionStore } from "@/stores/missionStore";
+import { usePlaybackStore } from "@/stores/playbackStore";
+import ControlBar from "@/components/common/controlBar";
+import { Form, Select, Switch } from "antd";
+import { formatTime } from "@/utils/date";
 
 type PlaybackFormValues = {
   company?: string;
@@ -41,17 +46,68 @@ type DeviceInfo = {
   longitude: string;
 };
 
-type VideoOption = {
-  value: string;
-  label: string;
-  duration: number;
+type VideoBookmark = {
+  timeSec: number | null;
+  type?: number;
+  c_ar?: number[];
 };
 
-const formatSeconds = (value: number) => {
-  const total = Math.max(0, Math.floor(value));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+type TimelineMarker = {
+  timeSec: number;
+  type: "vehicle" | "person" | "safety" | "alert";
+  label: string;
+  confidence?: number;
+  position?: "top" | "bottom";
+  classIds?: number[];
+};
+
+type LabelsMap = Record<number, string>;
+
+const getMetadataBaseUrl = (videoUrl: string) => {
+  return videoUrl
+    .replace(/\/index\.m3u8(\?.*)?$/i, "")
+    .replace(/\/playlist\.m3u8(\?.*)?$/i, "");
+};
+
+const normalizeText = (value?: string) => (value || "").trim().toLowerCase();
+
+const getMarkerTypeFromLabel = (
+  label?: string
+): TimelineMarker["type"] => {
+  const text = normalizeText(label);
+
+  if (
+    text.includes("person") ||
+    text.includes("human") ||
+    text.includes("intrusion")
+  ) {
+    return "person";
+  }
+
+  if (
+    text.includes("vehicle") ||
+    text.includes("car") ||
+    text.includes("truck") ||
+    text.includes("forklift")
+  ) {
+    return "vehicle";
+  }
+
+  if (
+    text.includes("helmet") ||
+    text.includes("vest") ||
+    text.includes("ppe") ||
+    text.includes("safety")
+  ) {
+    return "safety";
+  }
+
+  return "alert";
+};
+
+const getMarkerConfidence = (classIds?: number[]) => {
+  if (!classIds || classIds.length === 0) return undefined;
+  return 100;
 };
 
 export default function Playback() {
@@ -59,67 +115,94 @@ export default function Playback() {
   const { detailUserLogin } = useUserStore();
   const [form] = Form.useForm<PlaybackFormValues>();
 
+  const playerRefs = useRef<Record<string, HLSPlayerRef | null>>({});
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+
+  const [videoTimes, setVideoTimes] = useState<Record<string, number>>({});
+  const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
+  const [videoLoading, setVideoLoading] = useState<Record<string, boolean>>({});
+  const [bookmarksByVideo, setBookmarksByVideo] = useState<
+    Record<string, VideoBookmark[]>
+  >({});
+  const [labelsByVideo, setLabelsByVideo] = useState<Record<string, LabelsMap>>({});
+
+  const { list: companyList, getList: getCompanyList } = useCompanyStore();
+  const { list: siteList, getListByCompany } = useSiteStore();
+  const { list: robotList, getListBySite: getRobotListBySite } = useRobotStore();
+  const { listBySite: missionList, getListBySite: getMissionListBySite } =
+    useMissionStore();
+  const { list: playbackList, getPlayback, resetPlayback } = usePlaybackStore();
 
   const userRole = detailUserLogin?.roles?.[0];
   const values = Form.useWatch([], form);
 
-  const companyOptions = useMemo(
-    () => [
-      { value: "company-1", label: "Dhive" },
-      { value: "company-2", label: "Test Company" },
-    ],
-    []
-  );
+  const companyOptions = useMemo(() => {
+    if (userRole === 1) {
+      return companyList.map((item) => ({
+        value: item.companyId,
+        label: item.name,
+      }));
+    }
+
+    return detailUserLogin?.user?.companyId
+      ? [
+          {
+            value: detailUserLogin.user.companyId,
+            label: detailUserLogin.user.companyName || "",
+          },
+        ]
+      : [];
+  }, [userRole, companyList, detailUserLogin]);
 
   const siteOptions = useMemo(
-    () => [
-      { value: "site-1", label: "Seoul Site A" },
-      { value: "site-2", label: "Busan Site B" },
-      { value: "site-3", label: "Incheon Site C" },
-    ],
-    []
+    () =>
+      siteList.map((item) => ({
+        value: item.siteId,
+        label: item.name,
+      })),
+    [siteList]
   );
 
   const deviceOptions = useMemo(
-    () => [
-      { value: "device-1", label: "Drone Alpha" },
-      { value: "device-2", label: "Robot Bravo" },
-      { value: "device-3", label: "Drone Charlie" },
-    ],
-    []
+    () =>
+      robotList.map((item) => ({
+        value: item.deviceId,
+        label: item.deviceName,
+      })),
+    [robotList]
   );
 
-  const missionOptions = useMemo(
-    () => [
-      { value: "mission-1", label: "Patrol Mission" },
-      { value: "mission-2", label: "Monitoring Mission" },
-      { value: "mission-3", label: "Delivery Mission" },
-    ],
-    []
+  const selectedDevice = useMemo(
+    () => robotList.find((item) => item.deviceId === values?.device),
+    [robotList, values?.device]
   );
 
-  const videoOptions: VideoOption[] = useMemo(
-    () => [
-      {
-        value: "video-1",
-        label: "2026-03-27 10:15 Patrol Mission",
-        duration: 180,
-      },
-      {
-        value: "video-2",
-        label: "2026-03-27 11:10 Monitoring Mission",
-        duration: 240,
-      },
-      {
-        value: "video-3",
-        label: "2026-03-27 13:45 Delivery Mission",
-        duration: 210,
-      },
-    ],
-    []
+  const missionOptions = useMemo(() => {
+    return missionList
+      .filter((item) =>
+        selectedDevice?.deviceType
+          ? item.deviceType === selectedDevice.deviceType
+          : true
+      )
+      .map((item) => ({
+        value: item.missionId,
+        label: item.missionName,
+      }));
+  }, [missionList, selectedDevice]);
+
+  const videoOptions = useMemo(
+    () =>
+      playbackList
+        .slice()
+        .sort((a, b) => b.segment.localeCompare(a.segment))
+        .map((item) => ({
+          value: item.url,
+          label: item.segment,
+        })),
+    [playbackList]
   );
 
   const aiModules: AIModuleItem[] = useMemo(
@@ -179,29 +262,104 @@ export default function Playback() {
     [selectedVideos, videoOptions]
   );
 
+  const metadataBaseByVideo = useMemo(() => {
+    const next: Record<string, string> = {};
+    selectedVideos.forEach((url) => {
+      next[url] = getMetadataBaseUrl(url);
+    });
+    return next;
+  }, [selectedVideos]);
+
+  const selectedModuleIdsByVideo = useMemo(() => {
+    const result: Record<string, number[]> = {};
+
+    selectedVideos.forEach((videoUrl) => {
+      const labels = labelsByVideo[videoUrl] || {};
+      const matchedIds = Object.entries(labels)
+        .filter(([, label]) => {
+          const normalizedLabel = normalizeText(label);
+          return selectedModules.some(
+            (moduleValue) => normalizedLabel === normalizeText(moduleValue)
+          );
+        })
+        .map(([id]) => Number(id))
+        .filter((id) => Number.isFinite(id));
+
+      result[videoUrl] = matchedIds;
+    });
+
+    return result;
+  }, [labelsByVideo, selectedModules, selectedVideos]);
+
   const mainDuration = useMemo(() => {
-    if (selectedVideoItems.length === 0) return 0;
-    return Math.max(...selectedVideoItems.map((item) => item.duration));
-  }, [selectedVideoItems]);
+    if (selectedVideos.length === 0) return 0;
+    const durations = selectedVideos.map((url) => videoDurations[url] || 0);
+    return durations.length > 0 ? Math.max(...durations) : 0;
+  }, [selectedVideos, videoDurations]);
+
+  const mainVideoUrl = useMemo(() => {
+    if (selectedVideos.length === 0) return undefined;
+
+    return selectedVideos.reduce((longest, current) => {
+      const longestDuration = videoDurations[longest] || 0;
+      const currentDuration = videoDurations[current] || 0;
+      return currentDuration > longestDuration ? current : longest;
+    }, selectedVideos[0]);
+  }, [selectedVideos, videoDurations]);
+
+  const getMainPlayer = () => {
+    if (!mainVideoUrl) return null;
+    return playerRefs.current[mainVideoUrl] || null;
+  };
 
   const playbackDeviceInfo: DeviceInfo = {
     deviceName:
-      deviceOptions.find((item) => item.value === values?.device)?.label || "Drone Alpha",
+      robotList.find((item) => item.deviceId === values?.device)?.deviceName || "-",
     companyName:
-      companyOptions.find((item) => item.value === values?.company)?.label || "Dhive",
-    siteName:
-      siteOptions.find((item) => item.value === values?.site)?.label || "Seoul Site A",
+      companyList.find((item) => item.companyId === values?.company)?.name ||
+      detailUserLogin?.user?.companyName ||
+      "-",
+    siteName: siteList.find((item) => item.siteId === values?.site)?.name || "-",
     missionName:
-      missionOptions.find((item) => item.value === values?.mission)?.label || "Patrol Mission",
-    status: selectedVideos.length > 0 ? "active" : "offline",
-    deviceSn: "SN-001-A1",
-    startTime: "2026-03-27 10:15:00",
-    operatingHour: formatSeconds(currentTime),
-    latitude: "37.5665",
-    longitude: "126.9780",
+      missionList.find((item) => item.missionId === values?.mission)?.missionName ||
+      "-",
+    status: selectedVideos.length > 0 ? "active" : "inactive",
+    deviceSn:
+      robotList.find((item) => item.deviceId === values?.device)?.deviceSn || "-",
+    startTime: "-",
+    operatingHour: "_",
+    latitude: "-",
+    longitude: "-",
   };
 
-  const handleSelectChange = (fieldName: keyof PlaybackFormValues, value: string) => {
+  const handleBookmarksChange = useCallback(
+    (
+      items: Array<{ timeSec: number | null; t?: number; c_ar?: number[] }>,
+      videoUrl: string
+    ) => {
+      setBookmarksByVideo((prev) => ({
+        ...prev,
+        [videoUrl]: items.map((item) => ({
+          timeSec: item.timeSec,
+          type: item.t,
+          c_ar: item.c_ar,
+        })),
+      }));
+    },
+    []
+  );
+
+  const handleLabelsLoaded = useCallback((labels: LabelsMap, videoUrl: string) => {
+    setLabelsByVideo((prev) => ({
+      ...prev,
+      [videoUrl]: labels,
+    }));
+  }, []);
+
+  const handleSelectChange = (
+    fieldName: keyof PlaybackFormValues,
+    value: string
+  ) => {
     form.setFieldValue(fieldName, value);
 
     if (fieldName === "company") {
@@ -210,54 +368,211 @@ export default function Playback() {
         device: undefined,
         mission: undefined,
       });
+
       setSelectedVideos([]);
       setCurrentTime(0);
+      setDuration(0);
       setIsPlaying(false);
+      setBookmarksByVideo({});
+      setLabelsByVideo({});
+      resetPlayback();
     } else if (fieldName === "site") {
       form.setFieldsValue({
         device: undefined,
         mission: undefined,
       });
+
       setSelectedVideos([]);
       setCurrentTime(0);
+      setDuration(0);
       setIsPlaying(false);
+      setBookmarksByVideo({});
+      setLabelsByVideo({});
+      resetPlayback();
     } else if (fieldName === "device") {
       form.setFieldsValue({
         mission: undefined,
       });
+
       setSelectedVideos([]);
       setCurrentTime(0);
+      setDuration(0);
       setIsPlaying(false);
+      setBookmarksByVideo({});
+      setLabelsByVideo({});
+      resetPlayback();
+    } else if (fieldName === "mission") {
+      setSelectedVideos([]);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setBookmarksByVideo({});
+      setLabelsByVideo({});
     }
   };
 
   const handleVideoSelectionChange = (value: string[]) => {
     const limited = value.slice(0, 2);
+
+    Object.keys(playerRefs.current).forEach((key) => {
+      if (!limited.includes(key)) {
+        delete playerRefs.current[key];
+      }
+    });
+
     setSelectedVideos(limited);
     setCurrentTime(0);
+    setDuration(0);
     setIsPlaying(false);
+    setVideoTimes({});
+    setVideoDurations({});
+    setVideoLoading({});
+    setBookmarksByVideo((prev) => {
+      const next: Record<string, VideoBookmark[]> = {};
+      limited.forEach((url) => {
+        if (prev[url]) next[url] = prev[url];
+      });
+      return next;
+    });
+    setLabelsByVideo((prev) => {
+      const next: Record<string, LabelsMap> = {};
+      limited.forEach((url) => {
+        if (prev[url]) next[url] = prev[url];
+      });
+      return next;
+    });
   };
 
   const handleRemoveVideo = (index: number) => {
+    const removedVideo = selectedVideos[index];
+
+    if (removedVideo) {
+      delete playerRefs.current[removedVideo];
+    }
+
+    setVideoLoading((prev) => {
+      const next = { ...prev };
+      if (removedVideo) delete next[removedVideo];
+      return next;
+    });
+
     setSelectedVideos((prev) => prev.filter((_, i) => i !== index));
     setCurrentTime(0);
+    setDuration(0);
     setIsPlaying(false);
+
+    setVideoTimes((prev) => {
+      const next = { ...prev };
+      if (removedVideo) delete next[removedVideo];
+      return next;
+    });
+
+    setVideoDurations((prev) => {
+      const next = { ...prev };
+      if (removedVideo) delete next[removedVideo];
+      return next;
+    });
+
+    setBookmarksByVideo((prev) => {
+      const next = { ...prev };
+      if (removedVideo) delete next[removedVideo];
+      return next;
+    });
+
+    setLabelsByVideo((prev) => {
+      const next = { ...prev };
+      if (removedVideo) delete next[removedVideo];
+      return next;
+    });
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     if (selectedVideos.length === 0) return;
-    setIsPlaying((prev) => !prev);
+
+    try {
+      const players = selectedVideos
+        .map((url) => playerRefs.current[url])
+        .filter(Boolean) as HLSPlayerRef[];
+
+      if (players.length === 0) return;
+
+      const shouldPlay = players.some((player) => player.isPaused());
+
+      if (shouldPlay) {
+        await Promise.all(
+          players.map(async (player, index) => {
+            const videoUrl = selectedVideos[index];
+            const current = videoTimes[videoUrl] || 0;
+            const videoDuration = videoDurations[videoUrl] || 0;
+
+            if (videoDuration > 0 && current >= videoDuration) {
+              player.seekTo(Math.max(0, videoDuration - 0.1));
+            }
+
+            await player.play();
+          })
+        );
+        setIsPlaying(true);
+      } else {
+        players.forEach((player) => player.pause());
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error("Playback toggle failed:", error);
+    }
   };
 
   const handlePrevious = () => {
-    setCurrentTime((prev) => Math.max(0, prev - 10));
+    const players = selectedVideos
+      .map((url) => playerRefs.current[url])
+      .filter(Boolean) as HLSPlayerRef[];
+
+    if (players.length === 0) return;
+
+    players.forEach((player, index) => {
+      const videoUrl = selectedVideos[index];
+      const current = videoTimes[videoUrl] || 0;
+      const next = Math.max(0, current - 10);
+      player.seekTo(next);
+    });
+
+    const nextMainTime = Math.max(0, currentTime - 10);
+    setCurrentTime(nextMainTime);
   };
 
   const handleNext = () => {
-    setCurrentTime((prev) => Math.min(mainDuration, prev + 10));
+    const players = selectedVideos
+      .map((url) => playerRefs.current[url])
+      .filter(Boolean) as HLSPlayerRef[];
+
+    if (players.length === 0) return;
+
+    players.forEach((player, index) => {
+      const videoUrl = selectedVideos[index];
+      const current = videoTimes[videoUrl] || 0;
+      const videoDuration = videoDurations[videoUrl] || 0;
+      const next = Math.min(videoDuration, current + 10);
+      player.seekTo(next);
+    });
+
+    const nextMainTime = Math.min(mainDuration, currentTime + 10);
+    setCurrentTime(nextMainTime);
   };
 
   const handleSliderChange = (value: number) => {
+    setCurrentTime(value);
+  };
+
+  const handleTimeChangeComplete = (value: number) => {
+    selectedVideos.forEach((url) => {
+      const player = playerRefs.current[url];
+      const videoDuration = videoDurations[url] || 0;
+      if (!player) return;
+
+      const clampedValue = Math.min(value, videoDuration || value);
+      player.seekTo(clampedValue);
+    });
+
     setCurrentTime(value);
   };
 
@@ -290,13 +605,152 @@ export default function Playback() {
   const commonCount = aiModules.filter((item) => item.type === "common").length;
   const dangerCount = aiModules.filter((item) => item.type === "danger").length;
 
-  const selectedCommonCount = selectedModules.filter((value) =>
-    aiModules.find((item) => item.value === value)?.type === "common"
+  const selectedCommonCount = selectedModules.filter(
+    (value) => aiModules.find((item) => item.value === value)?.type === "common"
   ).length;
 
-  const selectedDangerCount = selectedModules.filter((value) =>
-    aiModules.find((item) => item.value === value)?.type === "danger"
+  const selectedDangerCount = selectedModules.filter(
+    (value) => aiModules.find((item) => item.value === value)?.type === "danger"
   ).length;
+
+  useEffect(() => {
+    if (userRole === 1) {
+      getCompanyList();
+    }
+  }, [userRole, getCompanyList]);
+
+  useEffect(() => {
+    if (userRole !== 1 && detailUserLogin?.user?.companyId) {
+      form.setFieldValue("company", detailUserLogin.user.companyId);
+    }
+  }, [userRole, detailUserLogin, form]);
+
+  useEffect(() => {
+    if (values?.company) {
+      getListByCompany(values.company);
+    }
+  }, [values?.company, getListByCompany]);
+
+  useEffect(() => {
+    if (values?.site) {
+      getRobotListBySite(values.site);
+      getMissionListBySite(values.site);
+    }
+  }, [values?.site, getRobotListBySite, getMissionListBySite]);
+
+  useEffect(() => {
+    if (!values?.company) {
+      resetPlayback();
+      return;
+    }
+
+    getPlayback({
+      companyId: values.company,
+      siteId: values.site || "",
+      deviceSn: selectedDevice?.deviceSn || "",
+      missionId: values.mission || "",
+    });
+  }, [
+    values?.company,
+    values?.site,
+    values?.mission,
+    selectedDevice?.deviceSn,
+    getPlayback,
+    resetPlayback,
+  ]);
+
+  useEffect(() => {
+    if (selectedVideos.length === 0) {
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+    }
+  }, [selectedVideos]);
+
+  useEffect(() => {
+    if (selectedVideos.length === 0) return;
+
+    const nextLoading: Record<string, boolean> = {};
+    selectedVideos.forEach((url) => {
+      nextLoading[url] = true;
+    });
+
+    setVideoLoading(nextLoading);
+  }, [selectedVideos]);
+
+  const getVideoStatus = (videoUrl: string) => {
+    if (videoLoading[videoUrl]) {
+      return {
+        label: "Loading...",
+        dotClass: "bg-[#F59E0B]",
+      };
+    }
+
+    if (isPlaying) {
+      return {
+        label: "PLAY",
+        dotClass: "bg-[#22C55E]",
+      };
+    }
+
+    return {
+      label: "PAUSE",
+      dotClass: "bg-[#F59E0B]",
+    };
+  };
+
+  const timelineMarkers = useMemo(() => {
+    if (mainDuration <= 0) return [];
+
+    const buildMarkers = (
+      videoUrl: string | undefined,
+      position: "top" | "bottom"
+    ): TimelineMarker[] => {
+      if (!videoUrl) return [];
+
+      const bookmarks = bookmarksByVideo[videoUrl] || [];
+      const labelsMap = labelsByVideo[videoUrl] || {};
+      const allowedIds = selectedModuleIdsByVideo[videoUrl] || [];
+
+      return bookmarks
+        .filter((bookmark) => {
+          if (bookmark.timeSec == null) return false;
+          if (!bookmark.c_ar || bookmark.c_ar.length === 0) return true;
+          if (allowedIds.length === 0) return true;
+          return bookmark.c_ar.some((id) => allowedIds.includes(id));
+        })
+        .map((bookmark, index) => {
+          const primaryClassId = bookmark.c_ar?.[0];
+          const primaryLabel = primaryClassId != null ? labelsMap[primaryClassId] : "";
+          const fallbackLabel =
+            primaryLabel ||
+            (bookmark.type != null ? `Event ${bookmark.type}` : t("playback_event"));
+
+          return {
+            timeSec: Number(bookmark.timeSec?.toFixed(1) || 0),
+            type: getMarkerTypeFromLabel(primaryLabel),
+            label: fallbackLabel,
+            confidence: getMarkerConfidence(bookmark.c_ar),
+            position,
+            classIds: bookmark.c_ar,
+            id: `${videoUrl}-${index}`,
+          };
+        })
+        .filter((marker) => marker.timeSec >= 0 && marker.timeSec <= mainDuration);
+    };
+
+    const primary = buildMarkers(selectedVideos[0], "top");
+    const secondary = buildMarkers(selectedVideos[1], "bottom");
+
+    return [...primary, ...secondary].sort((a, b) => a.timeSec - b.timeSec);
+  }, [
+    bookmarksByVideo,
+    labelsByVideo,
+    selectedModuleIdsByVideo,
+    selectedVideos,
+    mainDuration,
+    t,
+  ]);
 
   return (
     <div className="w-full h-full flex gap-[11px]">
@@ -315,16 +769,7 @@ export default function Playback() {
             >
               <Select
                 placeholder={t("stream_select_company")}
-                options={
-                  userRole === 1
-                    ? companyOptions
-                    : [
-                        {
-                          value: detailUserLogin?.user?.companyId || "company-1",
-                          label: detailUserLogin?.user?.companyName || "Dhive",
-                        },
-                      ]
-                }
+                options={companyOptions}
                 disabled={userRole !== 1}
                 className="h-[48px]"
                 onChange={(value) => handleSelectChange("company", value)}
@@ -397,8 +842,8 @@ export default function Playback() {
                 className="w-full h-[48px]"
                 onChange={handleVideoSelectionChange}
                 placeholder={t("playback_select_video")}
-                disabled={!values?.mission}
-                maxTagCount="responsive"
+                disabled={!values?.device}
+                maxTagCount={2}
                 maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
               />
             </div>
@@ -411,83 +856,231 @@ export default function Playback() {
               <img src={NoVideoIcon} alt="No video available" className="w-24 h-24" />
               <p className="text-base">{t("playback_no_video")}</p>
             </div>
-          ) : (
-            <div
-              className={`grid gap-2 p-2 h-full ${
-                selectedVideos.length === 1 ? "grid-cols-1" : "grid-cols-2"
-              }`}
-            >
-              {selectedVideoItems.map((video, index) => (
-                <div
-                  key={video.value}
-                  className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center"
-                >
-                  <div className="absolute top-3 left-3 z-10 bg-white/90 rounded-full px-3 py-1 text-xs font-semibold text-[#333D4B]">
-                    {index === 0
-                      ? t("playback_primary_video")
-                      : t("playback_secondary_video")}
-                  </div>
-
-                  <div className="text-white text-lg text-center px-4">
-                    {video.label}
-                  </div>
+          ) : selectedVideos.length === 1 ? (
+            <div className="p-2 h-full">
+              <div className="relative rounded-[8px] bg-black overflow-hidden">
+                <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      selectedVideos[0] && getVideoStatus(selectedVideos[0]).dotClass
+                    }`}
+                  />
+                  <span>
+                    {selectedVideos[0]
+                      ? getVideoStatus(selectedVideos[0]).label
+                      : "PAUSE"}
+                  </span>
                 </div>
-              ))}
+
+                <HLSPlayer
+                  ref={(instance) => {
+                    if (selectedVideos[0]) {
+                      playerRefs.current[selectedVideos[0]] = instance;
+                    }
+                  }}
+                  src={selectedVideos[0]}
+                  metadataBaseUrl={
+                    selectedVideos[0] ? metadataBaseByVideo[selectedVideos[0]] : undefined
+                  }
+                  onBookmarksChange={handleBookmarksChange}
+                  onLabelsLoaded={handleLabelsLoaded}
+                  className="w-full h-[410px] object-contain bg-black"
+                  autoPlay={false}
+                  muted={true}
+                  controls={false}
+                  onLoadedMetadata={() => {
+                    const player = selectedVideos[0]
+                      ? playerRefs.current[selectedVideos[0]]
+                      : null;
+
+                    const playerDuration = player?.getDuration() || 0;
+
+                    if (selectedVideos[0]) {
+                      setVideoLoading((prev) => ({
+                        ...prev,
+                        [selectedVideos[0]]: false,
+                      }));
+                    }
+
+                    if (selectedVideos[0]) {
+                      setVideoDurations((prev) => ({
+                        ...prev,
+                        [selectedVideos[0]]: playerDuration,
+                      }));
+                    }
+
+                    setDuration(playerDuration);
+                  }}
+                  onTimeUpdate={() => {
+                    const player = selectedVideos[0]
+                      ? playerRefs.current[selectedVideos[0]]
+                      : null;
+
+                    const playerTime = player?.getCurrentTime() || 0;
+                    const playerDuration = player?.getDuration() || 0;
+
+                    if (selectedVideos[0]) {
+                      setVideoTimes((prev) => ({
+                        ...prev,
+                        [selectedVideos[0]]: playerTime,
+                      }));
+
+                      setVideoDurations((prev) => ({
+                        ...prev,
+                        [selectedVideos[0]]: playerDuration,
+                      }));
+                    }
+
+                    setCurrentTime(playerTime);
+                    setDuration(playerDuration);
+                    setIsPlaying(!(player?.isPaused() ?? true));
+                  }}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 p-2 h-full">
+              {selectedVideoItems.map((video) => {
+                const videoTime = videoTimes[video.value] || 0;
+                const videoDuration = videoDurations[video.value] || 0;
+
+                return (
+                  <div key={video.value} className="flex flex-col gap-2">
+                    <div className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${getVideoStatus(video.value).dotClass}`}
+                        />
+                        <span>{getVideoStatus(video.value).label}</span>
+                      </div>
+
+                      <div className="w-full h-full">
+                        <HLSPlayer
+                          ref={(instance) => {
+                            playerRefs.current[video.value] = instance;
+                          }}
+                          src={video.value}
+                          metadataBaseUrl={metadataBaseByVideo[video.value]}
+                          onBookmarksChange={handleBookmarksChange}
+                          onLabelsLoaded={handleLabelsLoaded}
+                          className="w-full h-[410px] object-contain bg-black"
+                          autoPlay={false}
+                          muted={true}
+                          controls={false}
+                          onLoadedMetadata={() => {
+                            const player = playerRefs.current[video.value];
+
+                            setVideoLoading((prev) => ({
+                              ...prev,
+                              [video.value]: false,
+                            }));
+
+                            setVideoDurations((prev) => ({
+                              ...prev,
+                              [video.value]: player?.getDuration() || 0,
+                            }));
+
+                            if (video.value === selectedVideos[0]) {
+                              const mainPlayer = getMainPlayer();
+                              setDuration(mainPlayer?.getDuration() || 0);
+                            }
+                          }}
+                          onTimeUpdate={() => {
+                            const player = playerRefs.current[video.value];
+
+                            setVideoTimes((prev) => ({
+                              ...prev,
+                              [video.value]: player?.getCurrentTime() || 0,
+                            }));
+
+                            setVideoDurations((prev) => ({
+                              ...prev,
+                              [video.value]: player?.getDuration() || 0,
+                            }));
+
+                            if (video.value === selectedVideos[0]) {
+                              const mainPlayer = getMainPlayer();
+                              setCurrentTime(mainPlayer?.getCurrentTime() || 0);
+                              setDuration(mainPlayer?.getDuration() || 0);
+                              setIsPlaying(!(mainPlayer?.isPaused() ?? true));
+                            }
+                          }}
+                          onEnded={() => {
+                            if (video.value === selectedVideos[0]) {
+                              setIsPlaying(false);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-[#F3F4F6] rounded-[10px] px-5 py-4">
+                      <input
+                        type="range"
+                        min={0}
+                        max={videoDuration || 0}
+                        step={0.1}
+                        value={Math.min(videoTime, videoDuration || 0)}
+                        onChange={(e) => {
+                          const nextValue = Number(e.target.value);
+
+                          setVideoTimes((prev) => ({
+                            ...prev,
+                            [video.value]: nextValue,
+                          }));
+                        }}
+                        onMouseUp={(e) => {
+                          const nextValue = Number((e.target as HTMLInputElement).value);
+                          const player = playerRefs.current[video.value];
+                          if (player) {
+                            player.seekTo(nextValue);
+                          }
+
+                          if (video.value === mainVideoUrl) {
+                            setCurrentTime(nextValue);
+                          }
+                        }}
+                        onTouchEnd={(e) => {
+                          const target = e.target as HTMLInputElement;
+                          const nextValue = Number(target.value);
+                          const player = playerRefs.current[video.value];
+                          if (player) {
+                            player.seekTo(nextValue);
+                          }
+
+                          if (video.value === mainVideoUrl) {
+                            setCurrentTime(nextValue);
+                          }
+                        }}
+                        className="w-full accent-[#3B82F6]"
+                      />
+
+                      <div className="text-sm text-[#6B7280] mt-3">
+                        {formatTime(videoTime)} / {formatTime(videoDuration)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        <div className="w-full rounded-[10px] bg-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
-              type="button"
-              onClick={handlePrevious}
-              disabled={selectedVideos.length === 0}
-            >
-              <img src={PrevIcon} alt="Previous" className="w-4 h-4" />
-            </button>
-
-            <button
-              className="w-12 h-12 rounded-full bg-primary flex items-center justify-center"
-              type="button"
-              onClick={handlePlayPause}
-              disabled={selectedVideos.length === 0}
-            >
-              <img
-                src={isPlaying ? PauseIcon : PlayIcon}
-                alt="Play pause"
-                className="w-4 h-4"
-              />
-            </button>
-
-            <button
-              className="w-10 h-10 rounded-full bg-[#F6F7F9] flex items-center justify-center"
-              type="button"
-              onClick={handleNext}
-              disabled={selectedVideos.length === 0}
-            >
-              <img src={NextIcon} alt="Next" className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 px-6">
-            <Slider
-              value={currentTime}
-              min={0}
-              max={mainDuration || 0}
-              onChange={handleSliderChange}
-              disabled={selectedVideos.length === 0}
-              tooltip={{
-                formatter: (value) => formatSeconds(value || 0),
-              }}
-            />
-          </div>
-
-          <div className="text-sm text-[#333D4B] font-medium min-w-[110px] text-right">
-            {formatSeconds(currentTime)} / {formatSeconds(mainDuration)}
-          </div>
-        </div>
+        <ControlBar
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={mainDuration}
+          onPlayPause={handlePlayPause}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onTimeChange={handleSliderChange}
+          onTimeChangeComplete={handleTimeChangeComplete}
+          disabled={selectedVideos.length === 0}
+          bookmarks={timelineMarkers}
+        />
 
         <div className="bg-white rounded-[10px] p-6">
           <h2 className="text-[20px] font-bold mb-4">{t("stream_device_info")}</h2>
@@ -547,7 +1140,10 @@ export default function Playback() {
                           ? t("playback_primary_video")
                           : t("playback_secondary_video")}
                       </div>
-                      <div className="text-sm font-semibold text-gray-800 truncate max-w-[210px]">
+                      <div
+                        className="text-xs text-[#6B7280] line-clamp-2"
+                        title={video.label}
+                      >
                         {video.label}
                       </div>
                     </div>
@@ -698,4 +1294,4 @@ export default function Playback() {
       </div>
     </div>
   );
-}
+} 

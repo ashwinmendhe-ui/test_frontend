@@ -118,3 +118,8 @@ http://52.64.157.221:6789/api
 
 ## install hls player
 npm i hls.js
+
+
+## install sockjs for websocket connetions
+npm install @stomp/stompjs sockjs-client
+npm install -D @types/sockjs-client

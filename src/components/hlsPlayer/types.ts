@@ -1,5 +1,5 @@
 export interface HLSPlayerRef {
-  play: () => Promise<void> | void;
+  play: () => Promise<void>;
   pause: () => void;
   seekBy: (seconds: number) => void;
   seekTo: (seconds: number) => void;
