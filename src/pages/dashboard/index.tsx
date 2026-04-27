@@ -16,6 +16,9 @@ import { Input, Spin } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { TOPIC } from "@/constants/topic";
+import { useCallback } from "react";
 
 const { Search } = Input;
 
@@ -37,6 +40,7 @@ type DashboardCard = {
 };
 
 export default function Dashboard() {
+
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
   const { dashboard, stat, loading, getDashboard, getDashboardStat } =
@@ -45,6 +49,27 @@ export default function Dashboard() {
   const [searchKeyword, setSearchKeyword] = useState("");
 
   const userRole = detailUserLogin?.roles?.[0];
+  const [deviceStatusMap, setDeviceStatusMap] = useState<Record<string, any>>({});
+
+  const handleStatusMessage = useCallback((message: any) => {
+    const key = message.deviceId || message.deviceSn;
+
+    if (!key) return;
+
+    setDeviceStatusMap((prev) => ({
+      ...prev,
+      [key]: message,
+    }));
+  }, []);
+
+  useWebSocket(
+    import.meta.env.VITE_WS_URL,
+    TOPIC.STATUS,
+    handleStatusMessage,
+    true
+  );
+
+
 
   useEffect(() => {
     getDashboard();
@@ -90,8 +115,26 @@ export default function Dashboard() {
     },
   ];
 
+  const mergedDashboard = useMemo(() => {
+    return dashboard.map((item) => {
+      const live = deviceStatusMap[item.deviceId] || deviceStatusMap[item.deviceSn];
+
+      if (!live) return item;
+
+      return {
+        ...item,
+        status: live.status ?? item.status,
+        activeMissionName:
+          live.activeMissionName ??
+          live.missionName ??
+          live.workDetail ??
+          item.activeMissionName,
+      };
+    });
+  }, [dashboard, deviceStatusMap]);
+
   const filteredData = useMemo(() => {
-    return filterByQuery(dashboard, searchKeyword, [
+    return filterByQuery(mergedDashboard, searchKeyword, [
       "deviceName",
       "companyName",
       "siteName",
@@ -99,7 +142,7 @@ export default function Dashboard() {
       "activeMissionName",
       "deviceId",
     ]);
-  }, [dashboard, searchKeyword]);
+  }, [mergedDashboard, searchKeyword]);
 
   const columns = [
     {

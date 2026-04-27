@@ -10,6 +10,7 @@ interface DashboardStat {
 
 interface DashboardTable {
   deviceId: string;
+  deviceSn: string;
   deviceName: string;
   companyName: string;
   siteName: string;
