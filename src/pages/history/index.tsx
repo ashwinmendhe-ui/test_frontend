@@ -22,9 +22,16 @@ export default function History() {
   const [autoDownload, setAutoDownload] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
-
+  const [selectedHistory, setSelectedHistory] =
+    useState<HistoryManagementTable | null>(null);
   const handleView = async (record: HistoryManagementTable) => {
+  console.log("Selected history row:", record);
+
     await getDetail(record.historyId);
+
+    // 🔥 store AFTER API
+    setSelectedHistory(record);
+
     setAutoDownload(false);
     setIsModalOpen(true);
   };
@@ -135,7 +142,7 @@ export default function History() {
       !dateRange[0] ||
       !dateRange[1] ||
       (() => {
-        const itemDate = new Date(item.createdAt).getTime();
+        const itemDate = new Date(item.createdAt.replace(" ", "T")).getTime();
         const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
         const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
         return itemDate >= from && itemDate <= to;
@@ -182,8 +189,9 @@ export default function History() {
 
       <WorkReportModal
         open={isModalOpen}
-        onCancel={handleCancel}
-        reportData={detail}
+        onClose={handleCancel}
+        detail={detail}
+        reportMeta={selectedHistory}   // 🔥 IMPORTANT
         autoDownload={autoDownload}
       />
     </>

@@ -63,11 +63,58 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
 
     const safeJsonFetch = async (url: string) => {
-      const response = await fetch(url);
+      const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) {
         throw new Error(`Failed to fetch ${url}: ${response.status}`);
       }
       return response.json();
+    };
+
+    const safeTextFetch = async (url: string) => {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.status}`);
+      }
+      return response.text();
+    };
+
+    const parseBookmarkNdjson = (text: string): BookmarkPayload[] => {
+      return text
+        .trim()
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    };
+
+    const parsePlaylistSegments = async (
+      m3u8Url: string
+    ): Promise<SegmentInfo[]> => {
+      const text = await safeTextFetch(m3u8Url);
+      const lines = text.split("\n").map((line) => line.trim());
+
+      const segments: SegmentInfo[] = [];
+      let currentStartSec = 0;
+      let lastDurationSec = 0;
+
+      for (const line of lines) {
+        if (line.startsWith("#EXTINF:")) {
+          lastDurationSec =
+            Number(line.replace("#EXTINF:", "").split(",")[0]) || 0;
+          continue;
+        }
+
+        if (line && !line.startsWith("#") && line.endsWith(".ts")) {
+          segments.push({
+            name: line,
+            startSec: currentStartSec,
+          });
+
+          currentStartSec += lastDurationSec;
+        }
+      }
+
+      return segments;
     };
 
     const normalizeLabels = (raw: unknown): LabelsMap => {
@@ -79,42 +126,60 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
       if (Array.isArray(raw)) {
         const next: LabelsMap = {};
+
         raw.forEach((item, index) => {
           if (typeof item === "string") {
             next[index] = item;
-          } else if (item && typeof item === "object") {
+            return;
+          }
+
+          if (item && typeof item === "object") {
             const entry = item as Record<string, unknown>;
+
             const id =
               typeof entry.id === "number"
                 ? entry.id
                 : typeof entry.value === "number"
                 ? entry.value
                 : index;
+
             const label =
               typeof entry.label === "string"
                 ? entry.label
                 : typeof entry.name === "string"
                 ? entry.name
                 : "";
+
             if (label) next[id] = label;
           }
         });
+
         return next;
       }
 
       const obj = raw as Record<string, unknown>;
       const next: LabelsMap = {};
+
       Object.entries(obj).forEach(([key, value]) => {
-        const id = Number(key);
-        if (Number.isFinite(id) && typeof value === "string") {
-          next[id] = value;
-        } else if (
-          Number.isFinite(id) &&
+        const numericKey = Number(key);
+
+        if (Number.isFinite(numericKey) && typeof value === "string") {
+          next[numericKey] = value;
+          return;
+        }
+
+        if (
+          Number.isFinite(numericKey) &&
           value &&
           typeof value === "object" &&
           typeof (value as Record<string, unknown>).label === "string"
         ) {
-          next[id] = (value as Record<string, unknown>).label as string;
+          next[numericKey] = (value as Record<string, unknown>).label as string;
+          return;
+        }
+
+        if (typeof value === "number") {
+          next[value] = key;
         }
       });
 
@@ -124,17 +189,26 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const normalizeSegments = (raw: unknown): SegmentInfo[] => {
       if (!raw) return [];
 
-      const source = Array.isArray(raw)
-        ? raw
-        : Array.isArray((raw as Record<string, unknown>)?.segments)
-        ? ((raw as Record<string, unknown>).segments as unknown[])
-        : [];
+      let source: unknown[] = [];
+
+      if (Array.isArray(raw)) {
+        source = raw;
+      } else if (typeof raw === "object") {
+        const obj = raw as Record<string, unknown>;
+
+        if (Array.isArray(obj.segments)) {
+          source = obj.segments;
+        } else if (Array.isArray(obj.items)) {
+          source = obj.items;
+        }
+      }
 
       let runningStartSec = 0;
 
       return source
         .map((item) => {
           if (!item || typeof item !== "object") return null;
+
           const entry = item as Record<string, unknown>;
 
           const name =
@@ -162,13 +236,14 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
               ? entry.start
               : runningStartSec;
 
-          const segment: SegmentInfo = {
-            name,
-            startSec,
-          };
-
           runningStartSec = startSec + durationSec;
-          return name ? segment : null;
+
+          return name
+            ? {
+                name,
+                startSec,
+              }
+            : null;
         })
         .filter((item): item is SegmentInfo => Boolean(item));
     };
@@ -186,9 +261,11 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         if (Array.isArray(obj.bookmarks)) {
           return obj.bookmarks as BookmarkPayload[];
         }
+
         if (Array.isArray(obj.items)) {
           return obj.items as BookmarkPayload[];
         }
+
         if (Array.isArray(obj.events)) {
           return obj.events as BookmarkPayload[];
         }
@@ -202,11 +279,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         return bookmark.timeSec;
       }
 
-      if (
-        bookmark.s &&
-        typeof bookmark.o === "number" &&
-        Array.isArray(playlistSegmentsRef.current)
-      ) {
+      if (bookmark.s && typeof bookmark.o === "number") {
         const segment = playlistSegmentsRef.current.find(
           (item) => item.name === bookmark.s
         );
@@ -258,10 +331,13 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         hlsRef.current = hls;
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
+
         if (autoPlay) {
           video
             .play()
-            .catch((error) => console.error("Native HLS autoplay failed:", error));
+            .catch((error) =>
+              console.error("Native HLS autoplay failed:", error)
+            );
         }
       }
 
@@ -282,31 +358,40 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           return;
         }
 
+        const baseUrl = metadataBaseUrl.replace(/\/$/, "");
+
         const bookmarkCandidates = [
-          `${metadataBaseUrl}/bookmarks.json`,
-          `${metadataBaseUrl}/metadata/bookmarks.json`,
-          `${metadataBaseUrl}/events.json`,
-          `${metadataBaseUrl}/metadata/events.json`,
+          `${baseUrl}/bookmark.ndjson`,
+          `${baseUrl}/bookmarks.json`,
+          `${baseUrl}/metadata/bookmarks.json`,
+          `${baseUrl}/events.json`,
+          `${baseUrl}/metadata/events.json`,
         ];
 
         const labelsCandidates = [
-          `${metadataBaseUrl}/labels.json`,
-          `${metadataBaseUrl}/metadata/labels.json`,
-          `${metadataBaseUrl}/info.json`,
-          `${metadataBaseUrl}/metadata/info.json`,
+          `${baseUrl}/info.json`,
+          `${baseUrl}/metadata/info.json`,
+          `${baseUrl}/labels.json`,
+          `${baseUrl}/metadata/labels.json`,
         ];
 
         const segmentsCandidates = [
-          `${metadataBaseUrl}/segments.json`,
-          `${metadataBaseUrl}/metadata/segments.json`,
-          `${metadataBaseUrl}/index.json`,
-          `${metadataBaseUrl}/metadata/index.json`,
+          `${baseUrl}/segments.json`,
+          `${baseUrl}/metadata/segments.json`,
+          `${baseUrl}/index.json`,
+          `${baseUrl}/metadata/index.json`,
         ];
 
         let labelsMap: LabelsMap = {};
         let bookmarks: BookmarkPayload[] = [];
         let sessionStartMs: number | null = null;
         let segments: SegmentInfo[] = [];
+
+        try {
+          segments = await parsePlaylistSegments(src);
+        } catch (error) {
+          console.warn("Failed to parse index.m3u8 for bookmark timing:", error);
+        }
 
         for (const candidate of labelsCandidates) {
           try {
@@ -316,7 +401,8 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
             if (
               raw &&
               typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartTime === "number"
+              typeof (raw as Record<string, unknown>).sessionStartTime ===
+                "number"
             ) {
               sessionStartMs = (raw as Record<string, unknown>)
                 .sessionStartTime as number;
@@ -325,9 +411,11 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
             if (
               raw &&
               typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartMs === "number"
+              typeof (raw as Record<string, unknown>).sessionStartMs ===
+                "number"
             ) {
-              sessionStartMs = (raw as Record<string, unknown>).sessionStartMs as number;
+              sessionStartMs = (raw as Record<string, unknown>)
+                .sessionStartMs as number;
             }
 
             break;
@@ -336,36 +424,46 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           }
         }
 
-        for (const candidate of segmentsCandidates) {
-          try {
-            const raw = await safeJsonFetch(candidate);
-            segments = normalizeSegments(raw);
-            if (segments.length > 0) break;
-          } catch {
-            //
+        if (segments.length === 0) {
+          for (const candidate of segmentsCandidates) {
+            try {
+              const raw = await safeJsonFetch(candidate);
+              segments = normalizeSegments(raw);
+              if (segments.length > 0) break;
+            } catch {
+              //
+            }
           }
         }
 
         for (const candidate of bookmarkCandidates) {
           try {
-            const raw = await safeJsonFetch(candidate);
-            bookmarks = extractBookmarks(raw);
+            if (candidate.endsWith(".ndjson")) {
+              const text = await safeTextFetch(candidate);
+              bookmarks = parseBookmarkNdjson(text);
+            } else {
+              const raw = await safeJsonFetch(candidate);
+              bookmarks = extractBookmarks(raw);
 
-            if (
-              raw &&
-              typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartTime === "number"
-            ) {
-              sessionStartMs = (raw as Record<string, unknown>)
-                .sessionStartTime as number;
-            }
+              if (
+                raw &&
+                typeof raw === "object" &&
+                typeof (raw as Record<string, unknown>).sessionStartTime ===
+                  "number"
+              ) {
+                sessionStartMs = (raw as Record<string, unknown>)
+                  .sessionStartTime as number;
+              }
 
-            if (
-              raw &&
-              typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartMs === "number"
-            ) {
-              sessionStartMs = (raw as Record<string, unknown>).sessionStartMs as number;
+              if (
+                raw &&
+                typeof raw === "object" &&
+                typeof (raw as Record<string, unknown>).sessionStartMs ===
+                  "number"
+              ) {
+                sessionStartMs = (raw as Record<string, unknown>)
+                  .sessionStartMs as number;
+              }
             }
 
             break;
@@ -389,7 +487,21 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
             t: bookmark.t,
             c_ar: Array.isArray(bookmark.c_ar) ? bookmark.c_ar : [],
           }))
-          .filter((item) => item.timeSec !== null);
+          .filter((item) => item.timeSec !== null)
+          .map((item) => ({
+            timeSec: item.timeSec as number,
+            t: item.t,
+            c_ar: item.c_ar,
+          }));
+
+        console.log("[HLSPlayer] metadata loaded", {
+          src,
+          baseUrl,
+          labelsCount: Object.keys(labelsMap).length,
+          segmentCount: segments.length,
+          bookmarkCount: bookmarks.length,
+          parsedBookmarkCount: parsedBookmarks.length,
+        });
 
         onBookmarksChange?.(parsedBookmarks, src);
       };
@@ -408,9 +520,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         await video.play();
       },
       pause: () => {
-        const video = videoRef.current;
-        if (!video) return;
-        video.pause();
+        videoRef.current?.pause();
       },
       seekBy: (seconds: number) => {
         const video = videoRef.current;
@@ -419,11 +529,10 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         const duration = Number.isFinite(video.duration) ? video.duration : 0;
         const nextTime = video.currentTime + seconds;
 
-        if (duration > 0) {
-          video.currentTime = Math.min(Math.max(nextTime, 0), duration);
-        } else {
-          video.currentTime = Math.max(nextTime, 0);
-        }
+        video.currentTime =
+          duration > 0
+            ? Math.min(Math.max(nextTime, 0), duration)
+            : Math.max(nextTime, 0);
       },
       seekTo: (seconds: number) => {
         const video = videoRef.current;
@@ -431,11 +540,10 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
         const duration = Number.isFinite(video.duration) ? video.duration : 0;
 
-        if (duration > 0) {
-          video.currentTime = Math.min(Math.max(seconds, 0), duration);
-        } else {
-          video.currentTime = Math.max(seconds, 0);
-        }
+        video.currentTime =
+          duration > 0
+            ? Math.min(Math.max(seconds, 0), duration)
+            : Math.max(seconds, 0);
       },
       getCurrentTime: () => {
         return videoRef.current?.currentTime ?? 0;

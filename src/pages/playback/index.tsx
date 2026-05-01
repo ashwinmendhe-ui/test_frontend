@@ -15,6 +15,7 @@ import { usePlaybackStore } from "@/stores/playbackStore";
 import ControlBar from "@/components/common/controlBar";
 import { Form, Select, Switch } from "antd";
 import { formatTime } from "@/utils/date";
+import { useLocation } from "react-router-dom";
 
 type PlaybackFormValues = {
   company?: string;
@@ -110,7 +111,45 @@ const getMarkerConfidence = (classIds?: number[]) => {
   return 100;
 };
 
+
+const timeToSeconds = (time?: string) => {
+  if (!time) return 0;
+
+  const parts = time.split(":").map(Number);
+
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    return h * 3600 + m * 60 + s;
+  }
+
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    return m * 60 + s;
+  }
+
+  return 0;
+};
+
 export default function Playback() {
+  const location = useLocation();
+
+  const historyPlaybackState = location.state as
+  | {
+      playbackUrl?: string;
+      timestamp?: string;
+      label?: string;
+
+      // 🔥 ADD THESE
+      companyId?: string;
+      siteId?: string;
+      missionId?: string;
+      deviceSn?: string;
+
+      historyDetail?: any;
+    }
+  | undefined;
+
+  const historySeekTime = timeToSeconds(historyPlaybackState?.timestamp);
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
   const [form] = Form.useForm<PlaybackFormValues>();
@@ -258,9 +297,23 @@ export default function Playback() {
   );
 
   const selectedVideoItems = useMemo(
-    () => videoOptions.filter((item) => selectedVideos.includes(item.value)),
-    [selectedVideos, videoOptions]
-  );
+  () =>
+    selectedVideos.map((url) => {
+      const matched = videoOptions.find((item) => item.value === url);
+
+      return (
+        matched || {
+          value: url,
+          label: historyPlaybackState?.historyDetail?.missionName
+            ? `${historyPlaybackState.historyDetail.missionName} - ${
+                historyPlaybackState.timestamp || ""
+              }`
+            : url,
+        }
+      );
+    }),
+  [selectedVideos, videoOptions, historyPlaybackState]
+);
 
   const metadataBaseByVideo = useMemo(() => {
     const next: Record<string, string> = {};
@@ -613,70 +666,117 @@ export default function Playback() {
     (value) => aiModules.find((item) => item.value === value)?.type === "danger"
   ).length;
 
-  useEffect(() => {
-    if (userRole === 1) {
-      getCompanyList();
-    }
-  }, [userRole, getCompanyList]);
+  
 
-  useEffect(() => {
-    if (userRole !== 1 && detailUserLogin?.user?.companyId) {
-      form.setFieldValue("company", detailUserLogin.user.companyId);
-    }
-  }, [userRole, detailUserLogin, form]);
+  
+// Load company list
+useEffect(() => {
+  if (userRole === 1) {
+    getCompanyList();
+  }
+}, [userRole, getCompanyList]);
 
-  useEffect(() => {
-    if (values?.company) {
-      getListByCompany(values.company);
-    }
-  }, [values?.company, getListByCompany]);
+// Default company for non-admin
+useEffect(() => {
+  if (userRole !== 1 && detailUserLogin?.user?.companyId) {
+    form.setFieldValue("company", detailUserLogin.user.companyId);
+  }
+}, [userRole, detailUserLogin, form]);
 
-  useEffect(() => {
-    if (values?.site) {
-      getRobotListBySite(values.site);
-      getMissionListBySite(values.site);
-    }
-  }, [values?.site, getRobotListBySite, getMissionListBySite]);
+// Set video from history
+useEffect(() => {
+  if (!historyPlaybackState?.playbackUrl) return;
+  setSelectedVideos([historyPlaybackState.playbackUrl]);
+}, [historyPlaybackState?.playbackUrl]);
 
-  useEffect(() => {
-    if (!values?.company) {
-      resetPlayback();
-      return;
-    }
+// Set company
+useEffect(() => {
+  if (!historyPlaybackState?.companyId) return;
+  form.setFieldValue("company", historyPlaybackState.companyId);
+}, [historyPlaybackState?.companyId, form]);
 
-    getPlayback({
-      companyId: values.company,
-      siteId: values.site || "",
-      deviceSn: selectedDevice?.deviceSn || "",
-      missionId: values.mission || "",
-    });
-  }, [
-    values?.company,
-    values?.site,
-    values?.mission,
-    selectedDevice?.deviceSn,
-    getPlayback,
-    resetPlayback,
-  ]);
+// Load sites
+useEffect(() => {
+  if (values?.company) {
+    getListByCompany(values.company);
+  }
+}, [values?.company, getListByCompany]);
 
-  useEffect(() => {
-    if (selectedVideos.length === 0) {
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-    }
-  }, [selectedVideos]);
+// Set site
+useEffect(() => {
+  if (!historyPlaybackState?.siteId) return;
+  form.setFieldValue("site", historyPlaybackState.siteId);
+}, [historyPlaybackState?.siteId, form]);
 
-  useEffect(() => {
-    if (selectedVideos.length === 0) return;
+// Load robots + missions
+useEffect(() => {
+  if (values?.site) {
+    getRobotListBySite(values.site);
+    getMissionListBySite(values.site);
+  }
+}, [values?.site, getRobotListBySite, getMissionListBySite]);
 
-    const nextLoading: Record<string, boolean> = {};
-    selectedVideos.forEach((url) => {
-      nextLoading[url] = true;
-    });
+// Map deviceSn → deviceId
+useEffect(() => {
+  if (!historyPlaybackState?.deviceSn || robotList.length === 0) return;
 
-    setVideoLoading(nextLoading);
-  }, [selectedVideos]);
+  const matched = robotList.find(
+    (item) => item.deviceSn === historyPlaybackState.deviceSn
+  );
+
+  if (matched) {
+    form.setFieldValue("device", matched.deviceId);
+  }
+}, [historyPlaybackState?.deviceSn, robotList, form]);
+
+// Set mission
+useEffect(() => {
+  if (!historyPlaybackState?.missionId || missionList.length === 0) return;
+  form.setFieldValue("mission", historyPlaybackState.missionId);
+}, [historyPlaybackState?.missionId, missionList, form]);
+
+// Load playback list
+useEffect(() => {
+  if (!values?.company) {
+    resetPlayback();
+    return;
+  }
+
+  getPlayback({
+    companyId: values.company,
+    siteId: values.site || "",
+    deviceSn: selectedDevice?.deviceSn || "",
+    missionId: values.mission || "",
+  });
+}, [
+  values?.company,
+  values?.site,
+  values?.mission,
+  selectedDevice?.deviceSn,
+  getPlayback,
+  resetPlayback,
+]);
+
+// Reset playback state
+useEffect(() => {
+  if (selectedVideos.length === 0) {
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+  }
+}, [selectedVideos]);
+
+// Loading state
+useEffect(() => {
+  if (selectedVideos.length === 0) return;
+
+  const nextLoading: Record<string, boolean> = {};
+  selectedVideos.forEach((url) => {
+    nextLoading[url] = true;
+  });
+
+  setVideoLoading(nextLoading);
+}, [selectedVideos]);
 
   const getVideoStatus = (videoUrl: string) => {
     if (videoLoading[videoUrl]) {
@@ -910,6 +1010,18 @@ export default function Playback() {
                     }
 
                     setDuration(playerDuration);
+
+                    if (
+                      selectedVideos[0] === historyPlaybackState?.playbackUrl &&
+                      historySeekTime > 0
+                    ) {
+                      player?.seekTo(historySeekTime);
+                      setCurrentTime(historySeekTime);
+                      setVideoTimes((prev) => ({
+                        ...prev,
+                        [selectedVideos[0]]: historySeekTime,
+                      }));
+                    }
                   }}
                   onTimeUpdate={() => {
                     const player = selectedVideos[0]
@@ -987,6 +1099,22 @@ export default function Playback() {
                               const mainPlayer = getMainPlayer();
                               setDuration(mainPlayer?.getDuration() || 0);
                             }
+
+                          if (
+                              video.value === historyPlaybackState?.playbackUrl &&
+                              historySeekTime > 0
+                            ) {
+                              player?.seekTo(historySeekTime);
+                              setVideoTimes((prev) => ({
+                                ...prev,
+                                [video.value]: historySeekTime,
+                              }));
+
+                              if (video.value === selectedVideos[0]) {
+                                setCurrentTime(historySeekTime);
+                              }
+                            }
+
                           }}
                           onTimeUpdate={() => {
                             const player = playerRefs.current[video.value];
@@ -1293,5 +1421,4 @@ export default function Playback() {
         </div>
       </div>
     </div>
-  );
-} 
+  )}

@@ -4,19 +4,28 @@ import { historyApi } from "@/api/historyApi";
 
 export interface HistoryManagementTable {
   historyId: string;
+  companyId?: string;
   companyName: string;
+  siteId?: string;
   siteName: string;
+  missionId?: string;
   missionName: string;
+  deviceSn?: string;
   deviceName: string;
+  playbackUrl?: string;
   userName: string;
   totalRecognition: number;
   createdAt: string;
+  videoStatus?: string;
 }
 
 export interface ReportData {
   deviceSn: string;
   siteName: string;
   deviceName: string;
+  companyId?: string;
+  siteId?: string;
+  missionId?: string;
   robotName?: string;
   missionName?: string;
   userName: string;
@@ -24,10 +33,12 @@ export interface ReportData {
   startTime: string;
   endTime: string;
   totalTime?: string;
+  totalRecognition?: number;
   duration?: string;
   distance?: string;
   playbackUrl: string;
   reportCreatedAt?: string;
+
   labelCounts: Record<string, number>;
   bookmarks: Array<{
     label: string;
