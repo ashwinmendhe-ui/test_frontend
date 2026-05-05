@@ -7,6 +7,13 @@ import React, {
 } from "react";
 import type { HLSPlayerRef } from "./types";
 
+const getFileName = (path: string) => {
+  return path.split("/").pop()?.split("?")[0] || path;
+};
+const getBasePathFromUrl = (url: string) => {
+      return url.substring(0, url.lastIndexOf("/"));
+    };
+
 type BookmarkPayload = {
   m?: number;
   t?: number;
@@ -61,6 +68,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const hlsRef = useRef<Hls | null>(null);
     const sessionStartTimeRef = useRef<number | null>(null);
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
+    const metadataLoadedKeyRef = useRef<string>("");
 
     const safeJsonFetch = async (url: string) => {
       const response = await fetch(url, { cache: "no-store" });
@@ -84,7 +92,14 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean)
-        .map((line) => JSON.parse(line));
+        .map((line) => {
+          try {
+            return JSON.parse(line) as BookmarkPayload;
+          } catch {
+            return null;
+          }
+        })
+        .filter((item): item is BookmarkPayload => Boolean(item));
     };
 
     const parsePlaylistSegments = async (
@@ -106,14 +121,13 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
         if (line && !line.startsWith("#") && line.endsWith(".ts")) {
           segments.push({
-            name: line,
+            name: getFileName(line),
             startSec: currentStartSec,
           });
 
           currentStartSec += lastDurationSec;
         }
       }
-
       return segments;
     };
 
@@ -186,108 +200,29 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       return next;
     };
 
-    const normalizeSegments = (raw: unknown): SegmentInfo[] => {
-      if (!raw) return [];
-
-      let source: unknown[] = [];
-
-      if (Array.isArray(raw)) {
-        source = raw;
-      } else if (typeof raw === "object") {
-        const obj = raw as Record<string, unknown>;
-
-        if (Array.isArray(obj.segments)) {
-          source = obj.segments;
-        } else if (Array.isArray(obj.items)) {
-          source = obj.items;
-        }
-      }
-
-      let runningStartSec = 0;
-
-      return source
-        .map((item) => {
-          if (!item || typeof item !== "object") return null;
-
-          const entry = item as Record<string, unknown>;
-
-          const name =
-            typeof entry.name === "string"
-              ? entry.name
-              : typeof entry.segment === "string"
-              ? entry.segment
-              : typeof entry.file === "string"
-              ? entry.file
-              : "";
-
-          const durationSec =
-            typeof entry.durationSec === "number"
-              ? entry.durationSec
-              : typeof entry.duration === "number"
-              ? entry.duration
-              : typeof entry.d === "number"
-              ? entry.d
-              : 0;
-
-          const startSec =
-            typeof entry.startSec === "number"
-              ? entry.startSec
-              : typeof entry.start === "number"
-              ? entry.start
-              : runningStartSec;
-
-          runningStartSec = startSec + durationSec;
-
-          return name
-            ? {
-                name,
-                startSec,
-              }
-            : null;
-        })
-        .filter((item): item is SegmentInfo => Boolean(item));
-    };
-
-    const extractBookmarks = (raw: unknown): BookmarkPayload[] => {
-      if (!raw) return [];
-
-      if (Array.isArray(raw)) {
-        return raw as BookmarkPayload[];
-      }
-
-      if (typeof raw === "object") {
-        const obj = raw as Record<string, unknown>;
-
-        if (Array.isArray(obj.bookmarks)) {
-          return obj.bookmarks as BookmarkPayload[];
-        }
-
-        if (Array.isArray(obj.items)) {
-          return obj.items as BookmarkPayload[];
-        }
-
-        if (Array.isArray(obj.events)) {
-          return obj.events as BookmarkPayload[];
-        }
-      }
-
-      return [];
-    };
-
     const getBookmarkTimeSec = (bookmark: BookmarkPayload): number | null => {
       if (typeof bookmark.timeSec === "number") {
         return bookmark.timeSec;
       }
 
       if (bookmark.s && typeof bookmark.o === "number") {
-        const segment = playlistSegmentsRef.current.find(
-          (item) => item.name === bookmark.s
-        );
+          const bookmarkSegmentName = getFileName(bookmark.s);
 
-        if (segment) {
-          return segment.startSec + bookmark.o / 1000;
+          const segment = playlistSegmentsRef.current.find(
+            (item) => item.name === bookmarkSegmentName
+          );
+
+          if (!segment) {
+            console.log("Segment not found for bookmark:", {
+              bookmarkSegmentName,
+              availableSegments: playlistSegmentsRef.current.slice(0, 10),
+            });
+          }
+
+          if (segment) {
+            return segment.startSec + Number(bookmark.o || 0) / 1000;
+          }
         }
-      }
 
       if (
         typeof bookmark.m === "number" &&
@@ -322,8 +257,8 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           if (autoPlay) {
             try {
               await video.play();
-            } catch (error) {
-              console.error("Video autoplay failed:", error);
+            } catch {
+              // autoplay can fail depending on browser policy
             }
           }
         });
@@ -333,11 +268,9 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         video.src = src;
 
         if (autoPlay) {
-          video
-            .play()
-            .catch((error) =>
-              console.error("Native HLS autoplay failed:", error)
-            );
+          video.play().catch(() => {
+            // autoplay can fail depending on browser policy
+          });
         }
       }
 
@@ -350,168 +283,135 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     }, [src, autoPlay]);
 
     useEffect(() => {
-      let cancelled = false;
+  let cancelled = false;
 
-      const loadPlaybackMetadata = async () => {
-        if (!metadataBaseUrl || !src) {
-          onBookmarksChange?.([], src || "");
-          return;
-        }
+  const metadataKey = `${src || ""}_${metadataBaseUrl || ""}`;
 
-        const baseUrl = metadataBaseUrl.replace(/\/$/, "");
+  const loadPlaybackMetadata = async () => {
+    if (!metadataBaseUrl || !src) {
+      onBookmarksChange?.([], src || "");
+      onLabelsLoaded?.({}, src || "");
+      return;
+    }
 
-        const bookmarkCandidates = [
-          `${baseUrl}/bookmark.ndjson`,
-          `${baseUrl}/bookmarks.json`,
-          `${baseUrl}/metadata/bookmarks.json`,
-          `${baseUrl}/events.json`,
-          `${baseUrl}/metadata/events.json`,
-        ];
+    const baseUrl = metadataBaseUrl.replace(/\/$/, "");
+    console.log("🎬 HLS src:", src);
+    console.log("📂 metadataBaseUrl prop:", metadataBaseUrl);
+    console.log("📂 normalized metadata baseUrl:", baseUrl);
+    console.log("📂 base path from src:", getBasePathFromUrl(src));
+    console.log("🧠 test segment JSON:", `${baseUrl}/segment_000_00000.json`);
+    let labelsMap: LabelsMap = {};
+    let bookmarks: BookmarkPayload[] = [];
+    let sessionStartMs: number | null = null;
+    let segments: SegmentInfo[] = [];
 
-        const labelsCandidates = [
-          `${baseUrl}/info.json`,
-          `${baseUrl}/metadata/info.json`,
-          `${baseUrl}/labels.json`,
-          `${baseUrl}/metadata/labels.json`,
-        ];
+    try {
+      segments = await parsePlaylistSegments(src);
 
-        const segmentsCandidates = [
-          `${baseUrl}/segments.json`,
-          `${baseUrl}/metadata/segments.json`,
-          `${baseUrl}/index.json`,
-          `${baseUrl}/metadata/index.json`,
-        ];
+console.log("✅ Parsed playlist segments:", segments);
+console.log(
+  "🧠 Segment JSON candidates:",
+  segments.slice(0, 5).map((seg) => {
+    const tsBaseName = seg.name.replace(".ts", "");
+    return {
+      ts: seg.name,
+      startSec: seg.startSec,
+      candidate1: `${baseUrl}/${tsBaseName}.json`,
+      candidate2: `${baseUrl}/segment_000_${String(
+        segments.indexOf(seg)
+      ).padStart(5, "0")}.json`,
+    };
+  })
+);
+    } catch (error) {
+      console.log("Playlist parse failed:", error);
+      segments = [];
+    }
 
-        let labelsMap: LabelsMap = {};
-        let bookmarks: BookmarkPayload[] = [];
-        let sessionStartMs: number | null = null;
-        let segments: SegmentInfo[] = [];
 
-        try {
-          segments = await parsePlaylistSegments(src);
-        } catch (error) {
-          console.warn("Failed to parse index.m3u8 for bookmark timing:", error);
-        }
+try {
+  const testUrl = `${baseUrl}/segment_000_00000.json`;
+  const res = await fetch(testUrl, { cache: "no-store" });
 
-        for (const candidate of labelsCandidates) {
-          try {
-            const raw = await safeJsonFetch(candidate);
-            labelsMap = normalizeLabels(raw);
+  console.log("📡 Segment JSON fetch status:", res.status);
+  console.log("📡 Segment JSON fetch url:", testUrl);
 
-            if (
-              raw &&
-              typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartTime ===
-                "number"
-            ) {
-              sessionStartMs = (raw as Record<string, unknown>)
-                .sessionStartTime as number;
-            }
+  if (res.ok) {
+    const data = await res.json();
+    console.log("✅ Segment JSON data:", data);
+  } else {
+    console.error("❌ Segment JSON not accessible:", res.status, testUrl);
+  }
+} catch (error) {
+  console.error("🔥 Segment JSON fetch failed:", error);
+}
 
-            if (
-              raw &&
-              typeof raw === "object" &&
-              typeof (raw as Record<string, unknown>).sessionStartMs ===
-                "number"
-            ) {
-              sessionStartMs = (raw as Record<string, unknown>)
-                .sessionStartMs as number;
-            }
 
-            break;
-          } catch {
-            //
-          }
-        }
+    try {
+      const rawInfo = await safeJsonFetch(`${baseUrl}/info.json`);
+      labelsMap = normalizeLabels(rawInfo);
+    } catch (error) {
+      console.log("Info fetch failed:", error);
+      labelsMap = {};
+    }
 
-        if (segments.length === 0) {
-          for (const candidate of segmentsCandidates) {
-            try {
-              const raw = await safeJsonFetch(candidate);
-              segments = normalizeSegments(raw);
-              if (segments.length > 0) break;
-            } catch {
-              //
-            }
-          }
-        }
+    try {
+      const bookmarkUrl = `${baseUrl}/bookmark.ndjson`;
+      const text = await safeTextFetch(bookmarkUrl);
+      bookmarks = parseBookmarkNdjson(text);
+    } catch (error) {
+      console.log("Bookmark fetch/parse failed:", error);
+      bookmarks = [];
+    }
 
-        for (const candidate of bookmarkCandidates) {
-          try {
-            if (candidate.endsWith(".ndjson")) {
-              const text = await safeTextFetch(candidate);
-              bookmarks = parseBookmarkNdjson(text);
-            } else {
-              const raw = await safeJsonFetch(candidate);
-              bookmarks = extractBookmarks(raw);
+    if (cancelled) return;
 
-              if (
-                raw &&
-                typeof raw === "object" &&
-                typeof (raw as Record<string, unknown>).sessionStartTime ===
-                  "number"
-              ) {
-                sessionStartMs = (raw as Record<string, unknown>)
-                  .sessionStartTime as number;
-              }
+    sessionStartTimeRef.current = sessionStartMs;
+    playlistSegmentsRef.current = segments;
 
-              if (
-                raw &&
-                typeof raw === "object" &&
-                typeof (raw as Record<string, unknown>).sessionStartMs ===
-                  "number"
-              ) {
-                sessionStartMs = (raw as Record<string, unknown>)
-                  .sessionStartMs as number;
-              }
-            }
+    onLabelsLoaded?.(labelsMap, src);
+    
+    const getFileName = (value?: string) => {
+  return value?.split("/").pop()?.split("?")[0] || "";
+};
+try {
+  const parsedBookmarks = bookmarks
+    .map((bookmark) => {
+      const bookmarkSegmentName =
+        bookmark.s?.split("/").pop()?.split("?")[0] || "";
 
-            break;
-          } catch {
-            //
-          }
-        }
+      const segment = segments.find((item) => item.name === bookmarkSegmentName);
 
-        if (cancelled) return;
+      const timeSec =
+        segment && typeof bookmark.o === "number"
+          ? segment.startSec + Number(bookmark.o || 0) / 1000
+          : null;
 
-        sessionStartTimeRef.current = sessionStartMs;
-        playlistSegmentsRef.current = segments;
-
-        if (Object.keys(labelsMap).length > 0) {
-          onLabelsLoaded?.(labelsMap, src);
-        }
-
-        const parsedBookmarks = bookmarks
-          .map((bookmark) => ({
-            timeSec: getBookmarkTimeSec(bookmark),
-            t: bookmark.t,
-            c_ar: Array.isArray(bookmark.c_ar) ? bookmark.c_ar : [],
-          }))
-          .filter((item) => item.timeSec !== null)
-          .map((item) => ({
-            timeSec: item.timeSec as number,
-            t: item.t,
-            c_ar: item.c_ar,
-          }));
-
-        console.log("[HLSPlayer] metadata loaded", {
-          src,
-          baseUrl,
-          labelsCount: Object.keys(labelsMap).length,
-          segmentCount: segments.length,
-          bookmarkCount: bookmarks.length,
-          parsedBookmarkCount: parsedBookmarks.length,
-        });
-
-        onBookmarksChange?.(parsedBookmarks, src);
+      return {
+        ...bookmark,
+        timeSec,
+        c_ar: Array.isArray(bookmark.c_ar) ? bookmark.c_ar : [],
       };
+    })
+    .filter((item) => item.timeSec != null)
+    .map((item) => ({
+      ...item,
+      timeSec: item.timeSec as number,
+    }));
 
-      loadPlaybackMetadata();
 
-      return () => {
-        cancelled = true;
-      };
-    }, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded]);
+  onBookmarksChange?.(parsedBookmarks, src);
+} catch (error) {
+  console.log("Parsed bookmark mapping failed:", error);
+  onBookmarksChange?.([], src);
+}};
+
+  loadPlaybackMetadata();
+
+  return () => {
+    cancelled = true;
+  };
+}, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded]);
 
     useImperativeHandle(ref, () => ({
       play: async () => {

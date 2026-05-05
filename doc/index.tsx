@@ -871,10 +871,10 @@ useEffect(() => {
 ]);
 
   return (
-    <div className="w-full h-full grid grid-cols-[minmax(0,1fr)_390px] gap-[11px]">
-      <div className="min-w-0 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px]">
+    <div className="w-full h-full flex gap-[11px]">
+      <div className="w-2/3 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px]">
         <Form layout="vertical" form={form}>
-          <div className="grid grid-cols-[0.9fr_1.4fr_1fr_1fr_1.8fr] gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <Form.Item
               name="company"
               className="mb-0"
@@ -951,7 +951,7 @@ useEffect(() => {
               />
             </Form.Item>
 
-            <div className="min-w-0">
+            <div>
               <Select
                 mode="multiple"
                 maxCount={2}
@@ -962,10 +962,7 @@ useEffect(() => {
                 placeholder={t("playback_select_video")}
                 disabled={!values?.device}
                 maxTagCount={2}
-                showSearch={{
-                  filterOption: (input, option) =>
-                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase()),
-                }}
+                maxTagPlaceholder={(omittedValues) => `+${omittedValues.length}`}
               />
             </div>
           </div>
@@ -1230,76 +1227,42 @@ useEffect(() => {
           disabled={selectedVideos.length === 0}
           bookmarks={timelineMarkers}
         />
-        <div
-  className={`grid gap-4 ${
-    selectedVideoItems.length > 1 ? "grid-cols-2" : "grid-cols-1"
-  }`}
->
-  {selectedVideoItems.map((video) => (
-    <div key={video.value} className="space-y-3">
-      <h3 className="text-[18px] font-bold text-[#111827]">
-        {video.label}
-      </h3>
 
-      <div className="grid grid-cols-2 gap-3">
-        {/* Robot Status */}
-        <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-          <h2 className="text-[20px] font-bold mb-8">
-            {t("playback_robot_status")}
-          </h2>
+        <div className="bg-white rounded-[10px] p-6">
+          <h2 className="text-[20px] font-bold mb-4">{t("stream_device_info")}</h2>
 
-          <div className="space-y-6 text-sm">
-            <div className="flex justify-between">
-              <span>{t("stream_info_status")}</span>
-              <span>-</span>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_device")}</div>
+              <div className="font-medium mt-1">{playbackDeviceInfo.deviceName}</div>
             </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_battery")}</span>
-              <span>-</span>
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_status")}</div>
+              <div className="font-medium mt-1">
+                {selectedVideos.length > 0 ? t("status_active") : t("status_inactive")}
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_network")}</span>
-              <span>-</span>
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_mission")}</div>
+              <div className="font-medium mt-1">{playbackDeviceInfo.missionName}</div>
             </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_gps")}</span>
-              <span>-</span>
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_serial")}</div>
+              <div className="font-medium mt-1">{playbackDeviceInfo.deviceSn}</div>
             </div>
-          </div>
-        </div>
-
-        {/* Operation Info */}
-        <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-          <h2 className="text-[20px] font-bold mb-8">
-            {t("playback_operation_info")}
-          </h2>
-
-          <div className="space-y-6 text-sm">
-            <div className="flex justify-between">
-              <span>{t("stream_info_altitude")}</span>
-              <span>-</span>
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_start_time")}</div>
+              <div className="font-medium mt-1">{playbackDeviceInfo.startTime}</div>
             </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_speed")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_operating_hour")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_start_time")}</span>
-              <span>-</span>
+            <div className="bg-[#F6F7F9] rounded-[8px] p-3">
+              <div className="text-[#8E8E93]">{t("stream_info_operating_hour")}</div>
+              <div className="font-medium mt-1">{playbackDeviceInfo.operatingHour}</div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  ))}
-</div>
-      </div>
 
-      <div className="w-[390px] px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
+      <div className="w-1/3 px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
         <div className="w-full p-6 bg-white rounded-[10px]">
           <h2 className="text-[20px] font-bold mb-4">{t("playback_selected_video")}</h2>
 
@@ -1313,24 +1276,30 @@ useEffect(() => {
               selectedVideoItems.map((video, index) => (
                 <div
                   key={video.value}
-                  className="flex items-center justify-between gap-4 bg-[#F6F7F9] border border-[#DDE0E5] rounded-lg px-5 py-4 min-h-[66px]"
+                  className="flex items-center justify-between bg-[#F6F7F9] border border-[#DDE0E5] rounded-lg px-4 py-3"
                 >
-                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <img src={FolderIcon} alt="Folder Icon" className="w-7 h-7 flex-shrink-0" />
-
-                    <div
-                      className="text-[15px] font-semibold text-[#1F2937] whitespace-nowrap overflow-visible"
-                      title={video.label}
-                    >
-                      {video.label}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img src={FolderIcon} alt="Folder Icon" />
+                    <div className="min-w-0">
+                      <div className="text-xs text-[#8E8E93] mb-1">
+                        {index === 0
+                          ? t("playback_primary_video")
+                          : t("playback_secondary_video")}
+                      </div>
+                      <div
+                        className="text-xs text-[#6B7280] line-clamp-2"
+                        title={video.label}
+                      >
+                        {video.label}
+                      </div>
                     </div>
                   </div>
 
                   <button
                     onClick={() => handleRemoveVideo(index)}
-                    className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    <img src={XIcon} alt="Remove Icon" className="w-6 h-6" />
+                    <img src={XIcon} alt="Remove Icon" />
                   </button>
                 </div>
               ))

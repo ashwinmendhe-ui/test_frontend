@@ -544,15 +544,57 @@ export default function StreamIndex() {
             </div>
 
             <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-[10px] p-6">
-                <h2 className="text-[20px] font-bold mb-5">
-                  {t("stream_video_attachment")}
-                </h2>
+              <div className="grid grid-cols-2 gap-3">
+  <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
+    <h2 className="text-[20px] font-bold mb-8">
+      {t("stream_robot_status")}
+    </h2>
 
-                <div className="border border-dashed border-[#D7DCE3] rounded-[10px] h-[78px] flex items-center justify-center text-[#8E8E93] text-[16px] bg-[#FAFBFC]">
-                  {t("stream_select_first_video")}
-                </div>
-              </div>
+    <div className="space-y-6 text-sm">
+      <div className="flex justify-between">
+        <span>{t("stream_situation")}</span>
+        <span>{isStreaming ? t("status_active") : "-"}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_battery")}</span>
+        <span>-</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_network_century")}</span>
+        <span>-</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_gps_century")}</span>
+        <span>-</span>
+      </div>
+    </div>
+  </div>
+
+  <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
+    <h2 className="text-[20px] font-bold mb-8 leading-tight">
+      {t("stream_operation_information")}
+    </h2>
+
+    <div className="space-y-6 text-sm">
+      <div className="flex justify-between">
+        <span>{t("stream_altitude")}</span>
+        <span>-</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_speed")}</span>
+        <span>-</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_operating_hours")}</span>
+        <span>-</span>
+      </div>
+      <div className="flex justify-between">
+        <span>{t("stream_start_time")}</span>
+        <span>-</span>
+      </div>
+    </div>
+  </div>
+</div>
 
               <div className="bg-white rounded-[10px] p-6 min-h-[350px]">
                 <h2 className="text-[20px] font-bold mb-5">
@@ -678,7 +720,7 @@ export default function StreamIndex() {
 
               <div className="bg-white rounded-[10px] p-6">
                 <h2 className="text-[20px] font-bold mb-5">
-                  {t("stream_movement_route_map")}
+                  {t("stream_robot_control")}
                 </h2>
 
                 <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">

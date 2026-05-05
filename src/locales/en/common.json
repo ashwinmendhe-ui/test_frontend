@@ -521,5 +521,22 @@
   "stream_video_attachment": "Video Attachment",
   "stream_select_first_video": "Please select the first video",
   "stream_movement_route_map": "Movement Route Map",
-  "stream_map_waiting_activation": "It will be activated after video attachment."
+  "stream_map_waiting_activation": "It will be activated after video attachment.",
+
+
+  "playback_robot_status": "Robot Status",
+"playback_operation_info": "Operation Info",
+"stream_info_battery": "Battery",
+"stream_info_network": "Network Strength",
+"stream_info_gps": "GPS Strength",
+
+"stream_situation": "situation",
+"stream_battery": "battery",
+"stream_network_century": "Network Century",
+"stream_gps_century": "GPS Century",
+"stream_altitude": "altitude",
+"stream_speed": "speed",
+"stream_operating_hours": "Operating hours",
+"stream_start_time": "Start time",
+"stream_robot_control": "Robot control"
   }

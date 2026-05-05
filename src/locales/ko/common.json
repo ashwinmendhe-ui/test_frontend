@@ -603,5 +603,21 @@
   "stream_video_attachment": "영상 첨부",
   "stream_select_first_video": "첫번째 영상을 선택하세요",
   "stream_movement_route_map": "이동 경로 지도",
-  "stream_map_waiting_activation": "영상 첨부 이후 활성화됩니다"
+  "stream_map_waiting_activation": "영상 첨부 이후 활성화됩니다",
+
+  "playback_robot_status": "로봇 상태",
+"playback_operation_info": "운행 정보",
+"stream_info_battery": "배터리",
+"stream_info_network": "네트워크 세기",
+"stream_info_gps": "GPS 세기",
+
+"stream_situation": "상태",
+"stream_battery": "배터리",
+"stream_network_century": "네트워크 센추리",
+"stream_gps_century": "GPS 센추리",
+"stream_altitude": "고도",
+"stream_speed": "속도",
+"stream_operating_hours": "작동 시간",
+"stream_start_time": "시작 시간",
+"stream_robot_control": "로봇 제어"
 }
