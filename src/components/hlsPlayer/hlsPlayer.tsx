@@ -1,12 +1,14 @@
 import Hls from "hls.js";
-import React, {
+import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
+import { useDetectionCanvas } from "@/hooks/usePlaybackDetectionCanvas";
 import type { HLSPlayerRef } from "./types";
-
 const getFileName = (path: string) => {
   return path.split("/").pop()?.split("?")[0] || path;
 };
@@ -32,6 +34,9 @@ interface HLSPlayerProps {
   muted?: boolean;
   controls?: boolean;
   metadataBaseUrl?: string;
+  selectedClassIds?: number[];
+  showCommonDetection?: boolean;
+  showDangerDetection?: boolean;
   onLoadedMetadata?: () => void;
   onTimeUpdate?: () => void;
   onEnded?: () => void;
@@ -40,11 +45,18 @@ interface HLSPlayerProps {
     videoUrl: string
   ) => void;
   onLabelsLoaded?: (labels: LabelsMap, videoUrl: string) => void;
+  onDeviceInfoUpdate?: (
+  deviceInfo: any,
+  videoUrl: string,
+  videoTime: number
+) => void;
 }
 
 type SegmentInfo = {
   name: string;
   startSec: number;
+  durationSec: number;
+  startMs?: number;
 };
 
 const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
@@ -61,6 +73,10 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       onEnded,
       onBookmarksChange,
       onLabelsLoaded,
+      onDeviceInfoUpdate,
+      selectedClassIds = [],
+      showCommonDetection = true,
+      showDangerDetection = true,
     },
     ref
   ) => {
@@ -70,13 +86,45 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
     const metadataLoadedKeyRef = useRef<string>("");
 
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const labelsMapRef = useRef<LabelsMap>({});
+    const segmentMetadataRef = useRef<Record<string, any[]>>({});
+    const currentSegmentNameRef = useRef<string | null>(null);
+    const currentMetadataRef = useRef<any[]>([]);
+    const rafIdRef = useRef<number | null>(null);
+
+    const [frameDimensions, setFrameDimensions] = useState<{
+      width: number | null;
+      height: number | null;
+    }>({
+      width: null,
+      height: null,
+    });
+
+    const { drawDetections, clearCanvas } = useDetectionCanvas({
+      videoRef,
+      canvasRef,
+      frameWidth: frameDimensions.width,
+      frameHeight: frameDimensions.height,
+    });
+
+
+
+
     const safeJsonFetch = async (url: string) => {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${url}: ${response.status}`);
-      }
-      return response.json();
-    };
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    return await res.json();
+  } catch (error) {
+    // console.warn("JSON fetch failed:", url, error);
+    return null;
+  }
+};
 
     const safeTextFetch = async (url: string) => {
       const response = await fetch(url, { cache: "no-store" });
@@ -111,7 +159,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       const segments: SegmentInfo[] = [];
       let currentStartSec = 0;
       let lastDurationSec = 0;
-
+      let currentProgramTimeMs: number | null = null;
       for (const line of lines) {
         if (line.startsWith("#EXTINF:")) {
           lastDurationSec =
@@ -119,14 +167,27 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           continue;
         }
 
-        if (line && !line.startsWith("#") && line.endsWith(".ts")) {
-          segments.push({
-            name: getFileName(line),
-            startSec: currentStartSec,
-          });
-
-          currentStartSec += lastDurationSec;
+        if (line.startsWith("#EXT-X-PROGRAM-DATE-TIME:")) {
+          currentProgramTimeMs = new Date(
+            line.replace("#EXT-X-PROGRAM-DATE-TIME:", "")
+          ).getTime();
+          continue;
         }
+
+        if (line && !line.startsWith("#") && line.endsWith(".ts")) {
+            segments.push({
+              name: getFileName(line),
+              startSec: currentStartSec,
+              durationSec: lastDurationSec,
+              startMs: currentProgramTimeMs ?? undefined,
+            });
+
+            currentStartSec += lastDurationSec;
+
+            if (currentProgramTimeMs != null) {
+              currentProgramTimeMs += lastDurationSec * 1000;
+            }
+          }
       }
       return segments;
     };
@@ -234,6 +295,225 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       return null;
     };
 
+
+
+  const getLabelName = useCallback((classId?: number) => {
+      if (classId == null) return "unknown";
+      return labelsMapRef.current[classId] || `Class${classId}`;
+    }, []);
+
+    const loadSegmentMetadata = useCallback(
+  async (segmentName: string): Promise<any[]> => {
+    
+    if (!metadataBaseUrl) return [];
+
+    if (segmentMetadataRef.current[segmentName]) {
+      return segmentMetadataRef.current[segmentName];
+    }
+
+    const baseUrl = metadataBaseUrl.replace(/\/$/, "");
+    const segmentBaseName = getFileName(segmentName).replace(/\.ts$/i, "");
+
+    const candidates = [
+      `${segmentBaseName}_1.json`,
+      `${segmentBaseName}.json`,
+    ];
+
+    for (const candidate of candidates) {
+      const data = await safeJsonFetch(`${baseUrl}/${candidate}`);
+
+      if (Array.isArray(data)) {
+        const sorted = data.sort(
+          (a, b) => Number(a.m ?? a.ts_ms ?? 0) - Number(b.m ?? b.ts_ms ?? 0)
+        );
+
+        segmentMetadataRef.current[segmentName] = sorted;
+        return sorted;
+      }
+    }
+
+    segmentMetadataRef.current[segmentName] = [];
+    return [];
+  },
+  [metadataBaseUrl]
+);
+
+  const startFrameSync = useCallback(() => {
+  const syncLoop = () => {
+    const video = videoRef.current;
+
+    if (!video || playlistSegmentsRef.current.length === 0) {
+      rafIdRef.current = requestAnimationFrame(syncLoop);
+      return;
+    }
+
+    const currentTime = video.currentTime;
+
+    const segment = playlistSegmentsRef.current.find((item) => {
+      const start = item.startSec;
+      const end = item.startSec + item.durationSec;
+      return currentTime >= start && currentTime < end;
+    });
+
+    if (!segment) {
+      clearCanvas();
+      rafIdRef.current = requestAnimationFrame(syncLoop);
+      return;
+    }
+
+    if (currentSegmentNameRef.current !== segment.name) {
+      currentSegmentNameRef.current = segment.name;
+      currentMetadataRef.current = [];
+
+      loadSegmentMetadata(segment.name).then((metadata) => {
+        if (currentSegmentNameRef.current === segment.name) {
+          
+          currentMetadataRef.current = metadata;
+        }
+      });
+    }
+
+    const metadata = currentMetadataRef.current;
+
+    if (!metadata.length) {
+      clearCanvas();
+      rafIdRef.current = requestAnimationFrame(syncLoop);
+      return;
+    }
+
+    const segmentStartMs = segment.startMs ?? 0;
+    const timeInSegmentMs = (currentTime - segment.startSec) * 1000;
+    const targetFrameTime = segmentStartMs + timeInSegmentMs;
+
+  
+    let nearestYoloFrame: any | null = null;
+    let nearestLlmFrame: any | null = null;
+
+    let latestYoloTime = 0;
+    let latestLlmTime = 0;
+
+    for (const frame of metadata) {
+      const frameTime = Number(frame.m ?? frame.ts_ms ?? 0);
+
+      if (!frameTime || frameTime > targetFrameTime) continue;
+
+      const hasYolo =
+        Array.isArray(frame?.d) && frame.d.length > 0;
+
+      const hasLlm =
+        (Array.isArray(frame?.ld) && frame.ld.length > 0) ||
+        (Array.isArray(frame?.llm) && frame.llm.length > 0);
+
+      if (hasYolo && frameTime > latestYoloTime) {
+        nearestYoloFrame = frame;
+        latestYoloTime = frameTime;
+      }
+
+      if (hasLlm && frameTime > latestLlmTime) {
+        nearestLlmFrame = frame;
+        latestLlmTime = frameTime;
+      }
+    }
+
+    const infoFrame = nearestYoloFrame ?? nearestLlmFrame;
+
+    if (infoFrame?.device_info) {
+
+      onDeviceInfoUpdate?.(
+        infoFrame.device_info,
+        src || "",
+        currentTime
+      );
+    }
+
+    const yoloSource = Array.isArray(nearestYoloFrame?.d)
+      ? nearestYoloFrame.d
+      : [];
+
+    const llmSource = Array.isArray(nearestLlmFrame?.ld)
+      ? nearestLlmFrame.ld
+      : Array.isArray(nearestLlmFrame?.llm)
+        ? nearestLlmFrame.llm
+        : [];
+
+    if (yoloSource.length === 0 && llmSource.length === 0) {
+      clearCanvas();
+      rafIdRef.current = requestAnimationFrame(syncLoop);
+      return;
+    }
+
+    const convertDetection = (det: any, type: "yolo" | "llm") => {
+      const classId =
+        type === "llm" && Array.isArray(det.cids)
+          ? det.cids[0]
+          : det.cid ?? det.class_id ?? det.c;
+
+      const classIds =
+        type === "llm" && Array.isArray(det.cids) ? det.cids : undefined;
+
+      const classNames = classIds?.map((cid: number) => getLabelName(cid));
+      const bb = Array.isArray(det.bb) ? det.bb : null;
+
+      return {
+        x: bb ? Number(bb[0] || 0) / 1000 : Number(det.x || 0),
+        y: bb ? Number(bb[1] || 0) / 1000 : Number(det.y || 0),
+        w: bb ? Number(bb[2] || 0) / 1000 : Number(det.w || 0),
+        h: bb ? Number(bb[3] || 0) / 1000 : Number(det.h || 0),
+        class: det.class || det.label || getLabelName(classId),
+        classId,
+        classIds,
+        classNames,
+        confidence: det.cf ? Number(det.cf) / 1000 : Number(det.confidence || 0),
+        type,
+        properties: type === "llm" ? det.p : undefined,
+      };
+    };
+
+    const yoloDetections = yoloSource.map((det: any) =>
+      convertDetection(det, "yolo")
+    );
+
+    const llmDetections = llmSource.map((det: any) =>
+      convertDetection(det, "llm")
+    );
+
+    const detections = [...yoloDetections, ...llmDetections].filter((det: any) => {
+  if (!(det.w > 0 && det.h > 0)) return false;
+
+  const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
+
+const isDanger =
+  det.type === "llm" ||
+  DANGER_CLASS_IDS.includes(Number(det.classId)) ||
+  (Array.isArray(det.classIds) &&
+    det.classIds.some((id: number) =>
+      DANGER_CLASS_IDS.includes(Number(id))
+    ));
+
+  if (isDanger && !showDangerDetection) return false;
+  if (!isDanger && !showCommonDetection) return false;
+
+  return true;
+});
+    if (detections.length > 0) {
+      drawDetections(detections);
+    } else {
+      clearCanvas();
+    }
+
+    rafIdRef.current = requestAnimationFrame(syncLoop);
+    };
+
+    rafIdRef.current = requestAnimationFrame(syncLoop);
+  }, [
+  clearCanvas,
+  drawDetections,
+  getLabelName,
+  loadSegmentMetadata,
+  showCommonDetection,
+  showDangerDetection,
+]);
+
     useEffect(() => {
       const video = videoRef.current;
 
@@ -287,6 +567,17 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
   const metadataKey = `${src || ""}_${metadataBaseUrl || ""}`;
 
+  const getFileName = (value?: string) => {
+    return value?.split("/").pop()?.split("?")[0] || "";
+  };
+  const getSegmentJsonCandidates = (segmentTsName: string) => {
+    const tsBaseName = getFileName(segmentTsName).replace(/\.ts$/i, "");
+
+    return [
+      `${tsBaseName}_1.json`,
+      `${tsBaseName}.json`,
+    ];
+  };
   const loadPlaybackMetadata = async () => {
     if (!metadataBaseUrl || !src) {
       onBookmarksChange?.([], src || "");
@@ -295,11 +586,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     }
 
     const baseUrl = metadataBaseUrl.replace(/\/$/, "");
-    console.log("🎬 HLS src:", src);
-    console.log("📂 metadataBaseUrl prop:", metadataBaseUrl);
-    console.log("📂 normalized metadata baseUrl:", baseUrl);
-    console.log("📂 base path from src:", getBasePathFromUrl(src));
-    console.log("🧠 test segment JSON:", `${baseUrl}/segment_000_00000.json`);
     let labelsMap: LabelsMap = {};
     let bookmarks: BookmarkPayload[] = [];
     let sessionStartMs: number | null = null;
@@ -308,52 +594,52 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     try {
       segments = await parsePlaylistSegments(src);
 
-console.log("✅ Parsed playlist segments:", segments);
-console.log(
-  "🧠 Segment JSON candidates:",
-  segments.slice(0, 5).map((seg) => {
-    const tsBaseName = seg.name.replace(".ts", "");
-    return {
-      ts: seg.name,
-      startSec: seg.startSec,
-      candidate1: `${baseUrl}/${tsBaseName}.json`,
-      candidate2: `${baseUrl}/segment_000_${String(
-        segments.indexOf(seg)
-      ).padStart(5, "0")}.json`,
-    };
-  })
-);
     } catch (error) {
       console.log("Playlist parse failed:", error);
       segments = [];
     }
 
+    try {
+      const firstSegment = segments[0];
 
-try {
-  const testUrl = `${baseUrl}/segment_000_00000.json`;
-  const res = await fetch(testUrl, { cache: "no-store" });
+      if (firstSegment?.name) {
+        const candidates = getSegmentJsonCandidates(firstSegment.name);
 
-  console.log("📡 Segment JSON fetch status:", res.status);
-  console.log("📡 Segment JSON fetch url:", testUrl);
+        for (const candidate of candidates) {
+          const testUrl = `${baseUrl}/${candidate}`;
+          const res = await fetch(testUrl, { cache: "no-store" });
 
-  if (res.ok) {
-    const data = await res.json();
-    console.log("✅ Segment JSON data:", data);
-  } else {
-    console.error("❌ Segment JSON not accessible:", res.status, testUrl);
-  }
-} catch (error) {
-  console.error("🔥 Segment JSON fetch failed:", error);
-}
 
+          if (res.ok) {
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("🔥 Segment JSON fetch failed:", error);
+    }
+  
 
     try {
-      const rawInfo = await safeJsonFetch(`${baseUrl}/info.json`);
-      labelsMap = normalizeLabels(rawInfo);
-    } catch (error) {
-      console.log("Info fetch failed:", error);
-      labelsMap = {};
-    }
+  const info = await safeJsonFetch(`${baseUrl}/info.json`);
+  const labelsMap = normalizeLabels(info);
+
+  labelsMapRef.current = labelsMap;
+
+  if (info?.frame_width && info?.frame_height) {
+    setFrameDimensions({
+      width: info.frame_width,
+      height: info.frame_height,
+    });
+  }
+
+  onLabelsLoaded?.(labelsMap, src);
+} catch (error) {
+  console.log("Info fetch failed:", error);
+
+  labelsMapRef.current = {};
+  onLabelsLoaded?.({}, src);
+}
 
     try {
       const bookmarkUrl = `${baseUrl}/bookmark.ndjson`;
@@ -370,10 +656,6 @@ try {
     playlistSegmentsRef.current = segments;
 
     onLabelsLoaded?.(labelsMap, src);
-    
-    const getFileName = (value?: string) => {
-  return value?.split("/").pop()?.split("?")[0] || "";
-};
 try {
   const parsedBookmarks = bookmarks
     .map((bookmark) => {
@@ -412,6 +694,24 @@ try {
     cancelled = true;
   };
 }, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded]);
+
+
+  useEffect(() => {
+  if (!src || !metadataBaseUrl) return;
+
+  startFrameSync();
+
+  return () => {
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
+    clearCanvas();
+    currentSegmentNameRef.current = null;
+    currentMetadataRef.current = [];
+  };
+}, [src, metadataBaseUrl, startFrameSync, clearCanvas]);
 
     useImperativeHandle(ref, () => ({
       play: async () => {
@@ -458,19 +758,25 @@ try {
     }));
 
     return (
-      <video
-        ref={videoRef}
-        className={className}
-        muted={muted}
-        controls={controls}
-        playsInline
-        onLoadedMetadata={onLoadedMetadata}
-        onTimeUpdate={onTimeUpdate}
-        onEnded={onEnded}
-      />
-    );
-  }
+  <div className="relative w-full h-full bg-black overflow-hidden">
+    <video
+      ref={videoRef}
+      className={className}
+      muted={muted}
+      controls={controls}
+      playsInline
+      onLoadedMetadata={onLoadedMetadata}
+      onTimeUpdate={onTimeUpdate}
+      onEnded={onEnded}
+    />
+
+    <canvas
+      ref={canvasRef}
+      className="absolute top-0 left-0 w-full h-full pointer-events-none object-contain z-10"
+    />
+  </div>
 );
+  });
 
 HLSPlayer.displayName = "HLSPlayer";
 

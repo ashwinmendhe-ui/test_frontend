@@ -30,6 +30,8 @@ interface ControlBarProps {
   bookmarks?: BookmarkItem[];
   onBookmarkClick?: (time: number) => void;
   className?: string;
+  showCommonDetection?: boolean;
+showDangerDetection?: boolean;
 }
 
 const formatTime = (value: number): string => {
@@ -46,18 +48,41 @@ const formatTime = (value: number): string => {
   )}:${String(seconds).padStart(2, "0")}`;
 };
 
-const getMarkerColor = (type?: string) => {
+const getMarkerColor = (type?: string, classIds: number[] = []) => {
+  const firstClassId = classIds[0];
+
+  const colorByClassId: Record<number, string> = {
+    0: "#8B6F63", // Construction
+    1: "#FFD600", // HardHat
+    2: "#A855F7", // Mask
+    3: "#FF2D55", // NO-Hardhat
+    4: "#D100D8", // NO-Mask
+    5: "#FF8A00", // NO-Safety Vest
+    6: "#22C55E", // Person
+    7: "#FF8A00", // Safety Cone
+    8: "#1683FF", // Safety Vest
+    9: "#14B8C8", // Machinery
+    10: "#1683FF", // Vehicle
+    20: "#FF2D55", // NO-Hardhat LLM
+    21: "#FF8A00", // NO-Safety Vest LLM
+    22: "#FF2D55", // NO-Safety Rope LLM
+  };
+
+  if (typeof firstClassId === "number" && colorByClassId[firstClassId]) {
+    return colorByClassId[firstClassId];
+  }
+
   switch (type) {
     case "vehicle":
-      return "#3B82F6";
+      return "#1683FF";
     case "person":
       return "#22C55E";
     case "safety":
-      return "#F97316";
+      return "#FF8A00";
     case "alert":
-      return "#EF4444";
+      return "#FF2D55";
     default:
-      return "#6B7280";
+      return "#FF2D55";
   }
 };
 
@@ -81,11 +106,13 @@ export default function ControlBar({
   bookmarks = [],
   onBookmarkClick,
   className = "",
+  showCommonDetection = true,
+  showDangerDetection = true
 }: ControlBarProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragTime, setDragTime] = useState(0);
   const lastUpdateRef = useRef(0);
-
+  
   const displayTime = isDragging ? dragTime : currentTime;
 
   const clusteredBookmarks = useMemo(() => {
@@ -158,6 +185,28 @@ export default function ControlBar({
     onTimeChangeComplete(time);
   };
 
+  const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
+
+const filteredBookmarks = clusteredBookmarks.filter((bm) => {
+  const classIds = bm.classIds?.length
+    ? bm.classIds
+    : bm.c_ar ?? [];
+
+  const hasDanger = classIds.some((id) =>
+    DANGER_CLASS_IDS.includes(Number(id))
+  );
+
+  if (hasDanger && !showDangerDetection) {
+    return false;
+  }
+
+  if (!hasDanger && !showCommonDetection) {
+    return false;
+  }
+
+  return true;
+});
+
   return (
     <div className={`w-full mt-3 bg-white rounded-[7px] px-4 py-2.5 ${className}`}>
       <div className="flex items-center gap-4">
@@ -222,19 +271,18 @@ export default function ControlBar({
 
             {duration > 0 && clusteredBookmarks.length > 0 && (
               <div className="pointer-events-none absolute inset-0">
-                {clusteredBookmarks.map((bm) => {
+                {filteredBookmarks.map((bm) => {
                   if (bm.timeSec == null) return null;
 
+                  const classIds = bm.classIds?.length ? bm.classIds : bm.c_ar ?? [];
                   const markerHeight = getMarkerHeight(bm.idx, bm.type);
-                  const markerColor = getMarkerColor(bm.type);
+                  const markerColor = getMarkerColor(bm.type, classIds);
 
                   const markerLabels = bm.labels?.length
                     ? bm.labels
                     : bm.label
                     ? [bm.label]
                     : [];
-
-                  const classIds = bm.classIds?.length ? bm.classIds : bm.c_ar ?? [];
 
                   const tooltipContent = (
                     <div className="text-xs leading-5">
@@ -257,26 +305,29 @@ export default function ControlBar({
                   return (
                     <Tooltip key={bm.id || `${bm.timeSec}-${bm.idx}`} title={tooltipContent}>
                       <div
-  className={`cursor-pointer pointer-events-auto absolute p-0 bg-[#e9ecf0] border-[#e9ecf0] ${
-    bm.position === "bottom" ? "bottom-0" : ""
-  }`}
-  style={{
-    left: `${bm.positionPercent}%`,
-    top: bm.position === "bottom" ? "auto" : "8px",
-    bottom: bm.position === "bottom" ? "0px" : "auto",
-    transform:
-      bm.position === "bottom"
-        ? "translate(-50%, 0)"
-        : "translate(-50%, -50%)",
-    zIndex: 3,
-  }}
-  onClick={() => handleBookmarkTap(bm.timeSec as number)}
->
-  <div
-    className="h-[15px] w-1"
-    style={{ backgroundColor: markerColor }}
-  />
-</div>
+                      className={`cursor-pointer pointer-events-auto absolute p-0 bg-[#e9ecf0] border-[#e9ecf0] ${
+                        bm.position === "bottom" ? "bottom-0" : ""
+                      }`}
+                      style={{
+                        left: `${bm.positionPercent}%`,
+                        top: bm.position === "bottom" ? "auto" : "8px",
+                        bottom: bm.position === "bottom" ? "0px" : "auto",
+                        transform:
+                          bm.position === "bottom"
+                            ? "translate(-50%, 0)"
+                            : "translate(-50%, -50%)",
+                        zIndex: 3,
+                      }}
+                      onClick={() => handleBookmarkTap(bm.timeSec as number)}
+                    >
+                      <div
+                        className="w-1"
+                        style={{
+                          height: `${markerHeight}px`,
+                          backgroundColor: markerColor,
+                        }}
+                      />
+                    </div>
                     </Tooltip>
                   );
                 })}

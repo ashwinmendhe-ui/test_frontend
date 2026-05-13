@@ -170,7 +170,17 @@ export default function Playback() {
     Record<string, VideoBookmark[]>
   >({});
   const [labelsByVideo, setLabelsByVideo] = useState<Record<string, LabelsMap>>({});
+  const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
 
+const handleDeviceInfoUpdate = (
+  deviceInfo: any,
+  videoUrl: string
+) => {
+  setDeviceInfoByVideo((prev) => ({
+    ...prev,
+    [videoUrl]: deviceInfo,
+  }));
+};
   const { list: companyList, getList: getCompanyList } = useCompanyStore();
   const { list: siteList, getListByCompany } = useSiteStore();
   const { list: robotList, getListBySite: getRobotListBySite } = useRobotStore();
@@ -188,6 +198,17 @@ export default function Playback() {
         label: item.name,
       }));
     }
+
+  const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
+  const handleDeviceInfoUpdate = (
+  deviceInfo: any,
+  videoUrl: string
+) => {
+  setDeviceInfoByVideo((prev) => ({
+    ...prev,
+    [videoUrl]: deviceInfo,
+  }));
+};
 
     return detailUserLogin?.user?.companyId
       ? [
@@ -248,52 +269,25 @@ export default function Playback() {
   );
 
   const aiModules: AIModuleItem[] = useMemo(
-    () => [
-      {
-        value: "helmet",
-        label: t("stream_ai_helmet"),
-        category: t("stream_ai_category_safety"),
-        type: "common",
-        color: "#34C759",
-      },
-      {
-        value: "vest",
-        label: t("stream_ai_vest"),
-        category: t("stream_ai_category_safety"),
-        type: "common",
-        color: "#0A84FF",
-      },
-      {
-        value: "person",
-        label: t("stream_ai_person"),
-        category: t("stream_ai_category_object"),
-        type: "common",
-        color: "#AF52DE",
-      },
-      {
-        value: "fire",
-        label: t("stream_ai_fire"),
-        category: t("stream_ai_category_risk"),
-        type: "danger",
-        color: "#FF3B30",
-      },
-      {
-        value: "smoke",
-        label: t("stream_ai_smoke"),
-        category: t("stream_ai_category_risk"),
-        type: "danger",
-        color: "#FF9500",
-      },
-      {
-        value: "intrusion",
-        label: t("stream_ai_intrusion"),
-        category: t("stream_ai_category_security"),
-        type: "danger",
-        color: "#FF2D55",
-      },
-    ],
-    [t]
-  );
+  () => [
+    { value: "construction", label: "Construction", category: "YOLO", type: "common", color: "#8B6F63" },
+    { value: "hardhat", label: "HardHat", category: "YOLO", type: "common", color: "#FFD600" },
+    { value: "machinery", label: "Machinery", category: "YOLO", type: "common", color: "#14B8C8" },
+    { value: "mask", label: "Mask", category: "YOLO", type: "common", color: "#A855F7" },
+    { value: "person", label: "Person", category: "YOLO", type: "common", color: "#22C55E" },
+    { value: "vest", label: "Safety Vest", category: "YOLO", type: "common", color: "#1683FF" },
+    { value: "vehicle", label: "Vehicle", category: "YOLO", type: "common", color: "#1683FF" },
+    { value: "cone", label: "Safety Cone", category: "YOLO", type: "common", color: "#FF8A00" },
+
+    { value: "no-hardhat", label: "No HardHat", category: "YOLO", type: "danger", color: "#FF2D55" },
+    { value: "no-vest", label: "No Safety Vest", category: "YOLO", type: "danger", color: "#FF8A00" },
+    { value: "no-mask", label: "No Mask", category: "YOLO", type: "danger", color: "#D100D8" },
+    { value: "llm-hardhat", label: "No HardHat", category: "LLM", type: "danger", color: "#FF2D55" },
+    { value: "llm-vest", label: "No Safety Vest", category: "LLM", type: "danger", color: "#FF8A00" },
+    { value: "llm-rope", label: "No Safety Rope", category: "LLM", type: "danger", color: "#FF2D55" },
+  ],
+  []
+);
 
   const [selectedModules, setSelectedModules] = useState<string[]>(
     aiModules.map((item) => item.value)
@@ -870,6 +864,7 @@ useEffect(() => {
   t,
 ]);
 
+
   return (
     <div className="w-full h-full grid grid-cols-[minmax(0,1fr)_390px] gap-[11px]">
       <div className="min-w-0 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px]">
@@ -1000,11 +995,29 @@ useEffect(() => {
                     }
                   }}
                   src={selectedVideos[0]}
+                  onDeviceInfoUpdate={handleDeviceInfoUpdate}
                   metadataBaseUrl={
                     selectedVideos[0] ? metadataBaseByVideo[selectedVideos[0]] : undefined
                   }
+                  selectedClassIds={
+                    selectedVideos[0]
+                      ? selectedModuleIdsByVideo[selectedVideos[0]] ?? []
+                      : []
+                  }
+                  showCommonDetection={selectedModules.some((value) =>
+                    aiModules.some(
+                      (item) => item.value === value && item.type === "common"
+                    )
+                  )}
+                  
+                  showDangerDetection={selectedModules.some((value) =>
+                    aiModules.some(
+                      (item) => item.value === value && item.type === "danger"
+                    )
+                  )}
                   onBookmarksChange={handleBookmarksChange}
                   onLabelsLoaded={handleLabelsLoaded}
+                  
                   className="w-full h-[410px] object-contain bg-black"
                   autoPlay={false}
                   muted={true}
@@ -1096,7 +1109,20 @@ useEffect(() => {
                             playerRefs.current[video.value] = instance;
                           }}
                           src={video.value}
+                          onDeviceInfoUpdate={handleDeviceInfoUpdate}
                           metadataBaseUrl={metadataBaseByVideo[video.value]}
+                          selectedClassIds={selectedModuleIdsByVideo[video.value] ?? []}
+                          showCommonDetection={selectedModules.some((value) =>
+                              aiModules.some(
+                                (item) => item.value === value && item.type === "common"
+                              )
+                            )}
+
+                            showDangerDetection={selectedModules.some((value) =>
+                              aiModules.some(
+                                (item) => item.value === value && item.type === "danger"
+                              )
+                            )}
                           onBookmarksChange={handleBookmarksChange}
                           onLabelsLoaded={handleLabelsLoaded}
                           className="w-full h-[410px] object-contain bg-black"
@@ -1229,6 +1255,17 @@ useEffect(() => {
           onTimeChangeComplete={handleTimeChangeComplete}
           disabled={selectedVideos.length === 0}
           bookmarks={timelineMarkers}
+          showCommonDetection={selectedModules.some((value) =>
+              aiModules.some(
+                (item) => item.value === value && item.type === "common"
+              )
+            )}
+
+            showDangerDetection={selectedModules.some((value) =>
+              aiModules.some(
+                (item) => item.value === value && item.type === "danger"
+              )
+            )}
         />
         <div
   className={`grid gap-4 ${
