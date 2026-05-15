@@ -1,7 +1,7 @@
 import NoVideoIcon from "@/assets/no-video-icon.svg";
 import CustomModal from "@/components/common/customModal";
 import { Button, Form, Select, Switch } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
 import { useNavigate } from "react-router-dom";
@@ -32,8 +32,23 @@ type AIModuleItem = {
   type: AICategory;
   color: string;
 };
+type PlayerStatus =
+  | "OFFLINE"
+  | "LOADING"
+  | "CONNECTING"
+  | "RECONNECTING"
+  | "LIVE";
 
 export default function StreamIndex() {
+  const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
+  const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("OFFLINE");
+  const [hlsRetryKey, setHlsRetryKey] = useState(0);
+  const [hlsRetryCount, setHlsRetryCount] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const retryTimerRef = useRef<number | null>(null);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { detailUserLogin } = useUserStore();
@@ -120,6 +135,40 @@ export default function StreamIndex() {
       label: item.missionName,
     }));
   }, [missionList, robotList, values?.device]);
+
+
+  const playerStatusConfig: Record<
+  PlayerStatus,
+  { label: string; dotClass: string; badgeClass: string }
+  > = {
+    OFFLINE: {
+      label: "OFFLINE",
+      dotClass: "bg-[#9CA3AF]",
+      badgeClass: "bg-[#374151]/90",
+    },
+    LOADING: {
+      label: "Loading...",
+      dotClass: "bg-[#F59E0B]",
+      badgeClass: "bg-[#1F2937]/90",
+    },
+    CONNECTING: {
+      label: "Connecting...",
+      dotClass: "bg-[#3B82F6]",
+      badgeClass: "bg-[#1F2937]/90",
+    },
+    RECONNECTING: {
+      label: "Reconnecting...",
+      dotClass: "bg-[#A855F7] animate-pulse",
+      badgeClass: "bg-[#1F2937]/90",
+    },
+    LIVE: {
+      label: "LIVE",
+      dotClass: "bg-[#22C55E]",
+      badgeClass: "bg-[#1F2937]/90",
+    },
+  };
+
+const currentPlayerStatus = playerStatusConfig[playerStatus];
 
   const aiModules: AIModuleItem[] = useMemo(
     () => [
@@ -284,49 +333,57 @@ export default function StreamIndex() {
   }, [selectedRobotDetail, values?.mission]);
 
   const handleStartWork = async () => {
-    try {
-      await form.validateFields();
-      setIsLoading(true);
+  try {
+    await form.validateFields();
+    setIsLoading(true);
+    setPlayerStatus("LOADING");
 
-      const res = await streamApi.start(streamPayload);
+    const res = await streamApi.start(streamPayload);
 
-      if (res?.code === -1) {
-        showNotification(
-          "error",
-          "Start stream failed",
-          res?.message || "Unable to start stream."
-        );
-        return;
-      }
-
-      if (res?.data?.streamId) {
-        const streamInfo = await startStream(res.data.streamId);
-        setStreamPlaybackUrl(streamInfo?.playback_url || "");
-        setStreamMapUrl(streamInfo?.map_url || "");
-      }
-
-      if (res?.data?.sessionId) {
-        setSessionId(res.data.sessionId);
-        await heartBeat(res.data.sessionId);
-      }
-
-      setIsStreaming(true);
-
-      showNotification(
-        "success",
-        "Stream started",
-        "Live stream started successfully."
-      );
-    } catch (error: any) {
+    if (res?.code === -1) {
       showNotification(
         "error",
         "Start stream failed",
-        error?.message || "Validation or API error."
+        res?.message || "Unable to start stream."
       );
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+
+    if (res?.data?.streamId) {
+      const streamInfo = await startStream(res.data.streamId);
+
+      if (!streamInfo?.playback_url) {
+        throw new Error("Stream started, but playback URL was not found.");
+      }
+
+      setStreamPlaybackUrl(streamInfo.playback_url);
+      setPlayerStatus("LOADING");
+      setHlsRetryCount(0);
+      setHlsRetryKey(0);
+      setStreamMapUrl(streamInfo.map_url || "");
+      setIsStreaming(streamInfo.state === "RUNNING");
+    }
+
+    if (res?.data?.sessionId) {
+      setSessionId(res.data.sessionId);
+      await heartBeat(res.data.sessionId);
+    }
+
+    showNotification(
+      "success",
+      "Stream started",
+      "Live stream started successfully."
+    );
+  } catch (error: any) {
+    showNotification(
+      "error",
+      "Start stream failed",
+      error?.message || "Validation or API error."
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleStopWork = async () => {
     try {
@@ -357,13 +414,25 @@ export default function StreamIndex() {
           "Unable to stop stream."
       );
     } finally {
-      playerRef.current?.pause();
-      setIsStreaming(false);
-      setSessionId(null);
-      setStreamPlaybackUrl("");
-      setStreamMapUrl("");
-      setIsLoading(false);
-    }
+  playerRef.current?.pause();
+
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+
+  setSessionId(null);
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+  setBookmarks([]);
+
+  setHlsRetryCount(0);
+  setHlsRetryKey(0);
+
+  setIsLoading(false);
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+}
   };
 
   const handleReportOk = () => {
@@ -374,6 +443,144 @@ export default function StreamIndex() {
   const handleReportCancel = () => {
     setIsReportOpen(false);
   };
+
+
+ const handleHlsError = useCallback(() => {
+  if (!isStreaming || !streamPlaybackUrl) return;
+    if (playerStatus === "CONNECTING") return;
+
+
+  // Only reconnect state after stream was already live once
+  if (hasConnectedOnce) {
+    setPlayerStatus("RECONNECTING");
+
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+    }
+
+    retryTimerRef.current = window.setTimeout(() => {
+      setPlayerStatus("CONNECTING");
+
+      setHlsRetryCount((prev) => prev + 1);
+      setHlsRetryKey((prev) => prev + 1);
+    }, 700);
+
+    return;
+  }
+
+  // Initial startup retry
+  if (hlsRetryCount >= 30) {
+    setPlayerStatus("OFFLINE");
+
+    showNotification(
+      "error",
+      "Live stream unavailable",
+      "Stream playlist is still not accessible after retrying."
+    );
+
+    return;
+  }
+
+  if (retryTimerRef.current) {
+    window.clearTimeout(retryTimerRef.current);
+  }
+
+  retryTimerRef.current = window.setTimeout(() => {
+    setHlsRetryCount((prev) => prev + 1);
+    setHlsRetryKey((prev) => prev + 1);
+  }, 1200);
+}, [
+  hlsRetryCount,
+  isStreaming,
+  streamPlaybackUrl,
+  hasConnectedOnce,
+  playerStatus,
+]);
+
+
+const handlePlayPause = () => {
+  if (!playerRef.current) return;
+
+  if (isPlaying) {
+    playerRef.current.pause();
+    setIsPlaying(false);
+  } else {
+    playerRef.current.play();
+    setIsPlaying(true);
+  }
+};
+
+const handlePrevious = () => {
+  if (!playerRef.current) return;
+  const nextTime = Math.max(currentTime - 5, 0);
+  playerRef.current.seekTo(nextTime);
+  setCurrentTime(nextTime);
+};
+
+const handleNext = () => {
+  if (!playerRef.current) return;
+  const nextTime = duration ? Math.min(currentTime + 5, duration) : currentTime + 5;
+  playerRef.current.seekTo(nextTime);
+  setCurrentTime(nextTime);
+};
+
+const handleTimeChange = (value: number) => {
+  setCurrentTime(value);
+};
+
+const handleTimeChangeComplete = (value: number) => {
+  playerRef.current?.seekTo(value);
+};
+
+useEffect(() => {
+  if (!streamPlaybackUrl || !isStreaming) return;
+
+  const fetchBookmarks = async () => {
+    try {
+      const bookmarkUrl = streamPlaybackUrl.replace(
+        "index.m3u8",
+        "bookmark.ndjson"
+      );
+
+      const response = await fetch(bookmarkUrl);
+
+      if (!response.ok) {
+        return;
+      }
+
+      const text = await response.text();
+
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const parsed = lines.map((line, index) => {
+        const item = JSON.parse(line);
+
+        return {
+          id: `${item.s}-${index}`,
+          timeSec: index * 2,
+          type: item.c_ar?.some((id: number) =>
+            [3, 4, 5, 20, 21, 22].includes(id)
+          )
+            ? "alert"
+            : "person",
+          classIds: item.c_ar || [],
+          labels: [],
+          confidence: 90,
+          position: "top",
+        };
+      });
+
+      setBookmarks(parsed);
+    } catch (error) {
+      console.log("[BOOKMARK ERROR]", error);
+    }
+  };
+
+  fetchBookmarks();
+}, [streamPlaybackUrl, isStreaming]);
 
   useEffect(() => {
     if (userRole === 1) {
@@ -389,16 +596,25 @@ export default function StreamIndex() {
   }, [detailUserLogin, form, getSiteListByCompany, userRole]);
 
   useEffect(() => {
-    if (!sessionId || !isStreaming) return;
+  if (!sessionId || !isStreaming) return;
 
-    const interval = setInterval(() => {
-      heartBeat(sessionId).catch((error) => {
-        console.error("Heartbeat failed:", error);
-      });
-    }, 30000);
+  const interval = setInterval(() => {
+    heartBeat(sessionId).catch((error) => {
+      console.error("Heartbeat failed:", error);
+    });
+  }, 30000);
 
-    return () => clearInterval(interval);
-  }, [heartBeat, isStreaming, sessionId]);
+  return () => clearInterval(interval);
+}, [heartBeat, isStreaming, sessionId]);
+
+
+useEffect(() => {
+  return () => {
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+    }
+  };
+}, []);
 
   return (
     <>
@@ -483,25 +699,24 @@ export default function StreamIndex() {
               </Form.Item>
 
               <div className="flex items-center">
-                {!isStreaming ? (
-                  <Button
-                    type="primary"
-                    loading={isLoading}
-                    onClick={handleStartWork}
-                    className="w-full h-[48px] rounded-[8px] bg-primary! border-none text-white! font-bold! text-[18px]!"
-                  >
-                    {t("stream_start_work")}
-                  </Button>
-                ) : (
-                  <Button
-                    danger
-                    loading={isLoading}
-                    onClick={handleStopWork}
-                    className="w-full h-[48px] rounded-[8px] font-bold! text-[18px]!"
-                  >
-                    {t("stream_stop_work")}
-                  </Button>
-                )}
+              {!isStreaming ? (
+                <Button
+                  type="primary"
+                  loading={isLoading}
+                  onClick={handleStartWork}
+                  className="w-full h-[48px] rounded-[8px] bg-[#1FA34A]! border-[#1FA34A]! text-white! font-bold! text-[18px]!"
+                >
+                  {t("stream_start_work")}
+                </Button>
+              ) : (
+                <Button
+                  loading={isLoading}
+                  onClick={handleStopWork}
+                  className="w-full h-[48px] rounded-[8px] bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
+                >
+                  {t("stream_stop_work")}
+                </Button>
+              )}
               </div>
             </div>
           </Form>
@@ -509,19 +724,57 @@ export default function StreamIndex() {
           <div className="grid grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
             <div className="flex flex-col gap-4">
               <div className="relative bg-[#364152] rounded-[10px] h-[500px] overflow-hidden">
-                <div className="absolute top-4 left-5 flex items-center gap-2 text-white text-[14px] font-bold z-10">
-                  <span className="w-2 h-2 rounded-full bg-[#9CA3AF]" />
-                  {isStreaming ? t("status_active").toUpperCase() : "OFFLINE"}
+              <div className="absolute top-4 left-5 z-10">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px] font-bold text-white shadow-sm ${currentPlayerStatus.badgeClass}`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${currentPlayerStatus.dotClass}`}
+                  />
+                  {currentPlayerStatus.label}
                 </div>
+              </div>
 
                 {isStreaming && streamPlaybackUrl ? (
                   <HLSPlayer
+                    key={`${streamPlaybackUrl}-${hlsRetryKey}`}
                     ref={playerRef}
                     src={streamPlaybackUrl}
                     className="w-full h-full object-contain bg-black"
                     autoPlay
                     muted
                     controls={false}
+                    onReady={() => {
+                      // Prevent repeated CONNECTING after stream already stable
+                      if (hasConnectedOnce) {
+                        setPlayerStatus("LIVE");
+                        setIsPlaying(true);
+                        return;
+                      }
+
+                      setPlayerStatus("CONNECTING");
+
+                      setTimeout(() => {
+                        setHasConnectedOnce(true);
+                        setPlayerStatus("LIVE");
+                        setIsPlaying(true);
+                      }, 400);
+                    }}
+                    onError={handleHlsError}
+                    onLoadedMetadata={() => {
+                      setIsPlaying(true);
+                      setCurrentTime(0);
+                      setDuration(0);
+                    }}
+                    onTimeUpdate={(time) => {
+                      setCurrentTime(time);
+
+                      // Live HLS duration should stay slightly ahead of current time like ref UI
+                      setDuration((prev) => Math.max(prev, time + 7));
+                    }}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                    }}
                   />
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
@@ -538,9 +791,22 @@ export default function StreamIndex() {
               </div>
 
               <ControlBar
-                playerRef={playerRef}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                duration={duration}
+                onPlayPause={handlePlayPause}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                onTimeChange={handleTimeChange}
+                onTimeChangeComplete={handleTimeChangeComplete}
                 disabled={!isStreaming || !streamPlaybackUrl}
-              />
+                isLive
+                bookmarks={bookmarks}
+                onBookmarkClick={(time) => {
+                  playerRef.current?.seekTo(time);
+                  setCurrentTime(time);
+                }}
+/>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -553,7 +819,13 @@ export default function StreamIndex() {
     <div className="space-y-6 text-sm">
       <div className="flex justify-between">
         <span>{t("stream_situation")}</span>
-        <span>{isStreaming ? t("status_active") : "-"}</span>
+        <span>
+          {playerStatus === "LIVE"
+            ? "Live"
+            : playerStatus === "LOADING"
+            ? "Loading"
+            : "Offline"}
+        </span>
       </div>
       <div className="flex justify-between">
         <span>{t("stream_battery")}</span>

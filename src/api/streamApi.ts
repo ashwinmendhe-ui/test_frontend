@@ -1,4 +1,3 @@
-import axios from "axios";
 import axiosClient from "./axiosClient";
 
 export interface StreamData {
@@ -35,11 +34,13 @@ export const streamApi = {
     return res.data;
   },
 
+  // ✅ Updated API
   startStream: async (id?: string) => {
-    const res = await axios.get(`http://52.64.157.221:7879/api/stream/${id}`);
+    const res = await axiosClient.get(`/v1/live/stream-info/${id}`);
     return res.data;
   },
 
+  // ✅ Keep POST if Swagger defines POST
   heartBeat: async (sessionId: string) => {
     const res = await axiosClient.post(
       `/v1/live/streams/heartbeat?sessionId=${sessionId}`

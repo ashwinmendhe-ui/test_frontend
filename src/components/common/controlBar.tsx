@@ -18,6 +18,7 @@ interface BookmarkItem {
 }
 
 interface ControlBarProps {
+  isLive?: boolean;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -94,6 +95,7 @@ const getMarkerHeight = (index: number, type?: string) => {
 };
 
 export default function ControlBar({
+  isLive = false,
   isPlaying,
   currentTime,
   duration,
@@ -114,9 +116,12 @@ export default function ControlBar({
   const lastUpdateRef = useRef(0);
   
   const displayTime = isDragging ? dragTime : currentTime;
+  const timelineDuration = isLive
+  ? Math.max(duration, currentTime + 7)
+  : duration;
 
   const clusteredBookmarks = useMemo(() => {
-    if (duration <= 0) return [];
+    if (timelineDuration <= 0) return [];
 
     return bookmarks.map((bm, idx) => {
       if (bm.timeSec == null) {
@@ -130,7 +135,7 @@ export default function ControlBar({
 
       const positionPercent = Math.max(
         0,
-        Math.min(100, (bm.timeSec / duration) * 100)
+        Math.min(100, (bm.timeSec / timelineDuration) * 100)
       );
 
       let stackOffset = 0;
@@ -140,7 +145,7 @@ export default function ControlBar({
 
         const prevPercent = Math.max(
           0,
-          Math.min(100, (prev.timeSec / duration) * 100)
+          Math.min(100, (prev.timeSec / timelineDuration) * 100)
         );
 
         if (Math.abs(prevPercent - positionPercent) < 1.2) {
@@ -155,7 +160,7 @@ export default function ControlBar({
         stackOffset,
       };
     });
-  }, [bookmarks, duration]);
+  }, [bookmarks, timelineDuration]);
 
   const handleChange = (value: number) => {
     if (!isDragging) {
@@ -241,7 +246,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
           <div className="relative w-full">
             <Slider
               value={displayTime}
-              max={duration > 0 ? duration : 100}
+              max={timelineDuration > 0 ? timelineDuration : 100}
               min={0}
               step={0.1}
               onChange={handleChange}
@@ -337,7 +342,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
         </div>
 
         <div className="text-sm text-gray-600 min-w-[140px] text-left">
-          {formatTime(displayTime)} / {formatTime(duration)}
+          {formatTime(displayTime)} / {formatTime(timelineDuration)}
         </div>
       </div>
     </div>

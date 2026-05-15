@@ -37,8 +37,10 @@ interface HLSPlayerProps {
   selectedClassIds?: number[];
   showCommonDetection?: boolean;
   showDangerDetection?: boolean;
+  onReady?: () => void;
+  onError?: (error?: unknown) => void;
   onLoadedMetadata?: () => void;
-  onTimeUpdate?: () => void;
+  onTimeUpdate?: (time: number) => void;
   onEnded?: () => void;
   onBookmarksChange?: (
     bookmarks: Array<{ timeSec: number | null; t?: number; c_ar?: number[] }>,
@@ -71,9 +73,11 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       onLoadedMetadata,
       onTimeUpdate,
       onEnded,
+      onError,
       onBookmarksChange,
       onLabelsLoaded,
       onDeviceInfoUpdate,
+      onReady,
       selectedClassIds = [],
       showCommonDetection = true,
       showDangerDetection = true,
@@ -160,6 +164,8 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       let currentStartSec = 0;
       let lastDurationSec = 0;
       let currentProgramTimeMs: number | null = null;
+
+      
       for (const line of lines) {
         if (line.startsWith("#EXTINF:")) {
           lastDurationSec =
@@ -515,52 +521,69 @@ const isDanger =
 ]);
 
     useEffect(() => {
-      const video = videoRef.current;
+  const video = videoRef.current;
 
-      if (!video || !src) return;
+  if (!video || !src) return;
 
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
+  if (hlsRef.current) {
+    hlsRef.current.destroy();
+    hlsRef.current = null;
+  }
+
+  if (Hls.isSupported()) {
+    const hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: true,
+    });
+
+    hls.loadSource(src);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      onReady?.();
+
+      if (autoPlay) {
+        video.play().catch(() => {});
+      }
+    });
+
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      console.log("[HLS ERROR]", data);
+
+      if (
+        data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+        data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
+        data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+        data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
+        data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+        data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT
+      ) {
+        onError?.(data);
+      }
+
+      if (data.fatal) {
+        hls.destroy();
         hlsRef.current = null;
+        onError?.(data);
       }
+    });
 
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-        });
+    hlsRef.current = hls;
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = src;
 
-        hls.loadSource(src);
-        hls.attachMedia(video);
+    if (autoPlay) {
+      video.play().catch(() => {});
+    }
+  }
 
-        hls.on(Hls.Events.MANIFEST_PARSED, async () => {
-          if (autoPlay) {
-            try {
-              await video.play();
-            } catch {
-              // autoplay can fail depending on browser policy
-            }
-          }
-        });
-
-        hlsRef.current = hls;
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = src;
-
-        if (autoPlay) {
-          video.play().catch(() => {
-            // autoplay can fail depending on browser policy
-          });
-        }
-      }
-
-      return () => {
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-          hlsRef.current = null;
-        }
-      };
-    }, [src, autoPlay]);
+  return () => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+  };
+}, [src, autoPlay, onError]);
 
     useEffect(() => {
   let cancelled = false;
@@ -766,7 +789,11 @@ try {
       controls={controls}
       playsInline
       onLoadedMetadata={onLoadedMetadata}
-      onTimeUpdate={onTimeUpdate}
+      onTimeUpdate={() => {
+        const video = videoRef.current;
+        if (!video) return;
+        onTimeUpdate?.(video.currentTime);
+      }}
       onEnded={onEnded}
     />
 

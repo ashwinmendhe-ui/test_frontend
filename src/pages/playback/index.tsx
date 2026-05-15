@@ -162,6 +162,34 @@ export default function Playback() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
+  const handleDeviceInfoUpdate = useCallback(
+  (deviceInfo: any, videoUrl: string) => {
+    setDeviceInfoByVideo((prev) => {
+      const previous = prev[videoUrl];
+
+      const isSame =
+        previous?.status === deviceInfo?.status &&
+        previous?.battery === deviceInfo?.battery &&
+        previous?.network === deviceInfo?.network &&
+        previous?.gps === deviceInfo?.gps &&
+        previous?.altitude === deviceInfo?.altitude &&
+        previous?.speed === deviceInfo?.speed &&
+        previous?.latitude === deviceInfo?.latitude &&
+        previous?.longitude === deviceInfo?.longitude;
+
+      if (isSame) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [videoUrl]: deviceInfo,
+      };
+    });
+  },
+  []
+);
 
   const [videoTimes, setVideoTimes] = useState<Record<string, number>>({});
   const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
@@ -170,17 +198,6 @@ export default function Playback() {
     Record<string, VideoBookmark[]>
   >({});
   const [labelsByVideo, setLabelsByVideo] = useState<Record<string, LabelsMap>>({});
-  const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
-
-const handleDeviceInfoUpdate = (
-  deviceInfo: any,
-  videoUrl: string
-) => {
-  setDeviceInfoByVideo((prev) => ({
-    ...prev,
-    [videoUrl]: deviceInfo,
-  }));
-};
   const { list: companyList, getList: getCompanyList } = useCompanyStore();
   const { list: siteList, getListByCompany } = useSiteStore();
   const { list: robotList, getListBySite: getRobotListBySite } = useRobotStore();
@@ -198,17 +215,6 @@ const handleDeviceInfoUpdate = (
         label: item.name,
       }));
     }
-
-  const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
-  const handleDeviceInfoUpdate = (
-  deviceInfo: any,
-  videoUrl: string
-) => {
-  setDeviceInfoByVideo((prev) => ({
-    ...prev,
-    [videoUrl]: deviceInfo,
-  }));
-};
 
     return detailUserLogin?.user?.companyId
       ? [
@@ -289,9 +295,9 @@ const handleDeviceInfoUpdate = (
   []
 );
 
-  const [selectedModules, setSelectedModules] = useState<string[]>(
-    aiModules.map((item) => item.value)
-  );
+const [selectedModules, setSelectedModules] = useState<string[]>(() =>
+  aiModules.map((item) => item.value)
+);
 
   const selectedVideoItems = useMemo(
   () =>
@@ -863,7 +869,9 @@ useEffect(() => {
   mainDuration,
   t,
 ]);
-
+const selectedVideoInfo = selectedVideos[0]
+  ? deviceInfoByVideo[selectedVideos[0]]
+  : undefined;
 
   return (
     <div className="w-full h-full grid grid-cols-[minmax(0,1fr)_390px] gap-[11px]">
@@ -1286,50 +1294,79 @@ useEffect(() => {
           </h2>
 
           <div className="space-y-6 text-sm">
-            <div className="flex justify-between">
-              <span>{t("stream_info_status")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_battery")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_network")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_gps")}</span>
-              <span>-</span>
-            </div>
-          </div>
+  <div className="flex justify-between">
+    <span>{t("stream_info_status")}</span>
+    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+  {selectedVideoInfo?.status ?? "-"}
+</span>
+  </div>
+
+  <div className="flex justify-between">
+    <span>{t("stream_info_battery")}</span>
+    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+  {selectedVideoInfo?.battery != null ? `${selectedVideoInfo.battery}%` : "-"}
+</span>
+  </div>
+
+  <div className="flex justify-between">
+    <span>{t("stream_info_network")}</span>
+    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+  {selectedVideoInfo?.network ?? "-"}
+</span>
+  </div>
+
+  <div className="flex justify-between">
+    <span>{t("stream_info_gps")}</span>
+    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+  {selectedVideoInfo?.gps ?? "-"}
+</span>
+  </div>
+</div>
         </div>
 
-        {/* Operation Info */}
-        <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-          <h2 className="text-[20px] font-bold mb-8">
-            {t("playback_operation_info")}
-          </h2>
+       {/* Operation Info */}
+<div className="bg-white rounded-[10px] p-6 min-h-[250px]">
+  <h2 className="text-[20px] font-bold mb-8">
+    {t("playback_operation_info")}
+  </h2>
 
-          <div className="space-y-6 text-sm">
-            <div className="flex justify-between">
-              <span>{t("stream_info_altitude")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_speed")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_operating_hour")}</span>
-              <span>-</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{t("stream_info_start_time")}</span>
-              <span>-</span>
-            </div>
-          </div>
-        </div>
+  <div className="space-y-6 text-sm">
+    <div className="flex justify-between">
+      <span>{t("stream_info_altitude")}</span>
+      <span className="font-bold text-[#6B7280]">
+  {selectedVideoInfo?.altitude != null
+    ? `${Number(selectedVideoInfo.altitude).toFixed(2)} m`
+    : "-"}
+</span>
+    </div>
+
+    <div className="flex justify-between">
+      <span>{t("stream_info_speed")}</span>
+      <span className="font-bold text-[#6B7280]">
+  {selectedVideoInfo?.speed != null
+    ? `${selectedVideoInfo.speed} m/s`
+    : "-"}
+</span>
+    </div>
+
+    <div className="flex justify-between">
+  <span>{t("stream_info_operating_hour")}</span>
+
+  <span className="font-bold text-[#6B7280]">
+    {new Date(currentTime * 1000)
+      .toISOString()
+      .substring(11, 19)}
+  </span>
+</div>
+
+    <div className="flex justify-between">
+      <span>{t("stream_info_start_time")}</span>
+      <span className="font-bold text-[#6B7280]">
+  {selectedVideoItems?.[0]?.label ?? "-"}
+</span>
+    </div>
+  </div>
+</div>
       </div>
     </div>
   ))}
