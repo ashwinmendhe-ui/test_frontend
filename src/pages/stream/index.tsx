@@ -15,6 +15,9 @@ import { showNotification } from "@/utils/notification";
 import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
 import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
 import ControlBar from "@/components/common/controlBar";
+import WorkReportModal from "@/components/common/workReportModal";
+
+
 
 type StreamFormValues = {
   company?: string;
@@ -40,6 +43,10 @@ type PlayerStatus =
   | "LIVE";
 
 export default function StreamIndex() {
+  const [reportDetail, setReportDetail] = useState<any>(null);
+const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
+  const [workStartTime, setWorkStartTime] = useState<Date | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("OFFLINE");
@@ -261,7 +268,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   const selectedDangerCount = selectedModules.filter((value) =>
     dangerModules.some((item) => item.value === value)
   ).length;
-
+const [reportSnapshot, setReportSnapshot] = useState<any>(null);
   const handleSelectChange = async (
     fieldName: keyof StreamFormValues,
     value: string
@@ -366,6 +373,9 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
 
     if (res?.data?.streamId) {
       const streamInfo = await startStream(res.data.streamId);
+      const now = new Date();
+        setWorkStartTime(now);
+        setElapsedSeconds(0);
 
       if (!streamInfo?.playback_url) {
         throw new Error("Stream started, but playback URL was not found.");
@@ -400,55 +410,144 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   }
 };
 
-  const handleStopWork = async () => {
-    try {
-      setIsLoading(true);
+const handleStopWork = async () => {
+  try {
+    setIsLoading(true);
 
-      await streamApi.stop(streamPayload);
+    const endTime = new Date();
 
-      if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
-        await createReport({
-          deviceSn: selectedRobotDetail.deviceSn,
-          playbackUrl: streamPlaybackUrl,
-          missionId: values.mission,
-        });
-      }
+    await streamApi.stop(streamPayload);
 
-      showNotification(
-        "success",
-        "Stream stopped",
-        "Work session stopped successfully."
-      );
-      setIsReportOpen(true);
-    } catch (error: any) {
-      showNotification(
-        "error",
-        "Stop stream failed",
-        error?.response?.data?.message ||
-          error?.message ||
-          "Unable to stop stream."
-      );
-    } finally {
-  playerRef.current?.pause();
+    const startTimeText = workStartTime
+      ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
+      : "-";
 
-  setIsStreaming(false);
-  setIsPlaying(false);
-  setCurrentTime(0);
-  setDuration(0);
+    const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
 
-  setSessionId(null);
-  setStreamPlaybackUrl("");
-  setStreamMapUrl("");
-  setBookmarks([]);
+    const totalTimeText = formatDuration(elapsedSeconds);
 
-  setHlsRetryCount(0);
-  setHlsRetryKey(0);
+    const siteName =
+      siteOptions.find((s) => s.value === values?.site)?.label || "-";
 
-  setIsLoading(false);
-  setPlayerStatus("OFFLINE");
-  setHasConnectedOnce(false);
-}
-  };
+    const robotName =
+      selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-";
+
+    const missionName =
+      missionOptions.find((m) => m.value === values?.mission)?.label || "-";
+
+    if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
+      await createReport({
+        deviceSn: selectedRobotDetail.deviceSn,
+        playbackUrl: streamPlaybackUrl,
+        missionId: values.mission,
+      });
+    }
+
+    setReportDetail({
+      reportCreatedAt: endTimeText,
+      playbackUrl: streamPlaybackUrl,
+
+      startTime: startTimeText,
+      endTime: endTimeText,
+      totalTime: totalTimeText,
+
+      distance: "-",
+      siteName,
+      deviceName: robotName,
+      robotName,
+      missionName,
+      userName: "sysadmin",
+      workerName: "sysadmin",
+      deviceSn: selectedRobotDetail?.deviceSn || "",
+
+      totalRecognition: bookmarks.length,
+
+      bookmarks: bookmarks.map((bm: any, index: number) => {
+        const label =
+          bm.labels?.[0] ||
+          bm.label ||
+          bm.type ||
+          "Unknown";
+
+        return {
+          label,
+          mdisplay: bm.timeSec
+            ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
+            : "00:00:00",
+          m: bm.timeSec || 0,
+          s: bm.s || "",
+          o: 0,
+          duration: bm.timeSec
+            ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
+            : "00:00:00",
+          id: bm.id || `${label}-${index}`,
+        };
+      }),
+
+      labelCounts: bookmarks.reduce((acc: Record<string, number>, bm: any) => {
+        const label =
+          bm.labels?.[0] ||
+          bm.label ||
+          bm.type ||
+          "Unknown";
+
+        acc[label] = (acc[label] || 0) + 1;
+        return acc;
+      }, {}),
+    });
+
+    showNotification(
+      "success",
+      "Stream stopped",
+      "Work session stopped successfully."
+    );
+
+    setIsReportOpen(true);
+  } catch (error: any) {
+    showNotification(
+      "error",
+      "Stop stream failed",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Unable to stop stream."
+    );
+  } finally {
+    playerRef.current?.pause();
+
+    setIsStreaming(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+
+    setSessionId(null);
+    setStreamPlaybackUrl("");
+    setStreamMapUrl("");
+
+    setBookmarks([]);
+    setLiveDeviceInfo(null);
+    setWorkStartTime(null);
+    setElapsedSeconds(0);
+
+    setHlsRetryCount(0);
+    setHlsRetryKey(0);
+
+    setIsLoading(false);
+    setPlayerStatus("OFFLINE");
+    setHasConnectedOnce(false);
+  }
+};
+
+
+const formatDuration = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(
+    2,
+    "0"
+  )}:${String(s).padStart(2, "0")}`;
+};
 
   const handleReportOk = () => {
     setIsReportOpen(false);
@@ -538,7 +637,21 @@ const handleNext = () => {
   playerRef.current.seekTo(nextTime);
   setCurrentTime(nextTime);
 };
+const handleDeviceInfoUpdate = useCallback((deviceInfo: any) => {
+  setLiveDeviceInfo((previous: any) => {
+    const isSame =
+      previous?.status === deviceInfo?.status &&
+      previous?.battery === deviceInfo?.battery &&
+      previous?.network === deviceInfo?.network &&
+      previous?.gps === deviceInfo?.gps &&
+      previous?.altitude === deviceInfo?.altitude &&
+      previous?.speed === deviceInfo?.speed &&
+      previous?.latitude === deviceInfo?.latitude &&
+      previous?.longitude === deviceInfo?.longitude;
 
+    return isSame ? previous : deviceInfo;
+  });
+}, []);
 const handleTimeChange = (value: number) => {
   setCurrentTime(value);
 };
@@ -644,6 +757,15 @@ useEffect(() => {
   };
 }, []);
 
+useEffect(() => {
+  if (!isStreaming || !workStartTime) return;
+
+  const timer = window.setInterval(() => {
+    setElapsedSeconds(Math.floor((Date.now() - workStartTime.getTime()) / 1000));
+  }, 1000);
+
+  return () => window.clearInterval(timer);
+}, [isStreaming, workStartTime]);
 
 const showCommonDetection =
   selectedModules.some((m) =>
@@ -656,11 +778,12 @@ const showDangerDetection =
   );
 
   return (
-    <>
-      <div className="w-full rounded-[10px] bg-[#F6F7F9] p-6">
-        <div className="flex flex-col gap-4">
-          <Form form={form} layout="vertical">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_150px] gap-3 items-center">
+  <div className="w-full h-full overflow-auto">
+    <div className="w-full min-w-[1120px] min-h-full rounded-[10px] bg-[#F6F7F9] p-6">
+      <Form form={form} layout="vertical">
+        <div className="grid grid-cols-[minmax(700px,1fr)_390px] gap-5 items-start">
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-[repeat(4,minmax(120px,1fr))_160px] gap-3 items-center">
               <Form.Item
                 name="company"
                 className="mb-0"
@@ -738,31 +861,28 @@ const showDangerDetection =
               </Form.Item>
 
               <div className="flex items-center justify-end">
-              {!isStreaming ? (
-                <Button
-                  type="primary"
-                  loading={isLoading}
-                  onClick={handleStartWork}
-                  className="w-[138px]! h-[56px]! rounded-[10px]! bg-[#16A34A]! border-[#16A34A]! text-white! font-bold! text-[18px]!"
-                >
-                  {t("stream_start_work")}
-                </Button>
-              ) : (
-                <Button
-                  loading={isLoading}
-                  onClick={handleStopWork}
-                  className="w-[138px]! h-[56px]! rounded-[10px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
-                >
-                  {t("stream_stop_work")}
-                </Button>
-              )}
+                {!isStreaming ? (
+                  <Button
+                    type="primary"
+                    loading={isLoading}
+                    onClick={handleStartWork}
+                    className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#16A34A]! border-[#16A34A]! text-white! font-bold! text-[18px]!"
+                  >
+                    {t("stream_start_work")}
+                  </Button>
+                ) : (
+                  <Button
+                    loading={isLoading}
+                    onClick={handleStopWork}
+                    className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
+                  >
+                    {t("stream_stop_work")}
+                  </Button>
+                )}
+              </div>
             </div>
-            </div>
-          </Form>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
-            <div className="flex flex-col gap-4">
-              <div className="relative bg-[#364152] rounded-[10px] h-[500px] overflow-hidden">
+            <div className="relative bg-[#364152] rounded-[10px] h-[500px] overflow-hidden">
               <div className="absolute top-4 left-5 z-10">
                 <div
                   className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px] font-bold text-white shadow-sm ${currentPlayerStatus.badgeClass}`}
@@ -774,62 +894,65 @@ const showDangerDetection =
                 </div>
               </div>
 
-                {isStreaming && streamPlaybackUrl ? (
-                  <HLSPlayer
-                    key={`${streamPlaybackUrl}-${hlsRetryKey}`}
-                    ref={playerRef}
-                    src={streamPlaybackUrl}
-                    metadataBaseUrl={streamPlaybackUrl.replace("/index.m3u8", "")}
-                    className="w-full h-full object-contain bg-black"
-                    autoPlay
-                    muted
-                    controls={false}
-                    selectedClassIds={[]}
-                    showCommonDetection={showCommonDetection}
-                    showDangerDetection={showDangerDetection}
-                    onReady={() => {
-                      if (hasConnectedOnce) {
-                        setPlayerStatus("LIVE");
-                        setIsPlaying(true);
-                        return;
-                      }
+              {isStreaming && streamPlaybackUrl ? (
+                <HLSPlayer
+                  key={`${streamPlaybackUrl}-${hlsRetryKey}`}
+                  ref={playerRef}
+                  src={streamPlaybackUrl}
+                  metadataBaseUrl={streamPlaybackUrl.replace("/index.m3u8", "")}
+                  className="w-full h-full object-contain bg-black"
+                  autoPlay
+                  muted
+                  controls={false}
+                  selectedClassIds={[]}
+                  showCommonDetection={showCommonDetection}
+                  showDangerDetection={showDangerDetection}
+                  onDeviceInfoUpdate={(deviceInfo) => {
+                    handleDeviceInfoUpdate(deviceInfo);
+                  }}
+                  onReady={() => {
+                    if (hasConnectedOnce) {
+                      setPlayerStatus("LIVE");
+                      setIsPlaying(true);
+                      return;
+                    }
 
-                      setPlayerStatus("CONNECTING");
+                    setPlayerStatus("CONNECTING");
 
-                      setTimeout(() => {
-                        setHasConnectedOnce(true);
-                        setPlayerStatus("LIVE");
-                        setIsPlaying(true);
-                      }, 400);
-                    }}
-                    onError={handleHlsError}
-                    onLoadedMetadata={() => {
-                      setCurrentTime(0);
-                      setDuration(0);
-                    }}
-                    onTimeUpdate={(time) => {
-                      setCurrentTime(time);
-                      setDuration((prev) => Math.max(prev, time + 5));
-                    }}
-                    onEnded={() => {
-                      setIsPlaying(false);
-                    }}
+                    setTimeout(() => {
+                      setHasConnectedOnce(true);
+                      setPlayerStatus("LIVE");
+                      setIsPlaying(true);
+                    }, 400);
+                  }}
+                  onError={handleHlsError}
+                  onLoadedMetadata={() => {
+                    setCurrentTime(0);
+                    setDuration(0);
+                  }}
+                  onTimeUpdate={(time) => {
+                    setCurrentTime(time);
+                    setDuration((prev) => Math.max(prev, time + 5));
+                  }}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                  }}
+                />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
+                  <img
+                    src={NoVideoIcon}
+                    alt="No video"
+                    className="w-28 h-28 opacity-90"
                   />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-                    <img
-                      src={NoVideoIcon}
-                      alt="No video"
-                      className="w-28 h-28 opacity-90"
-                    />
-                    <p className="text-white text-[18px]">
-                      {t("stream_waiting_activation")}
-                    </p>
-                  </div>
-                )}
-              </div>
+                  <p className="text-white text-[18px]">
+                    {t("stream_waiting_activation")}
+                  </p>
+                </div>
+              )}
+            </div>
 
-              {isStreaming && streamPlaybackUrl && (
+            {isStreaming && streamPlaybackUrl && (
               <ControlBar
                 isPlaying={isPlaying}
                 currentTime={currentTime}
@@ -850,235 +973,271 @@ const showDangerDetection =
                 }}
               />
             )}
+          </div>
 
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
-  <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
-    <h2 className="text-[20px] font-bold mb-8">
-      {t("stream_robot_status")}
-    </h2>
-
-    <div className="space-y-6 text-sm">
-      <div className="flex justify-between">
-        <span>{t("stream_situation")}</span>
-        <span>
-          {playerStatus === "LIVE"
-            ? "Live"
-            : playerStatus === "LOADING"
-            ? "Loading"
-            : "Offline"}
-        </span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_battery")}</span>
-        <span>-</span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_network_century")}</span>
-        <span>-</span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_gps_century")}</span>
-        <span>-</span>
-      </div>
-    </div>
-  </div>
-
-  <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
-    <h2 className="text-[20px] font-bold mb-8 leading-tight">
-      {t("stream_operation_information")}
-    </h2>
-
-    <div className="space-y-6 text-sm">
-      <div className="flex justify-between">
-        <span>{t("stream_altitude")}</span>
-        <span>-</span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_speed")}</span>
-        <span>-</span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_operating_hours")}</span>
-        <span>-</span>
-      </div>
-      <div className="flex justify-between">
-        <span>{t("stream_start_time")}</span>
-        <span>-</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-              <div className="bg-white rounded-[10px] p-6 min-h-[350px]">
-                <h2 className="text-[20px] font-bold mb-5">
-                  {t("stream_ai_module")}
+          <div className="flex flex-col gap-4 w-[390px] shrink-0">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
+                <h2 className="text-[20px] font-bold mb-8">
+                  {t("stream_robot_status")}
                 </h2>
 
-                <div className="flex gap-3 h-[calc(100%-36px)]">
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="text-[18px] font-bold leading-[1.05]">
-                        {t("stream_ai_general_detection")}
-                      </div>
-                      <div className="text-[14px] text-gray-500 flex items-center">
-                        <Switch
-                          size="small"
-                          checked={selectedCommonCount === commonModules.length}
-                          onChange={() => toggleAllModules("common")}
-                          className="mr-1!"
-                        />
-                        ({selectedCommonCount}/{commonModules.length})
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
-                      {commonModules.map((item) => {
-                        const isChecked = selectedModules.includes(item.value);
-
-                        return (
-                          <div
-                            key={item.value}
-                            className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
-                          >
-                            <div className="absolute top-0 right-2">
-                              <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
-                                <path d="M0 0H10V16L5 22L0 16V0Z" fill={item.color} />
-                              </svg>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="text-[11px] text-gray-400 mb-1">
-                                  {item.category}
-                                </div>
-                                <div className="text-[13px] font-bold text-[#333] leading-tight">
-                                  {item.label}
-                                </div>
-                              </div>
-
-                              <Switch
-                                size="small"
-                                checked={isChecked}
-                                onChange={() => toggleModule(item.value)}
-                                style={{
-                                  backgroundColor: isChecked ? item.color : "#d1d5db",
-                                  marginRight: "8px",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                <div className="space-y-6 text-sm">
+                  <div className="flex justify-between">
+                    <span>{t("stream_situation")}</span>
+                    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+                      {playerStatus === "LIVE"
+                        ? "working"
+                        : playerStatus === "LOADING" ||
+                          playerStatus === "CONNECTING"
+                        ? "loading"
+                        : playerStatus === "RECONNECTING"
+                        ? "reconnecting"
+                        : "-"}
+                    </span>
                   </div>
 
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="text-[18px] font-bold leading-[1.05]">
-                        {t("stream_ai_risk_detection")}
-                      </div>
-                      <div className="text-[14px] text-gray-500 flex items-center">
-                        <Switch
-                          size="small"
-                          checked={selectedDangerCount === dangerModules.length}
-                          onChange={() => toggleAllModules("danger")}
-                          className="mr-1!"
-                        />
-                        ({selectedDangerCount}/{dangerModules.length})
-                      </div>
-                    </div>
+                  <div className="flex justify-between">
+                    <span>{t("stream_battery")}</span>
+                    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+                      {liveDeviceInfo?.battery != null
+                        ? `${liveDeviceInfo.battery}%`
+                        : "-"}
+                    </span>
+                  </div>
 
-                    <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
-                      {dangerModules.map((item) => {
-                        const isChecked = selectedModules.includes(item.value);
+                  <div className="flex justify-between">
+                    <span>{t("stream_network_century")}</span>
+                    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+                      {liveDeviceInfo?.network ?? "-"}
+                    </span>
+                  </div>
 
-                        return (
-                          <div
-                            key={item.value}
-                            className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
-                          >
-                            <div className="absolute top-0 right-2">
-                              <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
-                                <path d="M0 0H10V16L5 22L0 16V0Z" fill={item.color} />
-                              </svg>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="text-[11px] text-gray-400 mb-1">
-                                  {item.category}
-                                </div>
-                                <div className="text-[13px] font-bold text-[#333] leading-tight">
-                                  {item.label}
-                                </div>
-                              </div>
-
-                              <Switch
-                                size="small"
-                                checked={isChecked}
-                                onChange={() => toggleModule(item.value)}
-                                style={{
-                                  backgroundColor: isChecked ? item.color : "#d1d5db",
-                                  marginRight: "8px",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div className="flex justify-between">
+                    <span>{t("stream_gps_century")}</span>
+                    <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
+                      {liveDeviceInfo?.gps ?? "-"}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-[10px] p-6">
-                <h2 className="text-[20px] font-bold mb-5">
-                  {t("stream_robot_control")}
+              <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
+                <h2 className="text-[20px] font-bold mb-8 leading-tight">
+                  {t("stream_operation_information")}
                 </h2>
 
-                <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
-                  {isStreaming && streamMapUrl ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-lg gap-2">
-                      <div>{t("stream_secondary_video_placeholder")}</div>
-                      <div className="text-sm text-gray-200 px-4 text-center break-all">
-                        {streamMapUrl}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                      <img
-                        src={NoVideoIcon}
-                        alt="No map"
-                        className="w-16 h-16 opacity-90"
-                      />
-                      <p className="text-white text-[16px]">
-                        {t("stream_map_waiting_activation")}
-                      </p>
-                    </div>
-                  )}
+                <div className="space-y-6 text-sm">
+                  <div className="flex justify-between">
+                    <span>{t("stream_altitude")}</span>
+                    <span className="font-bold text-[#6B7280]">
+                      {liveDeviceInfo?.altitude != null
+                        ? `${Number(liveDeviceInfo.altitude).toFixed(2)} m`
+                        : "-"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>{t("stream_speed")}</span>
+                    <span className="font-bold text-[#6B7280]">
+                      {liveDeviceInfo?.speed != null
+                        ? `${liveDeviceInfo.speed}m/s`
+                        : "-"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>{t("stream_operating_hours")}</span>
+                    <span className="font-bold text-[#6B7280]">
+                      {isStreaming ? formatDuration(elapsedSeconds) : "-"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>{t("stream_start_time")}</span>
+                    <span className="font-bold text-[#6B7280]">
+                      {workStartTime
+                        ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
+                        : "-"}
+                    </span>
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[10px] p-6 min-h-[350px]">
+              <h2 className="text-[20px] font-bold mb-5">
+                {t("stream_ai_module")}
+              </h2>
+
+              <div className="flex gap-3 h-[calc(100%-36px)]">
+                <div className="flex-1 flex flex-col">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-[18px] font-bold leading-[1.05]">
+                      {t("stream_ai_general_detection")}
+                    </div>
+                    <div className="text-[14px] text-gray-500 flex items-center">
+                      <Switch
+                        size="small"
+                        checked={selectedCommonCount === commonModules.length}
+                        onChange={() => toggleAllModules("common")}
+                        className="mr-1!"
+                      />
+                      ({selectedCommonCount}/{commonModules.length})
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
+                    {commonModules.map((item) => {
+                      const isChecked = selectedModules.includes(item.value);
+
+                      return (
+                        <div
+                          key={item.value}
+                          className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
+                        >
+                          <div className="absolute top-0 right-2">
+                            <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
+                              <path
+                                d="M0 0H10V16L5 22L0 16V0Z"
+                                fill={item.color}
+                              />
+                            </svg>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-[11px] text-gray-400 mb-1">
+                                {item.category}
+                              </div>
+                              <div className="text-[13px] font-bold text-[#333] leading-tight">
+                                {item.label}
+                              </div>
+                            </div>
+
+                            <Switch
+                              size="small"
+                              checked={isChecked}
+                              onChange={() => toggleModule(item.value)}
+                              style={{
+                                backgroundColor: isChecked
+                                  ? item.color
+                                  : "#d1d5db",
+                                marginRight: "8px",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-col">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-[18px] font-bold leading-[1.05]">
+                      {t("stream_ai_risk_detection")}
+                    </div>
+                    <div className="text-[14px] text-gray-500 flex items-center">
+                      <Switch
+                        size="small"
+                        checked={selectedDangerCount === dangerModules.length}
+                        onChange={() => toggleAllModules("danger")}
+                        className="mr-1!"
+                      />
+                      ({selectedDangerCount}/{dangerModules.length})
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto bg-[#F6F7F9] border border-[#DDE0E5] rounded-[8px] p-2 space-y-2">
+                    {dangerModules.map((item) => {
+                      const isChecked = selectedModules.includes(item.value);
+
+                      return (
+                        <div
+                          key={item.value}
+                          className="relative bg-white border border-[#E5E7EB] rounded-[8px] p-3"
+                        >
+                          <div className="absolute top-0 right-2">
+                            <svg width="10" height="22" viewBox="0 0 10 22" fill="none">
+                              <path
+                                d="M0 0H10V16L5 22L0 16V0Z"
+                                fill={item.color}
+                              />
+                            </svg>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-[11px] text-gray-400 mb-1">
+                                {item.category}
+                              </div>
+                              <div className="text-[13px] font-bold text-[#333] leading-tight">
+                                {item.label}
+                              </div>
+                            </div>
+
+                            <Switch
+                              size="small"
+                              checked={isChecked}
+                              onChange={() => toggleModule(item.value)}
+                              style={{
+                                backgroundColor: isChecked
+                                  ? item.color
+                                  : "#d1d5db",
+                                marginRight: "8px",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[10px] p-6">
+              <h2 className="text-[20px] font-bold mb-5">
+                {t("stream_robot_control")}
+              </h2>
+
+              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+                {isStreaming && streamMapUrl ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-lg gap-2">
+                    <div>{t("stream_secondary_video_placeholder")}</div>
+                    <div className="text-sm text-gray-200 px-4 text-center break-all">
+                      {streamMapUrl}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <img
+                      src={NoVideoIcon}
+                      alt="No map"
+                      className="w-16 h-16 opacity-90"
+                    />
+                    <p className="text-white text-[16px]">
+                      {t("stream_map_waiting_activation")}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </Form>
 
-      <CustomModal
-        title={t("work_report_title")}
-        content={
-          <p className="text-[16px] font-medium">
-            {t("stream_report_generated_message")}
-          </p>
-        }
-        open={isReportOpen}
-        onOk={handleReportOk}
-        onCancel={handleReportCancel}
-        okText={t("button_ok")}
-        cancelText={t("button_close")}
-      />
-    </>
-  );
+      {reportDetail && (
+        <WorkReportModal
+          open={isReportOpen}
+          onClose={handleReportCancel}
+          detail={reportDetail}
+          reportMeta={reportDetail}
+          autoDownload={false}
+        />
+      )}
+    </div>
+  </div>
+);
 }

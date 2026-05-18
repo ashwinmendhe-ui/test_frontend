@@ -874,107 +874,117 @@ const selectedVideoInfo = selectedVideos[0]
   : undefined;
 
   return (
-    <div className="w-full h-full grid grid-cols-[minmax(0,1fr)_390px] gap-[11px]">
-      <div className="min-w-0 flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px]">
+  <div className="w-full h-full overflow-auto">
+    <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
+      <div className="min-w-[700px] flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px] overflow-hidden">
         <Form layout="vertical" form={form}>
-          <div className="grid grid-cols-[0.9fr_1.4fr_1fr_1fr_1.8fr] gap-3">
-            <Form.Item
-              name="company"
-              className="mb-0"
-              rules={[
-                {
-                  required: true,
-                  message: t("playback_validation_select_company"),
-                },
-              ]}
-            >
-              <Select
-                placeholder={t("stream_select_company")}
-                options={companyOptions}
-                disabled={userRole !== 1}
-                className="h-[48px]"
-                onChange={(value) => handleSelectChange("company", value)}
-              />
-            </Form.Item>
+          
 
-            <Form.Item
-              name="site"
-              className="mb-0"
-              rules={[
-                {
-                  required: true,
-                  message: t("playback_validation_select_site"),
-                },
-              ]}
-            >
-              <Select
-                placeholder={t("stream_select_site")}
-                options={siteOptions}
-                disabled={!values?.company}
-                className="h-[48px]"
-                onChange={(value) => handleSelectChange("site", value)}
-              />
-            </Form.Item>
 
-            <Form.Item
-              name="device"
-              className="mb-0"
-              rules={[
-                {
-                  required: true,
-                  message: t("playback_validation_select_device"),
-                },
-              ]}
-            >
-              <Select
-                placeholder={t("stream_select_device")}
-                options={deviceOptions}
-                disabled={!values?.site}
-                className="h-[48px]"
-                onChange={(value) => handleSelectChange("device", value)}
-              />
-            </Form.Item>
+      <div className="grid grid-cols-[1fr_1.15fr_1fr_1fr_220px] gap-3 items-center max-w-full">
+          <Form.Item
+            name="company"
+            className="mb-0"
+            rules={[
+              {
+                required: true,
+                message: t("playback_validation_select_company"),
+              },
+            ]}
+          >
+            <Select
+              placeholder={t("stream_select_company")}
+              options={companyOptions}
+              disabled={userRole !== 1}
+              className="h-[48px]"
+              onChange={(value) => handleSelectChange("company", value)}
+            />
+          </Form.Item>
 
-            <Form.Item
-              name="mission"
-              className="mb-0"
-              rules={[
-                {
-                  required: true,
-                  message: t("playback_validation_select_mission"),
-                },
-              ]}
-            >
-              <Select
-                placeholder={t("stream_select_mission")}
-                options={missionOptions}
-                disabled={!values?.device}
-                className="h-[48px]"
-                onChange={(value) => handleSelectChange("mission", value)}
-              />
-            </Form.Item>
+          <Form.Item
+            name="site"
+            className="mb-0"
+            rules={[
+              {
+                required: true,
+                message: t("playback_validation_select_site"),
+              },
+            ]}
+          >
+            <Select
+              placeholder={t("stream_select_site")}
+              options={siteOptions}
+              disabled={!values?.company}
+              className="h-[48px]"
+              onChange={(value) => handleSelectChange("site", value)}
+            />
+          </Form.Item>
 
-            <div className="min-w-0">
-              <Select
-                mode="multiple"
-                maxCount={2}
-                options={videoOptions}
-                value={selectedVideos}
-                className="w-full h-[48px]"
-                onChange={handleVideoSelectionChange}
-                placeholder={t("playback_select_video")}
-                disabled={!values?.device}
-                maxTagCount={2}
-                showSearch={{
-                  filterOption: (input, option) =>
-                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase()),
-                }}
-              />
-            </div>
-          </div>
+          <Form.Item
+            name="device"
+            className="mb-0"
+            rules={[
+              {
+                required: true,
+                message: t("playback_validation_select_device"),
+              },
+            ]}
+          >
+            <Select
+              placeholder={t("stream_select_device")}
+              options={deviceOptions}
+              disabled={!values?.site}
+              className="h-[48px]"
+              onChange={(value) => handleSelectChange("device", value)}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="mission"
+            className="mb-0"
+            rules={[
+              {
+                required: true,
+                message: t("playback_validation_select_mission"),
+              },
+            ]}
+          >
+            <Select
+              placeholder={t("stream_select_mission")}
+              options={missionOptions}
+              disabled={!values?.device}
+              className="h-[48px]"
+              onChange={(value) => handleSelectChange("mission", value)}
+            />
+          </Form.Item>
+
+          <Select
+              mode="multiple"
+              placeholder="Select Video"
+              value={selectedVideos}
+              options={videoOptions}
+              loading={videoLoading.video}
+              disabled={
+                !values?.company ||
+                !values?.site ||
+                !values?.device ||
+                !values?.mission ||
+                videoLoading.video ||
+                videoOptions.length === 0
+              }
+              notFoundContent={videoLoading.video ? "Loading..." : "No data"}
+              onChange={handleVideoSelectionChange}
+              className="w-full h-[48px]"
+              popupMatchSelectWidth={220}
+            />
+        </div>
+
+
+
+
         </Form>
 
-        <div className="bg-[#364152] rounded-[10px] overflow-hidden min-h-[430px] relative">
+        <div className="bg-[#364152] rounded-[10px] overflow-hidden min-h-[430px] relative min-w-[660px]">
           {selectedVideos.length === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-[#D5D7D8]">
               <img src={NoVideoIcon} alt="No video available" className="w-24 h-24" />
@@ -1251,7 +1261,7 @@ const selectedVideoInfo = selectedVideos[0]
             </div>
           )}
         </div>
-
+        <div className="min-w-[660px]">
         <ControlBar
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -1275,6 +1285,7 @@ const selectedVideoInfo = selectedVideos[0]
               )
             )}
         />
+        </div>
         <div
   className={`grid gap-4 ${
     selectedVideoItems.length > 1 ? "grid-cols-2" : "grid-cols-1"
@@ -1373,7 +1384,7 @@ const selectedVideoInfo = selectedVideos[0]
 </div>
       </div>
 
-      <div className="w-[390px] px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
+      <div className="w-[390px] shrink-0 px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
         <div className="w-full p-6 bg-white rounded-[10px]">
           <h2 className="text-[20px] font-bold mb-4">{t("playback_selected_video")}</h2>
 
@@ -1543,5 +1554,6 @@ const selectedVideoInfo = selectedVideos[0]
           </div>
         </div>
       </div>
+    </div>
     </div>
   )}
