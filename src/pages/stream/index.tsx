@@ -94,7 +94,22 @@ export default function StreamIndex() {
       },
     ];
   }, [companyList, detailUserLogin, userRole]);
-
+  const CLASS_LABELS: Record<number, string> = {
+    0: "Construction",
+    1: "Hardhat",
+    2: "Mask",
+    3: "NO-Hardhat",
+    4: "NO-Mask",
+    5: "NO-Safety Vest",
+    6: "Person",
+    7: "Safety Cone",
+    8: "Safety Vest",
+    9: "Machinery",
+    10: "Vehicle",
+    20: "NO-Hardhat(LLM)",
+    21: "NO-Safety Vest(LLM)",
+    22: "NO-Safety Rope(LLM)",
+  };
   const siteOptions = useMemo(
     () =>
       siteList.map((item) => ({
@@ -555,19 +570,26 @@ useEffect(() => {
         .map((line) => line.trim())
         .filter(Boolean);
 
-      const parsed = lines.map((line, index) => {
-        const item = JSON.parse(line);
+      const parsedRaw = lines.map((line) => JSON.parse(line));
+
+      const firstTimestamp = parsedRaw[0]?.m || 0;
+
+      const parsed = parsedRaw.map((item, index) => {
+        const classIds = item.c_ar || [];
 
         return {
           id: `${item.s}-${index}`,
-          timeSec: index * 2,
-          type: item.c_ar?.some((id: number) =>
+          timeSec: (item.m - firstTimestamp) / 1000,
+          type: classIds.some((id: number) =>
             [3, 4, 5, 20, 21, 22].includes(id)
           )
             ? "alert"
             : "person",
-          classIds: item.c_ar || [],
-          labels: [],
+          classIds,
+          c_ar: classIds,
+          labels: classIds.map(
+            (id: number) => CLASS_LABELS[id] || `Class ${id}`
+          ),
           confidence: 90,
           position: "top",
         };
@@ -580,7 +602,13 @@ useEffect(() => {
   };
 
   fetchBookmarks();
-}, [streamPlaybackUrl, isStreaming]);
+
+  const interval = window.setInterval(fetchBookmarks, 3000);
+
+  return () => {
+    window.clearInterval(interval);
+  };
+}, [streamPlaybackUrl, isStreaming, CLASS_LABELS]);
 
   useEffect(() => {
     if (userRole === 1) {
@@ -616,12 +644,23 @@ useEffect(() => {
   };
 }, []);
 
+
+const showCommonDetection =
+  selectedModules.some((m) =>
+    commonModules.some((c) => c.value === m)
+  );
+
+const showDangerDetection =
+  selectedModules.some((m) =>
+    dangerModules.some((d) => d.value === m)
+  );
+
   return (
     <>
       <div className="w-full rounded-[10px] bg-[#F6F7F9] p-6">
         <div className="flex flex-col gap-4">
           <Form form={form} layout="vertical">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_150px] gap-3 items-center">
               <Form.Item
                 name="company"
                 className="mb-0"
@@ -698,13 +737,13 @@ useEffect(() => {
                 />
               </Form.Item>
 
-              <div className="flex items-center">
+              <div className="flex items-center justify-end">
               {!isStreaming ? (
                 <Button
                   type="primary"
                   loading={isLoading}
                   onClick={handleStartWork}
-                  className="w-full h-[48px] rounded-[8px] bg-[#1FA34A]! border-[#1FA34A]! text-white! font-bold! text-[18px]!"
+                  className="w-[138px]! h-[56px]! rounded-[10px]! bg-[#16A34A]! border-[#16A34A]! text-white! font-bold! text-[18px]!"
                 >
                   {t("stream_start_work")}
                 </Button>
@@ -712,12 +751,12 @@ useEffect(() => {
                 <Button
                   loading={isLoading}
                   onClick={handleStopWork}
-                  className="w-full h-[48px] rounded-[8px] bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
+                  className="w-[138px]! h-[56px]! rounded-[10px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
                 >
                   {t("stream_stop_work")}
                 </Button>
               )}
-              </div>
+            </div>
             </div>
           </Form>
 
@@ -740,12 +779,15 @@ useEffect(() => {
                     key={`${streamPlaybackUrl}-${hlsRetryKey}`}
                     ref={playerRef}
                     src={streamPlaybackUrl}
+                    metadataBaseUrl={streamPlaybackUrl.replace("/index.m3u8", "")}
                     className="w-full h-full object-contain bg-black"
                     autoPlay
                     muted
                     controls={false}
+                    selectedClassIds={[]}
+                    showCommonDetection={showCommonDetection}
+                    showDangerDetection={showDangerDetection}
                     onReady={() => {
-                      // Prevent repeated CONNECTING after stream already stable
                       if (hasConnectedOnce) {
                         setPlayerStatus("LIVE");
                         setIsPlaying(true);
@@ -762,15 +804,12 @@ useEffect(() => {
                     }}
                     onError={handleHlsError}
                     onLoadedMetadata={() => {
-                      setIsPlaying(true);
                       setCurrentTime(0);
                       setDuration(0);
                     }}
                     onTimeUpdate={(time) => {
                       setCurrentTime(time);
-
-                      // Live HLS duration should stay slightly ahead of current time like ref UI
-                      setDuration((prev) => Math.max(prev, time + 7));
+                      setDuration((prev) => Math.max(prev, time + 5));
                     }}
                     onEnded={() => {
                       setIsPlaying(false);
@@ -790,6 +829,7 @@ useEffect(() => {
                 )}
               </div>
 
+              {isStreaming && streamPlaybackUrl && (
               <ControlBar
                 isPlaying={isPlaying}
                 currentTime={currentTime}
@@ -802,11 +842,15 @@ useEffect(() => {
                 disabled={!isStreaming || !streamPlaybackUrl}
                 isLive
                 bookmarks={bookmarks}
+                showCommonDetection={showCommonDetection}
+                showDangerDetection={showDangerDetection}
                 onBookmarkClick={(time) => {
                   playerRef.current?.seekTo(time);
                   setCurrentTime(time);
                 }}
-/>
+              />
+            )}
+
             </div>
 
             <div className="flex flex-col gap-4">

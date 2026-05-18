@@ -35,6 +35,23 @@ interface ControlBarProps {
 showDangerDetection?: boolean;
 }
 
+const CLASS_LABELS: Record<number, string> = {
+  0: "Construction",
+  1: "Hardhat",
+  2: "Mask",
+  3: "NO-Hardhat",
+  4: "NO-Mask",
+  5: "NO-Safety Vest",
+  6: "Person",
+  7: "Safety Cone",
+  8: "Safety Vest",
+  9: "Machinery",
+  10: "Vehicle",
+  20: "NO-Hardhat(LLM)",
+  21: "NO-Safety Vest(LLM)",
+  22: "NO-Safety Rope(LLM)",
+};
+
 const formatTime = (value: number): string => {
   if (!Number.isFinite(value) || value < 0) return "00:00:00";
 
@@ -88,10 +105,10 @@ const getMarkerColor = (type?: string, classIds: number[] = []) => {
 };
 
 const getMarkerHeight = (index: number, type?: string) => {
-  if (type === "alert") return 26;
+  if (type === "alert") return 28;
   if (index % 4 === 0) return 24;
   if (index % 3 === 0) return 20;
-  return 16;
+  return 20;
 };
 
 export default function ControlBar({
@@ -242,7 +259,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
           <img src={NextIcon} alt="Next" />
         </button>
 
-        <div className="flex-1 px-4">
+        <div className="flex-1 px-2">
           <div className="relative w-full">
             <Slider
               value={displayTime}
@@ -257,15 +274,15 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
               styles={{
                 track: {
                   backgroundColor: "#D1D1D6",
-                  height: "31px",
+                  height: "28px",
                 },
                 rail: {
                   backgroundColor: "#E9ECF0",
-                  height: "31px",
+                  height: "28px",
                 },
                 handle: {
                   width: "2px",
-                  height: "35px",
+                  height: "32px",
                   backgroundColor: "#9BA2A9",
                   marginTop: "-5px",
                   zIndex: 2,
@@ -282,12 +299,11 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                   const classIds = bm.classIds?.length ? bm.classIds : bm.c_ar ?? [];
                   const markerHeight = getMarkerHeight(bm.idx, bm.type);
                   const markerColor = getMarkerColor(bm.type, classIds);
-
                   const markerLabels = bm.labels?.length
                     ? bm.labels
                     : bm.label
                     ? [bm.label]
-                    : [];
+                    : classIds.map((id) => CLASS_LABELS[Number(id)] || `Class ${id}`);
 
                   const tooltipContent = (
                     <div className="text-xs leading-5">
@@ -315,12 +331,8 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                       }`}
                       style={{
                         left: `${bm.positionPercent}%`,
-                        top: bm.position === "bottom" ? "auto" : "8px",
-                        bottom: bm.position === "bottom" ? "0px" : "auto",
-                        transform:
-                          bm.position === "bottom"
-                            ? "translate(-50%, 0)"
-                            : "translate(-50%, -50%)",
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
                         zIndex: 3,
                       }}
                       onClick={() => handleBookmarkTap(bm.timeSec as number)}
@@ -341,7 +353,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
           </div>
         </div>
 
-        <div className="text-sm text-gray-600 min-w-[140px] text-left">
+        <div className="text-[18px] font-medium text-[#4B5563] min-w-[170px] text-left pl-2">
           {formatTime(displayTime)} / {formatTime(timelineDuration)}
         </div>
       </div>

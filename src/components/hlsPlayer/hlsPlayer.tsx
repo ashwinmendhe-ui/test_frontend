@@ -86,6 +86,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
   ) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hlsRef = useRef<Hls | null>(null);
+    const lastDetectionsRef = useRef<any[]>([]);
     const sessionStartTimeRef = useRef<number | null>(null);
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
     const metadataLoadedKeyRef = useRef<string>("");
@@ -280,7 +281,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           );
 
           if (!segment) {
-            console.log("Segment not found for bookmark:", {
+            console.error("Segment not found for bookmark:", {
               bookmarkSegmentName,
               availableSegments: playlistSegmentsRef.current.slice(0, 10),
             });
@@ -373,7 +374,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
       loadSegmentMetadata(segment.name).then((metadata) => {
         if (currentSegmentNameRef.current === segment.name) {
-          
+
           currentMetadataRef.current = metadata;
         }
       });
@@ -502,7 +503,12 @@ const isDanger =
   return true;
 });
     if (detections.length > 0) {
-      drawDetections(detections);
+      if (detections.length > 0) {
+        lastDetectionsRef.current = detections;
+        drawDetections(detections);
+      } else {
+        drawDetections(lastDetectionsRef.current);
+      }
     } else {
       clearCanvas();
     }
@@ -548,7 +554,7 @@ const isDanger =
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      console.log("[HLS ERROR]", data);
+      console.error("[HLS ERROR]", data);
 
       if (
         data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
@@ -618,7 +624,7 @@ const isDanger =
       segments = await parsePlaylistSegments(src);
 
     } catch (error) {
-      console.log("Playlist parse failed:", error);
+      console.error("Playlist parse failed:", error);
       segments = [];
     }
 
@@ -658,7 +664,7 @@ const isDanger =
 
   onLabelsLoaded?.(labelsMap, src);
 } catch (error) {
-  console.log("Info fetch failed:", error);
+  console.error("Info fetch failed:", error);
 
   labelsMapRef.current = {};
   onLabelsLoaded?.({}, src);
@@ -669,7 +675,7 @@ const isDanger =
       const text = await safeTextFetch(bookmarkUrl);
       bookmarks = parseBookmarkNdjson(text);
     } catch (error) {
-      console.log("Bookmark fetch/parse failed:", error);
+      console.error("Bookmark fetch/parse failed:", error);
       bookmarks = [];
     }
 
@@ -707,7 +713,7 @@ try {
 
   onBookmarksChange?.(parsedBookmarks, src);
 } catch (error) {
-  console.log("Parsed bookmark mapping failed:", error);
+  console.error("Parsed bookmark mapping failed:", error);
   onBookmarksChange?.([], src);
 }};
 
@@ -733,6 +739,7 @@ try {
     clearCanvas();
     currentSegmentNameRef.current = null;
     currentMetadataRef.current = [];
+    lastDetectionsRef.current = [];
   };
 }, [src, metadataBaseUrl, startFrameSync, clearCanvas]);
 
@@ -779,6 +786,34 @@ try {
         return videoRef.current?.paused ?? true;
       },
     }));
+
+
+    useEffect(() => {
+  if (!src || !metadataBaseUrl) return;
+
+  let stopped = false;
+
+  const refreshSegments = async () => {
+    try {
+      const segments = await parsePlaylistSegments(src);
+
+      if (!stopped && segments.length > 0) {
+        playlistSegmentsRef.current = segments;
+      }
+    } catch (error) {
+      console.error("[PLAYLIST REFRESH ERROR]", error);
+    }
+  };
+
+  refreshSegments();
+
+  const interval = window.setInterval(refreshSegments, 2000);
+
+  return () => {
+    stopped = true;
+    window.clearInterval(interval);
+  };
+}, [src, metadataBaseUrl]);
 
     return (
   <div className="relative w-full h-full bg-black overflow-hidden">
