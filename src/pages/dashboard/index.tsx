@@ -24,11 +24,21 @@ const { Search } = Input;
 
 type DashboardRow = {
   deviceId: string;
+  deviceSn?: string;
+
   deviceName: string;
+
+  companyId?: string;
   companyName: string;
+
+  siteId?: string;
   siteName: string;
-  status: string | boolean;
+
+  missionId?: string;
+  activeMissionId?: string;
   activeMissionName?: string;
+
+  status: string | boolean;
 };
 
 type DashboardCard = {
@@ -217,7 +227,21 @@ export default function Dashboard() {
         }
 
         return (
-          <Link to={`/stream/${record.deviceId}`}>
+          <Link
+            to={`/stream/${record.deviceId}`}
+            state={{
+              fromDashboard: true,
+              companyId: record.companyId,
+              companyName: record.companyName,
+              siteId: record.siteId,
+              siteName: record.siteName,
+              deviceId: record.deviceId,
+              deviceSn: record.deviceSn,
+              deviceName: record.deviceName,
+              missionId: record.activeMissionId || record.missionId,
+              missionName: record.activeMissionName,
+            }}
+          >
             <img src={ViewDrone} alt="view" />
           </Link>
         );

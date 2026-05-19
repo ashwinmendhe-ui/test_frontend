@@ -16,6 +16,7 @@ import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
 import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
 import ControlBar from "@/components/common/controlBar";
 import WorkReportModal from "@/components/common/workReportModal";
+import { LiveMap } from "@/components/map/liveMap";
 
 
 
@@ -374,18 +375,21 @@ const [reportSnapshot, setReportSnapshot] = useState<any>(null);
     if (res?.data?.streamId) {
       const streamInfo = await startStream(res.data.streamId);
       const now = new Date();
-        setWorkStartTime(now);
-        setElapsedSeconds(0);
+      setWorkStartTime(now);
+      setElapsedSeconds(0);
 
       if (!streamInfo?.playback_url) {
         throw new Error("Stream started, but playback URL was not found.");
       }
 
-      setStreamPlaybackUrl(streamInfo.playback_url);
+      setStreamPlaybackUrl(streamInfo.playback_url || "");
+      setStreamMapUrl(streamInfo.map_url || "");
+
+      setMapReady(false);
+      setMapRetryKey(0);
       setPlayerStatus("LOADING");
       setHlsRetryCount(0);
       setHlsRetryKey(0);
-      setStreamMapUrl(streamInfo.map_url || "");
       setIsStreaming(streamInfo.state === "RUNNING");
     }
 
@@ -446,7 +450,9 @@ const handleStopWork = async () => {
     setReportDetail({
       reportCreatedAt: endTimeText,
       playbackUrl: streamPlaybackUrl,
-
+      companyId: values?.company,
+      siteId: values?.site,
+      missionId: values?.mission,
       startTime: startTimeText,
       endTime: endTimeText,
       totalTime: totalTimeText,
@@ -534,7 +540,9 @@ const handleStopWork = async () => {
     setIsLoading(false);
     setPlayerStatus("OFFLINE");
     setHasConnectedOnce(false);
-  }
+    setMapReady(false);
+    setMapRetryKey(0);
+      }
 };
 
 
@@ -638,6 +646,7 @@ const handleNext = () => {
   setCurrentTime(nextTime);
 };
 const handleDeviceInfoUpdate = useCallback((deviceInfo: any) => {
+
   setLiveDeviceInfo((previous: any) => {
     const isSame =
       previous?.status === deviceInfo?.status &&
@@ -659,6 +668,40 @@ const handleTimeChange = (value: number) => {
 const handleTimeChangeComplete = (value: number) => {
   playerRef.current?.seekTo(value);
 };
+const [mapRetryKey, setMapRetryKey] = useState(0);
+const [mapReady, setMapReady] = useState(false);
+
+
+
+
+useEffect(() => {
+  if (!isStreaming || !streamMapUrl || mapReady) return;
+
+  const checkMapReady = async () => {
+    try {
+      const res = await fetch(streamMapUrl, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        setMapReady(true);
+        return;
+      }
+
+      setMapRetryKey((prev) => prev + 1);
+    } catch {
+      setMapRetryKey((prev) => prev + 1);
+    }
+  };
+
+  checkMapReady();
+
+  const timer = setInterval(checkMapReady, 3000);
+
+  return () => clearInterval(timer);
+}, [isStreaming, streamMapUrl, mapReady]);
+
 
 useEffect(() => {
   if (!streamPlaybackUrl || !isStreaming) return;
@@ -710,8 +753,7 @@ useEffect(() => {
 
       setBookmarks(parsed);
     } catch (error) {
-      console.log("[BOOKMARK ERROR]", error);
-    }
+      console.error("Failed to fetch bookmarks:", error);}
   };
 
   fetchBookmarks();
@@ -777,12 +819,51 @@ const showDangerDetection =
     dangerModules.some((d) => d.value === m)
   );
 
+const liveMapGpsData = useMemo(() => {
+  if (
+    typeof liveDeviceInfo?.latitude === "number" &&
+    typeof liveDeviceInfo?.longitude === "number"
+  ) {
+    return [
+      {
+        lat: liveDeviceInfo.latitude,
+        lng: liveDeviceInfo.longitude,
+        time: currentTime,
+      },
+    ];
+  }
+
+  return [];
+}, [liveDeviceInfo?.latitude, liveDeviceInfo?.longitude, currentTime]);
+
+
+const SmallStatusBadge = ({
+  label,
+  status,
+}: {
+  label: string;
+  status: "idle" | "loading" | "live";
+}) => (
+  <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 rounded-full bg-[#374151] px-3 py-1 text-white text-[12px] font-bold">
+    <span
+      className={`w-2 h-2 rounded-full ${
+        status === "live"
+          ? "bg-[#22C55E]"
+          : status === "loading"
+          ? "bg-[#F59E0B]"
+          : "bg-[#9CA3AF]"
+      }`}
+    />
+    {status === "idle" ? label : status === "live" ? "LIVE" : "Loading..."}
+  </div>
+);
+
   return (
   <div className="w-full h-full overflow-auto">
-    <div className="w-full min-w-[1120px] min-h-full rounded-[10px] bg-[#F6F7F9] p-6">
+    <div className="w-full min-w-[1120px] xl:min-w-0 min-h-full rounded-[10px] bg-[#F6F7F9] p-6">
       <Form form={form} layout="vertical">
         <div className="grid grid-cols-[minmax(700px,1fr)_390px] gap-5 items-start">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <div className="grid grid-cols-[repeat(4,minmax(120px,1fr))_160px] gap-3 items-center">
               <Form.Item
                 name="company"
@@ -973,6 +1054,72 @@ const showDangerDetection =
                 }}
               />
             )}
+            {/* Vector Space + Travel Route Map */}
+        <div className="grid grid-cols-2 gap-3 min-w-0">
+              {/* Vector Space */}
+              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+                <SmallStatusBadge
+                  label={t("stream_vector_space")}
+                  status={!isStreaming ? "idle" : mapReady ? "live" : "loading"}
+                />
+
+                {isStreaming && streamMapUrl && mapReady ? (
+                  <HLSPlayer
+                    key={`vector-${streamMapUrl}`}
+                    src={streamMapUrl}
+                    metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
+                    className="w-full h-full object-contain bg-black"
+                    autoPlay
+                    muted
+                    controls={false}
+                    selectedClassIds={[]}
+                    showCommonDetection={false}
+                    showDangerDetection={false}
+                    disableBackgroundTasks={true}
+                    type="vector"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
+                    {isStreaming
+                      ? t("stream_vector_space_loading")
+                      : t("stream_active_after_start")}
+                  </div>
+                )}
+              </div>
+
+              {/* Travel Route Map */}
+              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+              <SmallStatusBadge
+                  label={t("stream_travel_route_map")}
+                  status={
+                    !isStreaming
+                      ? "idle"
+                      : liveDeviceInfo?.latitude !== undefined &&
+                        liveDeviceInfo?.longitude !== undefined
+                      ? "live"
+                      : "loading"
+                  }
+                />
+
+                <LiveMap
+                  currentTime={currentTime}
+                  latitude={liveDeviceInfo?.latitude}
+                  longitude={liveDeviceInfo?.longitude}
+                  videoUrl={streamPlaybackUrl}
+                  gpsData={liveMapGpsData}
+                  streamStatus={{
+                    error: null,
+                    isLoading:
+                      playerStatus === "LOADING" ||
+                      playerStatus === "CONNECTING",
+                    videoConnected: playerStatus === "LIVE",
+                    isPaused: !isPlaying,
+                    isReconnecting: playerStatus === "RECONNECTING",
+                  }}
+                  mode="stream"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 w-[390px] shrink-0">
@@ -1065,7 +1212,7 @@ const showDangerDetection =
               </div>
             </div>
 
-            <div className="bg-white rounded-[10px] p-6 min-h-[350px]">
+            <div className="bg-white rounded-[10px] p-6 h-[330px] overflow-hidden">
               <h2 className="text-[20px] font-bold mb-5">
                 {t("stream_ai_module")}
               </h2>
@@ -1120,9 +1267,7 @@ const showDangerDetection =
                               checked={isChecked}
                               onChange={() => toggleModule(item.value)}
                               style={{
-                                backgroundColor: isChecked
-                                  ? item.color
-                                  : "#d1d5db",
+                                backgroundColor: isChecked ? item.color : "#d1d5db",
                                 marginRight: "8px",
                               }}
                             />
@@ -1182,9 +1327,7 @@ const showDangerDetection =
                               checked={isChecked}
                               onChange={() => toggleModule(item.value)}
                               style={{
-                                backgroundColor: isChecked
-                                  ? item.color
-                                  : "#d1d5db",
+                                backgroundColor: isChecked ? item.color : "#d1d5db",
                                 marginRight: "8px",
                               }}
                             />
@@ -1196,36 +1339,30 @@ const showDangerDetection =
                 </div>
               </div>
             </div>
+            {/* Robot Control */}
+            <div className="bg-white rounded-[10px] p-6 min-h-[180px]">
+            <h2 className="text-[20px] font-bold mb-5">
+              {t("stream_robot_control")}
+            </h2>
 
-            <div className="bg-white rounded-[10px] p-6">
-              <h2 className="text-[20px] font-bold mb-5">
-                {t("stream_robot_control")}
-              </h2>
-
-              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
-                {isStreaming && streamMapUrl ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-lg gap-2">
-                    <div>{t("stream_secondary_video_placeholder")}</div>
-                    <div className="text-sm text-gray-200 px-4 text-center break-all">
-                      {streamMapUrl}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                    <img
-                      src={NoVideoIcon}
-                      alt="No map"
-                      className="w-16 h-16 opacity-90"
-                    />
-                    <p className="text-white text-[16px]">
-                      {t("stream_map_waiting_activation")}
-                    </p>
-                  </div>
-                )}
+            {isStreaming ? (
+              <Button
+                onClick={handleStopWork}
+                loading={isLoading}
+                className="w-full h-[52px]! rounded-[6px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
+              >
+                {t("stream_emergency_stop")}
+              </Button>
+            ) : (
+              <div className="w-full rounded-[6px] border border-[#D9DEE7] bg-[#F6F7F9] px-4 py-3 text-[14px] text-[#374151]">
+                {t("stream_active_after_start")}
               </div>
-            </div>
+            )}
+          </div>
           </div>
         </div>
+
+        
       </Form>
 
       {reportDetail && (

@@ -538,5 +538,10 @@
 "stream_speed": "speed",
 "stream_operating_hours": "Operating hours",
 "stream_start_time": "Start time",
-"stream_robot_control": "Robot control"
+"stream_robot_control": "Robot control",
+"stream_vector_space": "Vector Space",
+"stream_travel_route_map": "Travel Route Map",
+"stream_active_after_start": "Activated after work starts",
+"stream_emergency_stop": "Emergency stop",
+"stream_vector_space_loading": "Loading vector space..."
   }

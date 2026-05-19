@@ -42,6 +42,8 @@ interface HLSPlayerProps {
   onLoadedMetadata?: () => void;
   onTimeUpdate?: (time: number) => void;
   onEnded?: () => void;
+  disableBackgroundTasks?: boolean;
+    type?: "main" | "vector" | "playback";
   onBookmarksChange?: (
     bookmarks: Array<{ timeSec: number | null; t?: number; c_ar?: number[] }>,
     videoUrl: string
@@ -81,6 +83,8 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       selectedClassIds = [],
       showCommonDetection = true,
       showDangerDetection = true,
+      disableBackgroundTasks = false,
+      type = "main",
     },
     ref
   ) => {
@@ -615,6 +619,12 @@ const isDanger =
     }
 
     const baseUrl = metadataBaseUrl.replace(/\/$/, "");
+    if (disableBackgroundTasks || type === "vector") {
+      onBookmarksChange?.([], src || "");
+      onLabelsLoaded?.({}, src || "");
+      return;
+    }
+
     let labelsMap: LabelsMap = {};
     let bookmarks: BookmarkPayload[] = [];
     let sessionStartMs: number | null = null;
@@ -722,7 +732,7 @@ try {
   return () => {
     cancelled = true;
   };
-}, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded]);
+}, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded,disableBackgroundTasks,type]);
 
 
   useEffect(() => {

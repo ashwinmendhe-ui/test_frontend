@@ -619,5 +619,10 @@
 "stream_speed": "속도",
 "stream_operating_hours": "작동 시간",
 "stream_start_time": "시작 시간",
-"stream_robot_control": "로봇 제어"
+"stream_robot_control": "로봇 제어",
+"stream_vector_space": "벡터 공간",
+"stream_travel_route_map": "이동 경로 지도",
+"stream_active_after_start": "작업 시작 이후 활성화됩니다",
+"stream_vector_space_loading": "벡터 공간 로딩 중...",
+"stream_emergency_stop": "비상 정지"
 }
