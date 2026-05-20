@@ -12,10 +12,17 @@ interface DashboardTable {
   deviceId: string;
   deviceSn: string;
   deviceName: string;
+
+  companyId?: string;
   companyName: string;
+
+  siteId?: string;
   siteName: string;
+
+  missionId?: string;
+  missionName?: string;
+
   status: string;
-  activeMissionName?: string;
 }
 
 interface DashboardStore {

@@ -72,7 +72,7 @@ export default function AppRouter() {
         { path: "history", element: <History /> },
         { path: "kpi", element: <KPI /> },
         { path: "stream", element: <Stream /> },
-        { path: "stream/:id", element: <StreamDetail /> },
+        { path: "stream/:id", element: <Stream /> },
         { path: "playback", element: <Playback /> },
       ],
     },

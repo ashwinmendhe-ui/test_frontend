@@ -34,13 +34,18 @@ export const streamApi = {
     return res.data;
   },
 
-  // ✅ Updated API
-  startStream: async (id?: string) => {
-  const res = await axiosClient.get(`/v1/live/stream-info/${id}`);
+  status: async (deviceSn: string) => {
+  const res = await axiosClient.get("/v1/live/streams/status", {
+    params: { deviceSn },
+  });
   return res.data?.data ?? res.data;
 },
 
-  // ✅ Keep POST if Swagger defines POST
+  startStream: async (id?: string) => {
+    const res = await axiosClient.get(`/v1/live/stream-info/${id}`);
+    return res.data?.data ?? res.data;
+  },
+
   heartBeat: async (sessionId: string) => {
     const res = await axiosClient.post(
       `/v1/live/streams/heartbeat?sessionId=${sessionId}`

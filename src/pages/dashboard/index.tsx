@@ -9,23 +9,21 @@ import {
   SortableTable,
   type SortableTableColumn,
 } from "@/components/common/table";
+import { TOPIC } from "@/constants/topic";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import { useUserStore } from "@/stores/userStore";
 import { filterByQuery } from "@/utils/filterByQuery";
 import { Input, Spin } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { TOPIC } from "@/constants/topic";
-import { useCallback } from "react";
 
 const { Search } = Input;
 
 type DashboardRow = {
   deviceId: string;
   deviceSn?: string;
-
   deviceName: string;
 
   companyId?: string;
@@ -34,11 +32,10 @@ type DashboardRow = {
   siteId?: string;
   siteName: string;
 
-  missionId?: string;
-  activeMissionId?: string;
-  activeMissionName?: string;
-
   status: string | boolean;
+
+  missionId?: string;
+  missionName?: string;
 };
 
 type DashboardCard = {
@@ -50,20 +47,20 @@ type DashboardCard = {
 };
 
 export default function Dashboard() {
-
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
   const { dashboard, stat, loading, getDashboard, getDashboardStat } =
     useDashboardStore();
 
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [deviceStatusMap, setDeviceStatusMap] = useState<Record<string, any>>(
+    {}
+  );
 
   const userRole = detailUserLogin?.roles?.[0];
-  const [deviceStatusMap, setDeviceStatusMap] = useState<Record<string, any>>({});
 
   const handleStatusMessage = useCallback((message: any) => {
-    const key = message.deviceId || message.deviceSn;
-
+    const key = message.deviceSn || message.deviceId;
     if (!key) return;
 
     setDeviceStatusMap((prev) => ({
@@ -78,8 +75,6 @@ export default function Dashboard() {
     handleStatusMessage,
     true
   );
-
-
 
   useEffect(() => {
     getDashboard();
@@ -105,7 +100,7 @@ export default function Dashboard() {
       bgClass: "bg-[#FBF6FF]",
       icon: HomeSite,
     },
-    ...((userRole === 1 || userRole === 2)
+    ...(userRole === 1 || userRole === 2
       ? [
           {
             key: "user",
@@ -127,18 +122,16 @@ export default function Dashboard() {
 
   const mergedDashboard = useMemo(() => {
     return dashboard.map((item) => {
-      const live = deviceStatusMap[item.deviceId] || deviceStatusMap[item.deviceSn];
+      const live =
+        deviceStatusMap[item.deviceSn] || deviceStatusMap[item.deviceId];
 
       if (!live) return item;
 
       return {
         ...item,
         status: live.status ?? item.status,
-        activeMissionName:
-          live.activeMissionName ??
-          live.missionName ??
-          live.workDetail ??
-          item.activeMissionName,
+        missionId: live.missionId ?? item.missionId,
+        missionName: live.missionName ?? item.missionName,
       };
     });
   }, [dashboard, deviceStatusMap]);
@@ -149,8 +142,9 @@ export default function Dashboard() {
       "companyName",
       "siteName",
       "status",
-      "activeMissionName",
+      "missionName",
       "deviceId",
+      "deviceSn",
     ]);
   }, [mergedDashboard, searchKeyword]);
 
@@ -199,8 +193,8 @@ export default function Dashboard() {
     },
     {
       title: t("dashboard_table_mission"),
-      dataIndex: "activeMissionName",
-      key: "activeMissionName",
+      dataIndex: "missionName",
+      key: "missionName",
       enableSort: true,
       render: (value?: string) => (
         <div className="truncate max-w-[320px]" title={value || "-"}>
@@ -213,8 +207,10 @@ export default function Dashboard() {
       key: "action",
       width: 100,
       render: (_: unknown, record: DashboardRow) => {
+        const currentStatus = String(record.status || "").toLowerCase();
+
         const isBlocked =
-          record.status === "offline" || record.status === "working";
+          currentStatus === "offline" || currentStatus === "inactive";
 
         if (isBlocked) {
           return (
@@ -228,18 +224,26 @@ export default function Dashboard() {
 
         return (
           <Link
+            // to="/stream"
             to={`/stream/${record.deviceId}`}
             state={{
               fromDashboard: true,
+              openLiveStream: currentStatus === "working",
+
               companyId: record.companyId,
               companyName: record.companyName,
+
               siteId: record.siteId,
               siteName: record.siteName,
+
               deviceId: record.deviceId,
               deviceSn: record.deviceSn,
               deviceName: record.deviceName,
-              missionId: record.activeMissionId || record.missionId,
-              missionName: record.activeMissionName,
+
+              missionId: record.missionId,
+              missionName: record.missionName,
+
+              status: record.status,
             }}
           >
             <img src={ViewDrone} alt="view" />

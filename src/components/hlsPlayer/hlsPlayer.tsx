@@ -558,7 +558,7 @@ const isDanger =
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      console.error("[HLS ERROR]", data);
+      // console.error("[HLS ERROR]", data);
 
       if (
         data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
@@ -634,7 +634,7 @@ const isDanger =
       segments = await parsePlaylistSegments(src);
 
     } catch (error) {
-      console.error("Playlist parse failed:", error);
+      // console.error("Playlist parse failed:", error);
       segments = [];
     }
 
@@ -655,7 +655,7 @@ const isDanger =
         }
       }
     } catch (error) {
-      console.error("🔥 Segment JSON fetch failed:", error);
+      // console.error("🔥 Segment JSON fetch failed:", error);
     }
   
 
@@ -674,7 +674,7 @@ const isDanger =
 
   onLabelsLoaded?.(labelsMap, src);
 } catch (error) {
-  console.error("Info fetch failed:", error);
+  // console.error("Info fetch failed:", error);
 
   labelsMapRef.current = {};
   onLabelsLoaded?.({}, src);
@@ -685,7 +685,7 @@ const isDanger =
       const text = await safeTextFetch(bookmarkUrl);
       bookmarks = parseBookmarkNdjson(text);
     } catch (error) {
-      console.error("Bookmark fetch/parse failed:", error);
+      // console.error("Bookmark fetch/parse failed:", error);
       bookmarks = [];
     }
 
@@ -723,7 +723,7 @@ try {
 
   onBookmarksChange?.(parsedBookmarks, src);
 } catch (error) {
-  console.error("Parsed bookmark mapping failed:", error);
+  // console.error("Parsed bookmark mapping failed:", error);
   onBookmarksChange?.([], src);
 }};
 
@@ -811,7 +811,7 @@ try {
         playlistSegmentsRef.current = segments;
       }
     } catch (error) {
-      console.error("[PLAYLIST REFRESH ERROR]", error);
+      // console.error("[PLAYLIST REFRESH ERROR]", error);
     }
   };
 

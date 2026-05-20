@@ -4,7 +4,7 @@ import { Button, Form, Select, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate , useLocation, useParams} from "react-router-dom";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useSiteStore } from "@/stores/siteStore";
 import { useMissionStore } from "@/stores/missionStore";
@@ -58,9 +58,11 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [duration, setDuration] = useState(0);
   const retryTimerRef = useRef<number | null>(null);
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const location = useLocation();
+  const dashboardPrefill = location.state as any;
+  const didDashboardPrefill = useRef(false);
   const { detailUserLogin } = useUserStore();
-
+  const { id: routeDeviceId } = useParams();
   const { list: companyList, getList: getCompanyList } = useCompanyStore();
   const { list: siteList, getListByCompany: getSiteListByCompany } =
     useSiteStore();
@@ -269,7 +271,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   const selectedDangerCount = selectedModules.filter((value) =>
     dangerModules.some((item) => item.value === value)
   ).length;
-const [reportSnapshot, setReportSnapshot] = useState<any>(null);
+
   const handleSelectChange = async (
     fieldName: keyof StreamFormValues,
     value: string
@@ -300,6 +302,7 @@ const [reportSnapshot, setReportSnapshot] = useState<any>(null);
         getRobotListBySite(value),
         getMissionListBySite(value),
       ]);
+      
     } else if (fieldName === "device") {
       form.setFieldValue("mission", undefined);
       setIsStreaming(false);
@@ -557,10 +560,6 @@ const formatDuration = (seconds: number) => {
   )}:${String(s).padStart(2, "0")}`;
 };
 
-  const handleReportOk = () => {
-    setIsReportOpen(false);
-    navigate("/history");
-  };
 
   const handleReportCancel = () => {
     setIsReportOpen(false);
@@ -808,6 +807,103 @@ useEffect(() => {
 
   return () => window.clearInterval(timer);
 }, [isStreaming, workStartTime]);
+
+
+useEffect(() => {
+  if (!dashboardPrefill?.fromDashboard) return;
+  if (didDashboardPrefill.current) return;
+
+  const companyId =
+    dashboardPrefill.companyId || detailUserLogin?.user?.companyId;
+  const siteId = dashboardPrefill.siteId;
+  const deviceId = dashboardPrefill.deviceId || routeDeviceId;
+  const deviceSn = dashboardPrefill.deviceSn;
+
+  if (!companyId || !siteId || !deviceId) return;
+
+  didDashboardPrefill.current = true;
+
+  const applyDashboardPrefill = async () => {
+    form.setFieldsValue({
+      company: companyId,
+      site: undefined,
+      device: undefined,
+      mission: undefined,
+    });
+
+    await getSiteListByCompany(companyId);
+
+    form.setFieldsValue({
+      site: siteId,
+      device: undefined,
+      mission: undefined,
+    });
+
+    await Promise.all([
+      getRobotListBySite(siteId),
+      getMissionListBySite(siteId),
+    ]);
+
+    form.setFieldsValue({
+      device: deviceId,
+      mission: undefined,
+    });
+
+    await getRobotDetail(deviceId);
+
+    const matchedMission = missionList.find(
+      (item: any) =>
+        item.missionId === dashboardPrefill.missionId ||
+        item.missionName === dashboardPrefill.missionName
+    );
+
+    if (matchedMission?.missionId) {
+      form.setFieldValue("mission", matchedMission.missionId);
+    }
+
+    if (dashboardPrefill.openLiveStream && deviceSn) {
+      const statusRes = await streamApi.status(deviceSn);
+
+      if (!statusRes?.streaming) return;
+
+      if (statusRes?.missionId) {
+        form.setFieldValue("mission", statusRes.missionId);
+      }
+
+      const streamInfo = await startStream(deviceSn);
+
+      setSessionId(deviceSn);
+
+      setStreamPlaybackUrl(
+        streamInfo.playback_url || streamInfo.playbackUrl || ""
+      );
+
+      setStreamMapUrl(streamInfo.map_url || streamInfo.mapUrl || "");
+
+      setMapReady(false);
+      setMapRetryKey(0);
+
+      setPlayerStatus("LOADING");
+      setHlsRetryCount(0);
+      setHlsRetryKey(0);
+
+      setIsStreaming(true);
+    }
+  };
+
+  applyDashboardPrefill();
+}, [
+  dashboardPrefill,
+  detailUserLogin?.user?.companyId,
+  form,
+  getSiteListByCompany,
+  getRobotListBySite,
+  getMissionListBySite,
+  getRobotDetail,
+  routeDeviceId,
+  missionList,
+  startStream,
+]);
 
 const showCommonDetection =
   selectedModules.some((m) =>
