@@ -137,7 +137,7 @@ export default function SiteForm({
               value: item.companyId,
               label: item.name,
             }))}
-            disabled={userRole !== 1 || mode === "edit"}
+            disabled={userRole !== 1}
             placeholder={t("site_placeholder_select_company")}
           />
         </Form.Item>

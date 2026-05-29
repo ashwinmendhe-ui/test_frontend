@@ -16,6 +16,7 @@ import ControlBar from "@/components/common/controlBar";
 import { Form, Select, Switch } from "antd";
 import { formatTime } from "@/utils/date";
 import { useLocation } from "react-router-dom";
+import { LiveMap } from "@/components/map/liveMap";
 
 type PlaybackFormValues = {
   company?: string;
@@ -135,7 +136,6 @@ const timeToSeconds = (time?: string) => {
 
 export default function Playback() {
   const location = useLocation();
-
   const historyPlaybackState = location.state as
   | {
       playbackUrl?: string;
@@ -873,6 +873,28 @@ const selectedVideoInfo = selectedVideos[0]
   ? deviceInfoByVideo[selectedVideos[0]]
   : undefined;
 
+const playbackLatitude = Number(selectedVideoInfo?.latitude);
+const playbackLongitude = Number(selectedVideoInfo?.longitude);
+
+const playbackMapGpsData = useMemo(() => {
+  if (
+    Number.isFinite(playbackLatitude) &&
+    Number.isFinite(playbackLongitude) &&
+    playbackLatitude !== 0 &&
+    playbackLongitude !== 0
+  ) {
+    return [
+      {
+        lat: playbackLatitude,
+        lng: playbackLongitude,
+        time: currentTime,
+      },
+    ];
+  }
+
+  return [];
+}, [playbackLatitude, playbackLongitude, currentTime]);
+
   return (
   <div className="w-full h-full overflow-auto">
     <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
@@ -1549,8 +1571,28 @@ const selectedVideoInfo = selectedVideos[0]
 
         <div className="w-full p-6 bg-white rounded-[10px]">
           <h2 className="text-[20px] font-bold mb-6">{t("playback_route_map")}</h2>
-          <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] flex items-center justify-center text-[#8E8E93]">
-            {t("playback_map_placeholder")}
+          <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] overflow-hidden">
+            {selectedVideos.length > 0 ? (
+              <LiveMap
+                currentTime={currentTime}
+                latitude={playbackLatitude}
+                longitude={playbackLongitude}
+                videoUrl={selectedVideos?.[0] || ""}
+                gpsData={playbackMapGpsData}
+                streamStatus={{
+                  error: null,
+                  isLoading: false,
+                  videoConnected: true,
+                  isPaused: !isPlaying,
+                  isReconnecting: false,
+                }}
+                mode="playback"
+              />
+            ) : (
+              <div className="h-full w-full bg-[#737D89] rounded-[8px] flex items-center justify-center text-white text-[15px]">
+                {t("playback_map_idle_message")}
+              </div>
+            )}
           </div>
         </div>
       </div>

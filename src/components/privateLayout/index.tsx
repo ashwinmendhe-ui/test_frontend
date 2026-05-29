@@ -5,10 +5,13 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserStore } from "@/stores/userStore";
 import { hasAccess } from "@/utils/roleAccess";
+import { getKstNowText } from "@/utils/dateTime";
 
 export default function PrivateLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [kstTime, setKstTime] = useState(getKstNowText());
+
   const location = useLocation();
   const navigate = useNavigate();
   const { detailUserLogin } = useUserStore();
@@ -23,6 +26,14 @@ export default function PrivateLayout() {
     }
   }, [currentRole, location.pathname, navigate]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setKstTime(getKstNowText());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -32,7 +43,7 @@ export default function PrivateLayout() {
       />
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <div className="h-14 shrink-0 bg-white flex items-center px-4 border-b">
+        <div className="h-14 shrink-0 bg-white flex items-center px-4">
           <button
             onClick={() => {
               setCollapsed(!collapsed);
@@ -47,8 +58,13 @@ export default function PrivateLayout() {
           </button>
         </div>
 
-        <div className="px-6 py-4 bg-[#F5F7FA] flex-1 min-w-0 overflow-auto">
+        <div className="px-6 pt-0 pb-4 bg-[#F5F7FA] flex-1 min-w-0 overflow-auto">
           <Header />
+
+          <div className="text-[13px] font-bold text-[#8E8E93] mb-0">
+            {kstTime}
+          </div>
+
           <div className="min-w-0">
             <Outlet />
           </div>

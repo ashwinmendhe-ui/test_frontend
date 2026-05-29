@@ -1,22 +1,40 @@
+const KOREA_TIMEZONE = "Asia/Seoul";
+
 export const formatDateTime = (
-  dateString: string | number | undefined,
+  dateString: string | number | Date | undefined,
   showHour?: boolean
 ) => {
   if (!dateString) return "-";
 
-  const d = new Date(dateString);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  const seconds = String(d.getSeconds()).padStart(2, "0");
+  const date = new Date(dateString);
 
-  if (showHour) {
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: KOREA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: showHour ? "2-digit" : undefined,
+    minute: showHour ? "2-digit" : undefined,
+    second: showHour ? "2-digit" : undefined,
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+
+  const yyyy = get("year");
+  const mm = get("month");
+  const dd = get("day");
+
+  if (!showHour) {
+    return `${yyyy}-${mm}-${dd}`;
   }
 
-  return `${year}-${month}-${day}`;
+  const hh = get("hour");
+  const mi = get("minute");
+  const ss = get("second");
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 };
 
 export const formatTime = (seconds: number) => {
@@ -36,12 +54,5 @@ export const formatTimestamp = (timestamp: string | number | undefined) => {
   const ts = typeof timestamp === "string" ? Number(timestamp) : timestamp;
   const date = ts < 10000000000 ? new Date(ts * 1000) : new Date(ts);
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return formatDateTime(date, true);
 };

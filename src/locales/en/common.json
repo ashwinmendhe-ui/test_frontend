@@ -543,5 +543,7 @@
 "stream_travel_route_map": "Travel Route Map",
 "stream_active_after_start": "Activated after work starts",
 "stream_emergency_stop": "Emergency stop",
-"stream_vector_space_loading": "Loading vector space..."
+"stream_vector_space_loading": "Loading vector space...",
+"playback_map_idle_message": "It will be activated after attaching a video",
+"status_working": "working"
   }

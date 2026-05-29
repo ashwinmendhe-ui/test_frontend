@@ -624,5 +624,6 @@
 "stream_travel_route_map": "이동 경로 지도",
 "stream_active_after_start": "작업 시작 이후 활성화됩니다",
 "stream_vector_space_loading": "벡터 공간 로딩 중...",
-"stream_emergency_stop": "비상 정지"
+"stream_emergency_stop": "비상 정지",
+"playback_map_idle_message": "영상 첨부 이후 활성화됩니다"
 }

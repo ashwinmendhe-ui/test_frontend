@@ -75,8 +75,15 @@ const FileUpload = forwardRef<FileUploadRef, FileUploadProps>(
     }));
 
     const handleDownload = (file: UploadFile) => {
-      if (downloadUrl) {
-        window.open(downloadUrl, "_blank");
+      if (downloadUrl && downloadUrl.trim() !== "") {
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.download = file.name || value || "download";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         return;
       }
 
@@ -89,7 +96,10 @@ const FileUpload = forwardRef<FileUploadRef, FileUploadProps>(
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        return;
       }
+
+      console.warn("No download URL available");
     };
 
     const handleDelete = () => {
@@ -172,7 +182,9 @@ const FileUpload = forwardRef<FileUploadRef, FileUploadProps>(
                   isShowEdit={false}
                   isShowDownload
                   isShowDelete
-                  onDownload={() => handleDownload(displayFile)}
+                  onDownload={() => {
+                    handleDownload(displayFile);
+                  }}
                   onDelete={handleDelete}
                 />
               )}

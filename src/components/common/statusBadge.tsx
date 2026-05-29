@@ -33,14 +33,31 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
   };
 
   const getStatusLabel = () => {
-    if (status === true || status === "active") {
-      return t("status_active");
-    }
-    if (status === false || status === "offline") {
-      return t("status_inactive");
-    }
-    return String(status);
-  };
+  const normalizedStatus = String(status).toLowerCase();
+
+  if (
+    status === true ||
+    normalizedStatus === "active" ||
+    normalizedStatus === "online"
+  ) {
+    return t("status_active");
+  }
+
+  if (
+    status === false ||
+    normalizedStatus === "offline" ||
+    normalizedStatus === "inactive" ||
+    normalizedStatus === "disable"
+  ) {
+    return t("status_inactive");
+  }
+
+  if (normalizedStatus === "working") {
+    return t("status_working");
+  }
+
+  return String(status);
+};
 
   return (
     <div className="flex items-center">

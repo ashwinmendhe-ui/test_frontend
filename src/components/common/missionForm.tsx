@@ -30,7 +30,8 @@ export default function MissionForm({
   const [form] = Form.useForm<MissionFormValue>();
   const [messageApi, contextHolder] = message.useMessage();
   const fileUploadRef = useRef<FileUploadRef>(null);
-
+  const watchedFile = Form.useWatch("file", form);
+  const watchedDownloadUrl = Form.useWatch("downloadUrl", form);
   const deviceTypeOptions = [
     { value: "Drone", label: t("mission_device_type_drone") },
     { value: "Robot", label: t("mission_device_type_robot") },
@@ -78,6 +79,17 @@ export default function MissionForm({
       }
     }
   }, [detailUserLogin, form, getListByCompany, userRole]);
+
+useEffect(() => {
+  if (initialValues) {
+    form.setFieldsValue({
+      ...initialValues,
+      file: initialValues.file,
+      downloadUrl: initialValues.downloadUrl,
+    });
+  }
+}, [initialValues, form]);
+
 
   const handleFileChange = (file: File | null, fileName?: string | null) => {
     if (file && fileName) {
@@ -246,6 +258,10 @@ export default function MissionForm({
           </div>
 
           <div className="flex flex-col">
+            <Form.Item name="downloadUrl" hidden>
+              <Input />
+            </Form.Item>
+
             <Form.Item
               label={
                 <div className="text-[18px] font-semibold text-[#333D4B]">
@@ -257,8 +273,8 @@ export default function MissionForm({
               <FileUpload
                 ref={fileUploadRef}
                 onFileChange={handleFileChange}
-                downloadUrl={values?.downloadUrl}
-                value={values?.file}
+                value={watchedFile}
+                downloadUrl={watchedDownloadUrl}
                 accept="*"
                 maxSize={10}
               />
