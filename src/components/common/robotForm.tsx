@@ -31,7 +31,7 @@ export default function RobotForm({
 
   const robotTypeOptions = [
     { value: "Drone", label: t("robot_type_drone") },
-    { value: "Quadruped Robot", label: t("robot_type_quadruped") },
+    { value: "Robot", label: t("robot_type_quadruped") },
   ];
 
   const { list: listCompany, getList: getListCompany } = useCompanyStore();

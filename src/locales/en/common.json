@@ -289,7 +289,7 @@
   "robot_validation_select_company": "Please select company",
 
   "robot_type_drone": "Drone",
-  "robot_type_quadruped": "Quadruped Robot",
+  "robot_type_quadruped": "Robot",
   "button_ok": "OK",
   "status_active": "Active",
   "status_inactive": "Inactive",

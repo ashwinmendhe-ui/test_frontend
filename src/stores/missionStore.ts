@@ -168,8 +168,10 @@ export const useMissionStore = create<Store>((set, get) => ({
     };
 
     const res = await missionApi.createMission(payload);
+    const data = res?.data ?? res;
+
     await get().getList();
-    return res;
+    return data;
   } catch (error) {
     set({ loading: false });
     throw error;
@@ -191,8 +193,10 @@ export const useMissionStore = create<Store>((set, get) => ({
     };
 
     const res = await missionApi.updateMission(id, payload);
+    const data = res?.data ?? res;
+
     await get().getList();
-    return res;
+    return data;
   } catch (error) {
     set({ loading: false });
     throw error;
@@ -203,6 +207,7 @@ export const useMissionStore = create<Store>((set, get) => ({
   set({ loading: true });
   try {
     const res = await missionApi.deleteMission(id);
+
     await get().getList();
     return res;
   } catch (error) {
