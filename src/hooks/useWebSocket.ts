@@ -21,19 +21,25 @@ export const useWebSocket = (
     stompClient.current = Stomp.over(socket);
     stompClient.current.debug = () => {};
 
-    stompClient.current.connect(
-      { Authorization: `Bearer ${token}` },
-      () => {
-        stompClient.current?.subscribe(topic, (message) => {
-          if (message.body) {
-            onMessage(JSON.parse(message.body));
-          }
-        });
-      },
-      (error: unknown) => {
-        console.error("WebSocket connection error:", error);
+    console.log("[WS] connecting endpoint=", endpoint, "topic=", topic);
+
+stompClient.current.connect(
+  { Authorization: `Bearer ${token}` },
+  () => {
+    console.log("[WS] connected topic=", topic);
+
+    stompClient.current?.subscribe(topic, (message) => {
+      console.log("[WS] received topic=", topic, "body=", message.body);
+
+      if (message.body) {
+        onMessage(JSON.parse(message.body));
       }
-    );
+    });
+  },
+  (error: unknown) => {
+    console.error("[WS] connection error:", error);
+  }
+);
 
     return () => {
       stompClient.current?.disconnect();

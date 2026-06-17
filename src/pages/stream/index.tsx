@@ -60,6 +60,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const { t } = useTranslation();
   const location = useLocation();
   const dashboardPrefill = location.state as any;
+  const lockSelection = Boolean(dashboardPrefill?.fromDashboard);
   const didDashboardPrefill = useRef(false);
   const { detailUserLogin } = useUserStore();
   const { id: routeDeviceId } = useParams();
@@ -367,13 +368,19 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     const res = await streamApi.start(streamPayload);
 
     if (res?.code === -1) {
-      showNotification(
-        "error",
-        "Start stream failed",
-        res?.message || "Unable to start stream."
-      );
-      return;
-    }
+  setPlayerStatus("OFFLINE");
+  setIsStreaming(false);
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+  setSessionId(null);
+
+  showNotification(
+    "error",
+    "Start stream failed",
+    res?.message || "Unable to start stream."
+  );
+  return;
+}
 
     if (res?.data?.streamId) {
       const streamInfo = await startStream(res.data.streamId);
@@ -407,14 +414,22 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       "Live stream started successfully."
     );
   } catch (error: any) {
-    showNotification(
-      "error",
-      "Start stream failed",
-      error?.message || "Validation or API error."
-    );
-  } finally {
-    setIsLoading(false);
-  }
+  setPlayerStatus("OFFLINE");
+  setIsStreaming(false);
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+  setSessionId(null);
+
+  showNotification(
+    "error",
+    "Start stream failed",
+    error?.response?.data?.message ||
+      error?.message ||
+      "Validation or API error."
+  );
+} finally {
+  setIsLoading(false);
+}
 };
 
 const handleStopWork = async () => {
@@ -442,68 +457,67 @@ const handleStopWork = async () => {
     const missionName =
       missionOptions.find((m) => m.value === values?.mission)?.label || "-";
 
-    if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
-      await createReport({
-        deviceSn: selectedRobotDetail.deviceSn,
-        playbackUrl: streamPlaybackUrl,
-        missionId: values.mission,
-      });
-    }
+    let reportRes: any = null;
 
-    setReportDetail({
-      reportCreatedAt: endTimeText,
-      playbackUrl: streamPlaybackUrl,
-      companyId: values?.company,
-      siteId: values?.site,
-      missionId: values?.mission,
-      startTime: startTimeText,
-      endTime: endTimeText,
-      totalTime: totalTimeText,
+if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
+  reportRes = await createReport({
+    deviceSn: selectedRobotDetail.deviceSn,
+    playbackUrl: streamPlaybackUrl,
+    missionId: values.mission,
+  });
+}
 
-      distance: "-",
-      siteName,
-      deviceName: robotName,
-      robotName,
-      missionName,
-      userName: "sysadmin",
-      workerName: "sysadmin",
-      deviceSn: selectedRobotDetail?.deviceSn || "",
+if (reportRes) {
+  setReportDetail(reportRes);
+} else {
+  const fallbackBookmarks = bookmarks.map((bm: any, index: number) => {
+    const label = bm.labels?.[0] || bm.label || bm.type || "Unknown";
 
-      totalRecognition: bookmarks.length,
+    return {
+      label,
+      mdisplay: bm.timeSec
+        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
+        : "00:00:00",
+      m: bm.timeSec || 0,
+      s: bm.s || "",
+      o: 0,
+      duration: bm.timeSec
+        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
+        : "00:00:00",
+      id: bm.id || `${label}-${index}`,
+    };
+  });
 
-      bookmarks: bookmarks.map((bm: any, index: number) => {
-        const label =
-          bm.labels?.[0] ||
-          bm.label ||
-          bm.type ||
-          "Unknown";
+  const fallbackLabelCounts = fallbackBookmarks.reduce(
+    (acc: Record<string, number>, bm: any) => {
+      acc[bm.label] = (acc[bm.label] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
-        return {
-          label,
-          mdisplay: bm.timeSec
-            ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-            : "00:00:00",
-          m: bm.timeSec || 0,
-          s: bm.s || "",
-          o: 0,
-          duration: bm.timeSec
-            ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-            : "00:00:00",
-          id: bm.id || `${label}-${index}`,
-        };
-      }),
-
-      labelCounts: bookmarks.reduce((acc: Record<string, number>, bm: any) => {
-        const label =
-          bm.labels?.[0] ||
-          bm.label ||
-          bm.type ||
-          "Unknown";
-
-        acc[label] = (acc[label] || 0) + 1;
-        return acc;
-      }, {}),
-    });
+  setReportDetail({
+    reportCreatedAt: endTimeText,
+    playbackUrl: streamPlaybackUrl,
+    companyId: values?.company,
+    siteId: values?.site,
+    missionId: values?.mission,
+    startTime: startTimeText,
+    endTime: endTimeText,
+    totalTime: totalTimeText,
+    distance: "-",
+    siteName,
+    deviceName: robotName,
+    robotName,
+    missionName,
+    userName: "sysadmin",
+    workerName: "sysadmin",
+    deviceSn: selectedRobotDetail?.deviceSn || "",
+    totalRecognition: fallbackBookmarks.length,
+    labelCounts: fallbackLabelCounts,
+    bookmarks: fallbackBookmarks,
+  });
+}
 
     showNotification(
       "success",
@@ -511,6 +525,8 @@ const handleStopWork = async () => {
       "Work session stopped successfully."
     );
 
+    remoteSeenActiveRef.current = false;
+    inactivePollCountRef.current = 0;
     setIsReportOpen(true);
   } catch (error: any) {
     showNotification(
@@ -522,6 +538,8 @@ const handleStopWork = async () => {
     );
   } finally {
     playerRef.current?.pause();
+    remoteSeenActiveRef.current = false;
+    inactivePollCountRef.current = 0;
 
     setIsStreaming(false);
     setIsPlaying(false);
@@ -670,8 +688,95 @@ const handleTimeChangeComplete = (value: number) => {
 const [mapRetryKey, setMapRetryKey] = useState(0);
 const [mapReady, setMapReady] = useState(false);
 
+const remoteSeenActiveRef = useRef(false);
+const inactivePollCountRef = useRef(0);
 
+useEffect(() => {
+  if (!selectedRobotDetail?.deviceSn || !streamPlaybackUrl || isReportOpen) return;
 
+  const timer = window.setInterval(async () => {
+    try {
+      const statusRes = await streamApi.status(selectedRobotDetail.deviceSn!);
+
+      const active =
+        statusRes?.active === true ||
+        statusRes?.streaming === true ||
+        statusRes?.sessionStatus === "ACTIVE";
+
+      if (active) {
+        remoteSeenActiveRef.current = true;
+        inactivePollCountRef.current = 0;
+        return;
+      }
+
+      if (!remoteSeenActiveRef.current) {
+        return;
+      }
+
+      inactivePollCountRef.current += 1;
+
+      if (inactivePollCountRef.current < 2) {
+        return;
+      }
+
+      const endTime = new Date();
+      const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
+
+      playerRef.current?.pause();
+
+      setReportDetail({
+        reportCreatedAt: endTimeText,
+        playbackUrl: streamPlaybackUrl,
+        companyId: values?.company,
+        siteId: values?.site,
+        missionId: values?.mission,
+        startTime: workStartTime
+          ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
+          : "-",
+        endTime: endTimeText,
+        totalTime: formatDuration(elapsedSeconds),
+        distance: "-",
+        siteName: siteOptions.find((s) => s.value === values?.site)?.label || "-",
+        deviceName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
+        robotName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
+        missionName: missionOptions.find((m) => m.value === values?.mission)?.label || "-",
+        userName: "sysadmin",
+        workerName: "sysadmin",
+        deviceSn: selectedRobotDetail?.deviceSn || "",
+        totalRecognition: bookmarks.length,
+        bookmarks: [],
+        labelCounts: {},
+      });
+
+      setIsReportOpen(true);
+      setIsStreaming(false);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      setSessionId(null);
+      setStreamPlaybackUrl("");
+      setStreamMapUrl("");
+      setPlayerStatus("OFFLINE");
+      setHasConnectedOnce(false);
+      setMapReady(false);
+      setMapRetryKey(0);
+    } catch (e) {
+      console.error("Failed to poll stream status", e);
+    }
+  }, 3000);
+
+  return () => window.clearInterval(timer);
+}, [
+  selectedRobotDetail?.deviceSn,
+  streamPlaybackUrl,
+  isReportOpen,
+  values?.company,
+  values?.site,
+  values?.mission,
+  workStartTime,
+  elapsedSeconds,
+  bookmarks.length,
+]);
 
 useEffect(() => {
   if (!isStreaming || !streamMapUrl || mapReady) return;
@@ -905,7 +1010,9 @@ useEffect(() => {
   startStream,
 ]);
 
-const showCommonDetection =
+
+
+  const showCommonDetection =
   selectedModules.some((m) =>
     commonModules.some((c) => c.value === m)
   );
@@ -974,7 +1081,7 @@ const SmallStatusBadge = ({
                 <Select
                   placeholder={t("stream_select_company")}
                   options={companyOptions}
-                  disabled={userRole !== 1}
+                  disabled={userRole !== 1 || lockSelection}
                   className="h-[48px]"
                   onChange={(value) => handleSelectChange("company", value)}
                 />
@@ -993,7 +1100,7 @@ const SmallStatusBadge = ({
                 <Select
                   placeholder={t("stream_select_site")}
                   options={siteOptions}
-                  disabled={!values?.company}
+                  disabled={!values?.company || lockSelection}
                   className="h-[48px]"
                   onChange={(value) => handleSelectChange("site", value)}
                 />
@@ -1012,7 +1119,7 @@ const SmallStatusBadge = ({
                 <Select
                   placeholder={t("stream_select_device")}
                   options={deviceOptions}
-                  disabled={!values?.site}
+                  disabled={!values?.site || lockSelection}
                   className="h-[48px]"
                   onChange={(value) => handleSelectChange("device", value)}
                 />

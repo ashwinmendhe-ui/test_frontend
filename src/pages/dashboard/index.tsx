@@ -69,12 +69,30 @@ export default function Dashboard() {
     }));
   }, []);
 
+  const handleDashboardDeviceMessage = useCallback(
+  (message: any) => {
+    console.log("[WS][Dashboard] received", message);
+
+    getDashboard();
+    getDashboardStat();
+  },
+  [getDashboard, getDashboardStat]
+);
+
   useWebSocket(
     import.meta.env.VITE_WS_URL,
     TOPIC.STATUS,
     handleStatusMessage,
     true
   );
+
+  useWebSocket(
+    import.meta.env.VITE_WS_URL,
+    TOPIC.DASHBOARD_DEVICES,
+    handleDashboardDeviceMessage,
+    true
+  );
+
 
   useEffect(() => {
     getDashboard();

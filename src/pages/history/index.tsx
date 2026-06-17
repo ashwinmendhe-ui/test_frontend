@@ -3,7 +3,6 @@ import ActionMenu from "@/components/common/actionMenu";
 import WorkReportModal from "@/components/common/workReportModal";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
 import { useHistoryStore, type HistoryManagementTable } from "@/stores/historyStore";
-import { formatDateTime } from "@/utils/date";
 import { DatePicker, Dropdown, Input } from "antd";
 import type { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
@@ -59,8 +58,7 @@ export default function History() {
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
-      render: (item: string) => <>{formatDateTime(item, true)}</>,
-    },
+      render: (item: string) => <>{item || "-"}</>,    },
     {
       title: t("history_company_name"),
       dataIndex: "companyName",
