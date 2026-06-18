@@ -43,10 +43,25 @@ type PlayerStatus =
   | "RECONNECTING"
   | "LIVE";
 
+
+  const STREAM_SYNC_CHANNEL = "robopilot-stream-sync";
+  const ACTIVE_STREAM_KEY = "robopilot-active-stream";
+
+  type StreamSyncMessage = {
+    type: "STREAM_STARTED" | "STREAM_STOPPED";
+    deviceSn: string;
+    sessionId?: string | null;
+    playbackUrl?: string;
+    mapUrl?: string;
+    startTime?: string;
+    startAtMs?: number;
+  };
+
 export default function StreamIndex() {
   const [reportDetail, setReportDetail] = useState<any>(null);
 const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [workStartTime, setWorkStartTime] = useState<Date | null>(null);
+  const [workStartAtMs, setWorkStartAtMs] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
@@ -80,6 +95,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
   const playerRef = useRef<HLSPlayerRef | null>(null);
+  const streamSyncChannelRef = useRef<BroadcastChannel | null>(null);
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -359,6 +375,44 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     };
   }, [selectedRobotDetail, values?.mission]);
 
+
+  const getCurrentDeviceSn = useCallback(() => {
+    return selectedRobotDetail?.deviceSn || streamPayload.deviceSn || "";
+  }, [selectedRobotDetail?.deviceSn, streamPayload.deviceSn]);
+
+  const clearLocalStreamState = useCallback(() => {
+  playerRef.current?.pause();
+
+  localStorage.removeItem(ACTIVE_STREAM_KEY);
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+  setSessionId(null);
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+  setMapReady(false);
+  setMapRetryKey(0);
+  setElapsedSeconds(0);
+  setWorkStartTime(null);
+  setWorkStartAtMs(null);
+}, []);
+
+  const broadcastStreamMessage = useCallback((message: StreamSyncMessage) => {
+    if (message.type === "STREAM_STARTED") {
+        localStorage.setItem(ACTIVE_STREAM_KEY, JSON.stringify(message));
+      }
+
+      if (message.type === "STREAM_STOPPED") {
+        localStorage.removeItem(ACTIVE_STREAM_KEY);
+      }
+
+      streamSyncChannelRef.current?.postMessage(message);
+        }, []);
+
+
   const handleStartWork = async () => {
   try {
     await form.validateFields();
@@ -385,7 +439,10 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     if (res?.data?.streamId) {
       const streamInfo = await startStream(res.data.streamId);
       const now = new Date();
+      const startAtMs = now.getTime();
+
       setWorkStartTime(now);
+      setWorkStartAtMs(startAtMs);
       setElapsedSeconds(0);
 
       if (!streamInfo?.playback_url) {
@@ -401,6 +458,16 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       setHlsRetryCount(0);
       setHlsRetryKey(0);
       setIsStreaming(streamInfo.state === "RUNNING");
+
+      broadcastStreamMessage({
+      type: "STREAM_STARTED",
+      deviceSn: getCurrentDeviceSn(),
+      sessionId: res?.data?.sessionId || null,
+      playbackUrl: streamInfo.playback_url || "",
+      mapUrl: streamInfo.map_url || "",
+      startTime: now.toISOString(),
+      startAtMs,
+    });
     }
 
     if (res?.data?.sessionId) {
@@ -439,6 +506,13 @@ const handleStopWork = async () => {
     const endTime = new Date();
 
     await streamApi.stop(streamPayload);
+    const stoppedDeviceSn = getCurrentDeviceSn();
+
+    streamSyncChannelRef.current?.postMessage({
+      type: "STREAM_STOPPED",
+      deviceSn: stoppedDeviceSn,
+    });
+    clearLocalStreamState();
 
     const startTimeText = workStartTime
       ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
@@ -895,6 +969,98 @@ useEffect(() => {
 }, [heartBeat, isStreaming, sessionId]);
 
 
+
+useEffect(() => {
+  const channel = new BroadcastChannel(STREAM_SYNC_CHANNEL);
+  streamSyncChannelRef.current = channel;
+
+  const applyActiveStream = (message: StreamSyncMessage) => {
+    if (!message?.deviceSn || !message.playbackUrl) return;
+
+    const currentDeviceSn = getCurrentDeviceSn();
+    if (!currentDeviceSn || currentDeviceSn !== message.deviceSn) return;
+
+    const startedAtMs =
+      message.startAtMs ||
+      (message.startTime ? new Date(message.startTime).getTime() : Date.now());
+
+    const startedAt = new Date(startedAtMs);
+
+    setSessionId(message.sessionId || null);
+    setStreamPlaybackUrl(message.playbackUrl);
+    setStreamMapUrl(message.mapUrl || "");
+    setWorkStartTime(startedAt);
+    setWorkStartAtMs(startedAtMs);
+    setElapsedSeconds(
+      Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
+    );
+    setIsStreaming(true);
+    setIsPlaying(false);
+    setPlayerStatus("LOADING");
+    setHlsRetryCount(0);
+    setHlsRetryKey((prev) => prev + 1);
+    setMapReady(false);
+    setMapRetryKey(0);
+  };
+
+  const savedActiveStream = localStorage.getItem(ACTIVE_STREAM_KEY);
+
+if (savedActiveStream) {
+  try {
+    const parsed = JSON.parse(savedActiveStream);
+
+    if (!parsed?.deviceSn) {
+      localStorage.removeItem(ACTIVE_STREAM_KEY);
+    } else {
+      streamApi
+        .status(parsed.deviceSn)
+        .then((statusResponse) => {
+          const streamStatus =
+            statusResponse?.status ||
+            statusResponse?.sessionStatus ||
+            statusResponse?.session_status;
+
+          if (
+            streamStatus === "ACTIVE" ||
+            streamStatus === "LIVE" ||
+            streamStatus === "WORKING"
+          ) {
+            applyActiveStream(parsed);
+          } else {
+            localStorage.removeItem(ACTIVE_STREAM_KEY);
+            clearLocalStreamState();
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem(ACTIVE_STREAM_KEY);
+          clearLocalStreamState();
+        });
+    }
+  } catch {
+    localStorage.removeItem(ACTIVE_STREAM_KEY);
+  }
+}
+
+  channel.onmessage = (event: MessageEvent<StreamSyncMessage>) => {
+    const message = event.data;
+    if (!message?.type || !message.deviceSn) return;
+
+    if (message.type === "STREAM_STARTED") {
+      applyActiveStream(message);
+    }
+
+    if (message.type === "STREAM_STOPPED") {
+      clearLocalStreamState();
+    }
+  };
+
+  return () => {
+    channel.close();
+    streamSyncChannelRef.current = null;
+  };
+}, [clearLocalStreamState, getCurrentDeviceSn]);
+
+
 useEffect(() => {
   return () => {
     if (retryTimerRef.current) {
@@ -904,14 +1070,30 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  if (!isStreaming || !workStartTime) return;
+  if (!isStreaming || !workStartAtMs) return;
 
-  const timer = window.setInterval(() => {
-    setElapsedSeconds(Math.floor((Date.now() - workStartTime.getTime()) / 1000));
-  }, 1000);
+  const updateElapsed = () => {
+    const nextElapsed = Math.max(
+      0,
+      Math.floor((Date.now() - workStartAtMs) / 1000)
+    );
+
+    setElapsedSeconds(nextElapsed);
+
+    console.log("[TIMER]", {
+      workStartAtMs,
+      workStartTime: new Date(workStartAtMs).toISOString(),
+      elapsedSeconds: nextElapsed,
+      now: new Date().toISOString(),
+    });
+  };
+
+  updateElapsed();
+
+  const timer = window.setInterval(updateElapsed, 1000);
 
   return () => window.clearInterval(timer);
-}, [isStreaming, workStartTime]);
+}, [isStreaming, workStartAtMs]);
 
 
 useEffect(() => {
