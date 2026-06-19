@@ -384,6 +384,10 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   playerRef.current?.pause();
 
   localStorage.removeItem(ACTIVE_STREAM_KEY);
+    setLiveDeviceInfo(null);
+  if (localStorage.getItem(STREAM_OWNER_TAB_KEY) === CURRENT_TAB_ID) {
+    localStorage.removeItem(STREAM_OWNER_TAB_KEY);
+  }
   setIsStreaming(false);
   setIsPlaying(false);
   setCurrentTime(0);
@@ -472,6 +476,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
 
     if (res?.data?.sessionId) {
       setSessionId(res.data.sessionId);
+      localStorage.setItem(STREAM_OWNER_TAB_KEY, CURRENT_TAB_ID);      
       await heartBeat(res.data.sessionId);
     }
 
@@ -640,7 +645,8 @@ if (reportRes) {
       }
 };
 
-
+const STREAM_OWNER_TAB_KEY = "robopilot-stream-owner-tab";
+const CURRENT_TAB_ID = crypto.randomUUID();
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -959,15 +965,19 @@ useEffect(() => {
   useEffect(() => {
   if (!sessionId || !isStreaming) return;
 
-  const interval = setInterval(() => {
+  const isOwnerTab =
+    localStorage.getItem(STREAM_OWNER_TAB_KEY) === CURRENT_TAB_ID;
+
+  if (!isOwnerTab) return;
+
+  const interval = window.setInterval(() => {
     heartBeat(sessionId).catch((error) => {
       console.error("Heartbeat failed:", error);
     });
   }, 30000);
 
-  return () => clearInterval(interval);
+  return () => window.clearInterval(interval);
 }, [heartBeat, isStreaming, sessionId]);
-
 
 
 useEffect(() => {
@@ -1079,13 +1089,6 @@ useEffect(() => {
     );
 
     setElapsedSeconds(nextElapsed);
-
-    console.log("[TIMER]", {
-      workStartAtMs,
-      workStartTime: new Date(workStartAtMs).toISOString(),
-      elapsedSeconds: nextElapsed,
-      now: new Date().toISOString(),
-    });
   };
 
   updateElapsed();
@@ -1440,56 +1443,59 @@ const SmallStatusBadge = ({
               />
             )}
             {/* Vector Space + Travel Route Map */}
-        <div className="grid grid-cols-2 gap-3 min-w-0">
-              {/* Vector Space */}
-              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
-                <SmallStatusBadge
-                  label={t("stream_vector_space")}
-                  status={!isStreaming ? "idle" : mapReady ? "live" : "loading"}
-                />
-
-                {isStreaming && streamMapUrl && mapReady ? (
-                  <HLSPlayer
-                    key={`vector-${streamMapUrl}`}
-                    src={streamMapUrl}
-                    metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
-                    className="w-full h-full object-contain bg-black"
-                    autoPlay
-                    muted
-                    controls={false}
-                    selectedClassIds={[]}
-                    showCommonDetection={false}
-                    showDangerDetection={false}
-                    disableBackgroundTasks={true}
-                    type="vector"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
-                    {isStreaming
-                      ? t("stream_vector_space_loading")
-                      : t("stream_active_after_start")}
-                  </div>
-                )}
-              </div>
-
-              {/* Travel Route Map */}
-              <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+          <div className="grid grid-cols-2 gap-3 min-w-0">
+            {/* Vector Space */}
+            <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
               <SmallStatusBadge
-                  label={t("stream_travel_route_map")}
-                  status={
-                    !isStreaming
-                      ? "idle"
-                      : liveDeviceInfo?.latitude !== undefined &&
-                        liveDeviceInfo?.longitude !== undefined
-                      ? "live"
-                      : "loading"
-                  }
-                />
+                label={t("stream_vector_space")}
+                status={!isStreaming ? "idle" : mapReady ? "live" : "loading"}
+              />
 
+              {isStreaming && streamMapUrl && mapReady ? (
+                <HLSPlayer
+                  key={`vector-${streamMapUrl}`}
+                  src={streamMapUrl}
+                  metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
+                  className="w-full h-full object-contain bg-black"
+                  autoPlay
+                  muted
+                  controls={false}
+                  selectedClassIds={[]}
+                  showCommonDetection={false}
+                  showDangerDetection={false}
+                  disableBackgroundTasks={true}
+                  type="vector"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
+                  {isStreaming
+                    ? t("stream_vector_space_loading")
+                    : t("stream_active_after_start")}
+                </div>
+              )}
+            </div>
+
+            {/* Travel Route Map */}
+            <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+              <SmallStatusBadge
+                label={t("stream_travel_route_map")}
+                status={
+                  !isStreaming
+                    ? "idle"
+                    : liveDeviceInfo?.latitude !== undefined &&
+                      liveDeviceInfo?.longitude !== undefined
+                    ? "live"
+                    : "loading"
+                }
+              />
+
+              {isStreaming &&
+              liveDeviceInfo?.latitude !== undefined &&
+              liveDeviceInfo?.longitude !== undefined ? (
                 <LiveMap
                   currentTime={currentTime}
-                  latitude={liveDeviceInfo?.latitude}
-                  longitude={liveDeviceInfo?.longitude}
+                  latitude={liveDeviceInfo.latitude}
+                  longitude={liveDeviceInfo.longitude}
                   videoUrl={streamPlaybackUrl}
                   gpsData={liveMapGpsData}
                   streamStatus={{
@@ -1503,10 +1509,14 @@ const SmallStatusBadge = ({
                   }}
                   mode="stream"
                 />
-              </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
+                  {t("stream_active_after_start")}
+                </div>
+              )}
             </div>
           </div>
-
+          </div>
           <div className="flex flex-col gap-4 w-[390px] shrink-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-[10px] p-6 min-h-[220px]">
@@ -1532,7 +1542,7 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_battery")}</span>
                     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-                      {liveDeviceInfo?.battery != null
+                      {isStreaming && liveDeviceInfo?.battery != null
                         ? `${liveDeviceInfo.battery}%`
                         : "-"}
                     </span>
@@ -1541,14 +1551,18 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_network_century")}</span>
                     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-                      {liveDeviceInfo?.network ?? "-"}
+                      {isStreaming && liveDeviceInfo?.network
+                        ? liveDeviceInfo.network
+                        : "-"}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span>{t("stream_gps_century")}</span>
                     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-                      {liveDeviceInfo?.gps ?? "-"}
+                      {isStreaming && liveDeviceInfo?.gps != null
+                        ? liveDeviceInfo.gps
+                        : "-"}
                     </span>
                   </div>
                 </div>
@@ -1563,7 +1577,7 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_altitude")}</span>
                     <span className="font-bold text-[#6B7280]">
-                      {liveDeviceInfo?.altitude != null
+                      {isStreaming && liveDeviceInfo?.altitude != null
                         ? `${Number(liveDeviceInfo.altitude).toFixed(2)} m`
                         : "-"}
                     </span>
@@ -1572,7 +1586,7 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_speed")}</span>
                     <span className="font-bold text-[#6B7280]">
-                      {liveDeviceInfo?.speed != null
+                      {isStreaming && liveDeviceInfo?.speed != null
                         ? `${liveDeviceInfo.speed}m/s`
                         : "-"}
                     </span>
@@ -1588,7 +1602,7 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_start_time")}</span>
                     <span className="font-bold text-[#6B7280]">
-                      {workStartTime
+                      {isStreaming && workStartTime
                         ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
                         : "-"}
                     </span>
