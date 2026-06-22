@@ -59,15 +59,15 @@ export default function Dashboard() {
 
   const userRole = detailUserLogin?.roles?.[0];
 
-  const handleStatusMessage = useCallback((message: any) => {
-    const key = message.deviceSn || message.deviceId;
-    if (!key) return;
+  // const handleStatusMessage = useCallback((message: any) => {
+  //   const key = message.deviceSn || message.deviceId;
+  //   if (!key) return;
 
-    setDeviceStatusMap((prev) => ({
-      ...prev,
-      [key]: message,
-    }));
-  }, []);
+  //   setDeviceStatusMap((prev) => ({
+  //     ...prev,
+  //     [key]: message,
+  //   }));
+  // }, []);
 
   const handleDashboardDeviceMessage = useCallback(
   (message: any) => {
@@ -78,13 +78,6 @@ export default function Dashboard() {
   },
   [getDashboard, getDashboardStat]
 );
-
-  useWebSocket(
-    import.meta.env.VITE_WS_URL,
-    TOPIC.STATUS,
-    handleStatusMessage,
-    true
-  );
 
   useWebSocket(
     import.meta.env.VITE_WS_URL,
