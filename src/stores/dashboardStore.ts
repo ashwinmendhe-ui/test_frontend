@@ -32,6 +32,8 @@ interface DashboardStore {
 
   getDashboard: (param?: string) => Promise<void>;
   getDashboardStat: () => Promise<void>;
+  getDashboardSilent: (param?: string) => Promise<void>;
+  getDashboardStatSilent: () => Promise<void>;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -75,6 +77,31 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       console.error("getDashboardStat error:", err);
     } finally {
       set({ loading: false });
+    }
+  },
+  getDashboardSilent: async (param) => {
+    try {
+      const res = await dashboardApi.getList(param);
+      set({ dashboard: res?.data ?? res ?? [] });
+    } catch (err) {
+      console.error("getDashboardSilent error:", err);
+    }
+  },
+  getDashboardStatSilent: async () => {
+    try {
+      const res = await dashboardApi.getStat();
+      set({
+        stat:
+          res?.data ??
+          res ?? {
+            totalCompanies: 0,
+            totalDevices: 0,
+            totalSites: 0,
+            totalUsers: 0,
+          },
+      });
+    } catch (err) {
+      console.error("getDashboardStatSilent error:", err);
     }
   },
 }));

@@ -49,8 +49,15 @@ type DashboardCard = {
 export default function Dashboard() {
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
-  const { dashboard, stat, loading, getDashboard, getDashboardStat } =
-    useDashboardStore();
+  const {
+  dashboard,
+  stat,
+  loading,
+  getDashboard,
+  getDashboardStat,
+  getDashboardSilent,
+  getDashboardStatSilent,
+} = useDashboardStore();
 
   const [searchKeyword, setSearchKeyword] = useState("");
   const [deviceStatusMap, setDeviceStatusMap] = useState<Record<string, any>>(
@@ -73,18 +80,22 @@ export default function Dashboard() {
   (message: any) => {
     console.log("[WS][Dashboard] received", message);
 
-    getDashboard();
-    getDashboardStat();
+    getDashboardSilent();
+    getDashboardStatSilent();
   },
-  [getDashboard, getDashboardStat]
+  [getDashboardSilent, getDashboardStatSilent]
 );
 
-  useWebSocket(
-    import.meta.env.VITE_WS_URL,
-    TOPIC.DASHBOARD_DEVICES,
-    handleDashboardDeviceMessage,
-    true
-  );
+useWebSocket(
+  import.meta.env.VITE_WS_URL,
+  TOPIC.DASHBOARD_DEVICES,
+  handleDashboardDeviceMessage,
+  true,
+  () => {
+    getDashboardSilent();
+    getDashboardStatSilent();
+  }
+);
 
 
   useEffect(() => {

@@ -516,6 +516,7 @@ const handleStopWork = async () => {
     streamSyncChannelRef.current?.postMessage({
       type: "STREAM_STOPPED",
       deviceSn: stoppedDeviceSn,
+      sessionId,
     });
     clearLocalStreamState();
 
@@ -1060,7 +1061,11 @@ if (savedActiveStream) {
     }
 
     if (message.type === "STREAM_STOPPED") {
-      clearLocalStreamState();
+      const currentDeviceSn = getCurrentDeviceSn();
+
+      if (currentDeviceSn && currentDeviceSn === message.deviceSn) {
+        clearLocalStreamState();
+      }
     }
   };
 
