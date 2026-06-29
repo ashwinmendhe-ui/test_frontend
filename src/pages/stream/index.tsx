@@ -90,7 +90,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
     getListBySite: getRobotListBySite,
     getDetail: getRobotDetail,
   } = useRobotStore();
-  const { startStream, heartBeat, createReport } = useStreamStore();
+  const { startStream, heartBeat } = useStreamStore();
 
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
@@ -540,11 +540,6 @@ const handleStopWork = async () => {
     let reportRes: any = null;
 
 if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
-  reportRes = await createReport({
-    deviceSn: selectedRobotDetail.deviceSn,
-    playbackUrl: streamPlaybackUrl,
-    missionId: values.mission,
-  });
 }
 
 if (reportRes) {

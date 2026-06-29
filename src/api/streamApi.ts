@@ -16,13 +16,6 @@ export interface StreamData {
   videoType?: string;
   missionId?: string;
 }
-
-export interface CreateReport {
-  deviceSn: string;
-  playbackUrl: string;
-  missionId: string;
-}
-
 export const streamApi = {
   start: async (data?: StreamData) => {
     const res = await axiosClient.post("/v1/live/streams/start", data);
@@ -50,11 +43,6 @@ export const streamApi = {
     const res = await axiosClient.post(
       `/v1/live/streams/heartbeat?sessionId=${sessionId}`
     );
-    return res.data;
-  },
-
-  createReport: async (data?: CreateReport) => {
-    const res = await axiosClient.post("/v1/history", data);
     return res.data;
   },
 };

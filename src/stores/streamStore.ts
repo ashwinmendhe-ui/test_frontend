@@ -41,7 +41,6 @@ interface Store {
   report: ReportData;
   startStream: (id: string) => Promise<any>;
   heartBeat: (sessionId: string) => Promise<any>;
-  createReport: (data?: CreateReport) => Promise<any>;
 }
 
 const defaultReport: ReportData = {
@@ -102,12 +101,6 @@ export const useStreamStore = create<Store>((set) => ({
 
   heartBeat: async (sessionId: string) => {
     const res = await streamApi.heartBeat(sessionId);
-    return res;
-  },
-
-  createReport: async (data?: CreateReport) => {
-    const res = await streamApi.createReport(data);
-    set({ report: res || defaultReport });
     return res;
   },
 }));
