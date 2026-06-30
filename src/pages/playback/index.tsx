@@ -848,7 +848,6 @@ useEffect(() => {
           marker.timeSec >= 0 && marker.timeSec <= mainDuration;
 
         if (!valid) {
-          console.log("marker filtered by duration:", marker);
         }
 
         return valid;

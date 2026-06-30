@@ -34,6 +34,8 @@ interface DashboardStore {
   getDashboardStat: () => Promise<void>;
   getDashboardSilent: (param?: string) => Promise<void>;
   getDashboardStatSilent: () => Promise<void>;
+  optimisticStopDevice: (deviceSn: string) => void;
+
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -45,6 +47,23 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     totalSites: 0,
     totalUsers: 0,
   },
+
+  optimisticStopDevice: (deviceSn) => {
+  if (!deviceSn) return;
+
+  set((state) => ({
+    dashboard: state.dashboard.map((device) =>
+      device.deviceSn === deviceSn
+        ? {
+            ...device,
+            status: "Online",
+            missionId: undefined,
+            missionName: "",
+          }
+        : device
+    ),
+  }));
+},
 
   getDashboard: async (param) => {
     set({ loading: true });

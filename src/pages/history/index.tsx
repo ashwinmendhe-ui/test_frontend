@@ -24,8 +24,6 @@ export default function History() {
   const [selectedHistory, setSelectedHistory] =
     useState<HistoryManagementTable | null>(null);
   const handleView = async (record: HistoryManagementTable) => {
-  console.log("Selected history row:", record);
-
     await getDetail(record.historyId);
 
     // 🔥 store AFTER API

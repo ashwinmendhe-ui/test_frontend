@@ -293,11 +293,9 @@ export default function UserForm({
       sites: values?.role === 3 ? sites : [],
     };
 
-    console.log("user form submit payload:", JSON.stringify(payload, null, 2));
 
     const res = await onSubmit(payload);
 
-    console.log("user form submit response:", JSON.stringify(res, null, 2));
 
     if (!res) return;
 
@@ -820,7 +818,6 @@ export default function UserForm({
             layout="vertical"
             form={formChangePass}
             onFinish={(passwordValues) => {
-              console.log("Password changed:", passwordValues);
               setIsChangePassOpen(false);
             }}
           >

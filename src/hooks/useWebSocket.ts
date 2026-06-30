@@ -48,19 +48,16 @@ export const useWebSocket = (
         client.debug = () => {};
         stompClient.current = client;
 
-        console.log("[WS] connecting endpoint=", endpoint, "topic=", topic);
 
         client.connect(
           { Authorization: `Bearer ${token}` },
           () => {
-            console.log("[WS] connected topic=", topic);
 
             clearReconnectTimer();
 
             // onReconnect?.();
 
             client.subscribe(topic, (message) => {
-              console.log("[WS] received topic=", topic, "body=", message.body);
 
               if (message.body) {
                 onMessage(JSON.parse(message.body));

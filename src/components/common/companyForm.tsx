@@ -32,12 +32,7 @@ export default function CompanyForm({
   }, [initialValues, form]);
 
   const handleSubmit = async (values: CompanyFormValue) => {
-    console.log("company form submit values:", JSON.stringify(values, null, 2));
-
     const res = await onSubmit(values);
-
-    console.log("company form submit response:", JSON.stringify(res, null, 2));
-
     if (!res) return;
 
     if (

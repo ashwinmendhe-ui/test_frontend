@@ -17,6 +17,7 @@ import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
 import ControlBar from "@/components/common/controlBar";
 import WorkReportModal from "@/components/common/workReportModal";
 import { LiveMap } from "@/components/map/liveMap";
+import { useDashboardStore } from "@/stores/dashboardStore";
 
 
 
@@ -105,6 +106,11 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [streamMapUrl, setStreamMapUrl] = useState("");
 
   const userRole = detailUserLogin?.roles?.[0];
+  const {
+    optimisticStopDevice,
+    getDashboardSilent,
+    getDashboardStatSilent,
+  } = useDashboardStore();
 
   const companyOptions = useMemo(() => {
     if (userRole === 1) {
@@ -361,7 +367,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       deviceSn: selectedRobotDetail?.deviceSn || "",
       urlType: 1,
       videoId: {
-        droneSn: selectedRobotDetail?.droneSn || "1581F7FVC25A700DF473",
+        droneSn: selectedRobotDetail?.droneSn || selectedRobotDetail?.deviceSn || "",
         payloadIndex: {
           type: selectedRobotDetail?.subDeviceInfo?.type || 99,
           subType: selectedRobotDetail?.subDeviceInfo?.subType || 0,
@@ -511,14 +517,25 @@ const handleStopWork = async () => {
     const endTime = new Date();
 
     await streamApi.stop(streamPayload);
-    const stoppedDeviceSn = getCurrentDeviceSn();
 
-    streamSyncChannelRef.current?.postMessage({
-      type: "STREAM_STOPPED",
-      deviceSn: stoppedDeviceSn,
-      sessionId,
-    });
-    clearLocalStreamState();
+const stoppedDeviceSn = getCurrentDeviceSn();
+
+optimisticStopDevice(stoppedDeviceSn);
+
+// Let backend transaction + history creation finish.
+// WebSocket will confirm server truth.
+// Optional delayed confirmation refetch:
+window.setTimeout(() => {
+  getDashboardSilent();
+  getDashboardStatSilent();
+}, 800);
+streamSyncChannelRef.current?.postMessage({
+  type: "STREAM_STOPPED",
+  deviceSn: stoppedDeviceSn,
+  sessionId,
+});
+
+clearLocalStreamState();
 
     const startTimeText = workStartTime
       ? workStartTime.toLocaleString("sv-SE").replace("T", " ")

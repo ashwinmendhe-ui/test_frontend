@@ -62,7 +62,6 @@ const WorkReportModal: React.FC<Props> = ({
     0;
 
   const handleDownload = () => {
-    console.log("Download PDF");
   };
 
   const handleViewDetail = (record: {
@@ -70,8 +69,6 @@ const WorkReportModal: React.FC<Props> = ({
   mdisplay: string;
   duration?: string;
 }) => {
-  console.log("reportMeta before navigate:", reportMeta);
-
   navigate("/playback", {
     state: {
       playbackUrl: detail.playbackUrl,
