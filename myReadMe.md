@@ -125,3 +125,6 @@ npm install @stomp/stompjs sockjs-client
 npm install -D @types/sockjs-client
 
 
+# for build and deploy in s3
+npm run build
+aws s3 sync dist/ s3://robopilot-frontend/ --delete
