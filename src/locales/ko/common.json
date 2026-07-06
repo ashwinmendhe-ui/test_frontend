@@ -625,5 +625,25 @@
 "stream_active_after_start": "작업 시작 이후 활성화됩니다",
 "stream_vector_space_loading": "벡터 공간 로딩 중...",
 "stream_emergency_stop": "비상 정지",
-"playback_map_idle_message": "영상 첨부 이후 활성화됩니다"
+"playback_map_idle_message": "영상 첨부 이후 활성화됩니다",
+
+"work_report_created": "보고서 생성",
+"work_report_download_pdf": "PDF 다운로드",
+
+"work_report_start_work": "작업 시작",
+"work_report_end_task": "작업 종료",
+"work_report_travel_distance": "이동 거리",
+"work_report_time_taken": "소요 시간",
+"work_report_site_name": "현장명",
+"work_report_robot_name": "로봇명",
+"work_report_mission_name": "미션명",
+"work_report_worker": "작업자",
+
+"work_report_total": "총계",
+
+"work_report_number": "번호",
+"work_report_recognition_content": "감지 내용",
+"work_report_detection_types": "감지 유형",
+"work_report_view_details": "상세 보기",
+"common_no_data": "데이터 없음"
 }
