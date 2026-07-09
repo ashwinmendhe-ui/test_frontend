@@ -708,7 +708,8 @@ useEffect(() => {
 // Load robots + missions
 useEffect(() => {
   if (values?.site) {
-    getRobotListBySite(values.site);
+
+    getRobotListBySite(values.site, "site");
     getMissionListBySite(values.site);
   }
 }, [values?.site, getRobotListBySite, getMissionListBySite]);

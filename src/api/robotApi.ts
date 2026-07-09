@@ -33,12 +33,20 @@ export const robotApi = {
     return res.data;
   },
 
-  getListBySite: async (siteId?: string) => {
-    const res = await axiosClient.get(
-      `/v1/devices${siteId ? `?siteId=${siteId}` : ""}`
-    );
-    return res.data;
-  },
+getListBySite: async (siteId?: string, scope?: string) => {
+  const queryParams = new URLSearchParams();
+
+  if (siteId) queryParams.append("siteId", siteId);
+  if (scope) queryParams.append("scope", scope);
+
+  const queryString = queryParams.toString();
+
+  const res = await axiosClient.get(
+    `/v1/devices${queryString ? `?${queryString}` : ""}`
+  );
+
+  return res.data;
+},
 
   getDetail: async (id: string) => {
     const res = await axiosClient.get(`/v1/devices/${id}`);
