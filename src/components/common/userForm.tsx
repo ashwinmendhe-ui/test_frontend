@@ -671,9 +671,9 @@ export default function UserForm({
               ) : (
                 <Select
                   placeholder={t("user_placeholder_select_company")}
-                  className="h-[41px]"
                   options={companyOptions}
                   loading={companyLoading}
+                  disabled={userRole === 2 || userRole === 3}
                 />
               )}
             </Form.Item>
