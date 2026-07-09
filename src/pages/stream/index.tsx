@@ -219,66 +219,25 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
 const currentPlayerStatus = playerStatusConfig[playerStatus];
 
   const aiModules: AIModuleItem[] = useMemo(
-    () => [
-      {
-        value: "construction",
-        label: t("stream_ai_construction"),
-        category: "YOLO",
-        type: "common",
-        color: "#8D6E63",
-      },
-      {
-        value: "hardhat",
-        label: t("stream_ai_hardhat"),
-        category: "YOLO",
-        type: "common",
-        color: "#F4C20D",
-      },
-      {
-        value: "machinery",
-        label: t("stream_ai_machinery"),
-        category: "YOLO",
-        type: "common",
-        color: "#1FB6CF",
-      },
-      {
-        value: "person",
-        label: t("stream_ai_person"),
-        category: "YOLO",
-        type: "common",
-        color: "#7C4DFF",
-      },
-      {
-        value: "no_hardhat",
-        label: t("stream_ai_no_hardhat"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF2D55",
-      },
-      {
-        value: "no_safety_vest",
-        label: t("stream_ai_no_safety_vest"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF9500",
-      },
-      {
-        value: "no_mask",
-        label: t("stream_ai_no_mask"),
-        category: "YOLO",
-        type: "danger",
-        color: "#C218F3",
-      },
-      {
-        value: "fire",
-        label: t("stream_ai_fire"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF3B30",
-      },
-    ],
-    [t]
-  );
+  () => [
+    { value: "construction", label: t("stream_ai_construction"), category: "YOLO", type: "common", color: "#8D6E63" },
+    { value: "hardhat", label: t("stream_ai_hardhat"), category: "YOLO", type: "common", color: "#F4C20D" },
+    { value: "machinery", label: t("stream_ai_machinery"), category: "YOLO", type: "common", color: "#1FB6CF" },
+    { value: "mask", label: t("stream_ai_mask"), category: "YOLO", type: "common", color: "#00BCD4" },
+    { value: "no_mask_common", label: t("stream_ai_no_mask"), category: "YOLO", type: "common", color: "#C218F3" },
+    { value: "person", label: t("stream_ai_person"), category: "YOLO", type: "common", color: "#7C4DFF" },
+    { value: "vehicle", label: t("stream_ai_vehicle"), category: "YOLO", type: "common", color: "#607D8B" },
+    { value: "safety_vest", label: t("stream_ai_vest"), category: "YOLO", type: "common", color: "#34C759" },
+
+    { value: "no_hardhat", label: t("stream_ai_no_hardhat"), category: "YOLO", type: "danger", color: "#FF2D55" },
+    { value: "no_safety_vest", label: t("stream_ai_no_safety_vest"), category: "YOLO", type: "danger", color: "#FF9500" },
+    { value: "no_mask", label: t("stream_ai_no_mask"), category: "YOLO", type: "danger", color: "#C218F3" },
+    { value: "fire", label: t("stream_ai_fire"), category: "YOLO", type: "danger", color: "#FF3B30" },
+    { value: "llm_no_hardhat", label: t("stream_ai_no_hardhat"), category: "LLM", type: "danger", color: "#FF2D55" },
+    { value: "llm_no_safety_vest", label: t("stream_ai_no_safety_vest"), category: "LLM", type: "danger", color: "#FF9500" },
+  ],
+  [t]
+);
 
   const [selectedModules, setSelectedModules] = useState<string[]>(
     aiModules.map((item) => item.value)

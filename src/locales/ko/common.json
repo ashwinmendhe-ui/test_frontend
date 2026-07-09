@@ -645,5 +645,7 @@
 "work_report_recognition_content": "감지 내용",
 "work_report_detection_types": "감지 유형",
 "work_report_view_details": "상세 보기",
-"common_no_data": "데이터 없음"
+"common_no_data": "데이터 없음",
+"stream_ai_mask": "Mask",
+"stream_ai_vehicle": "Vehicle"
 }

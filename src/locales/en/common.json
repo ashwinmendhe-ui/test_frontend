@@ -566,6 +566,8 @@
 "work_report_recognition_content": "Recognition Content",
 "work_report_detection_types": "Detection Type",
 "work_report_view_details": "View Details",
-"common_no_data": "No data"
+"common_no_data": "No data",
+"stream_ai_mask": "Mask",
+"stream_ai_vehicle": "Vehicle"
 
   }
