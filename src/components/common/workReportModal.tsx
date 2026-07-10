@@ -206,7 +206,9 @@ const WorkReportModal: React.FC<Props> = ({
               locale={{
                 emptyText: t("table_no_data"),
               }}
-              rowKey={(r) => `${r.label}-${r.mdisplay}-${r.duration ?? ""}`}
+              rowKey={(r, index) =>
+  `${r.label}-${r.mdisplay || r.duration || index}`
+}
               columns={[
                 {
                   title: t("work_report_number"),
@@ -214,9 +216,9 @@ const WorkReportModal: React.FC<Props> = ({
                   width: 70,
                 },
                 {
-                  title: t("work_report_timestamp"),
-                  dataIndex: "mdisplay",
-                },
+  title: t("work_report_timestamp"),
+  render: (_, record) => record.mdisplay || record.duration || "-",
+},
                 {
                   title: t("work_report_recognition_content"),
                   dataIndex: "label",
