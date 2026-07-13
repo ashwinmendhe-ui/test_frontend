@@ -25,6 +25,7 @@ dist-ssr
 
 ## env files
 .env
+.env.local
 
 
 ## md files
