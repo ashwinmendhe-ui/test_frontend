@@ -742,18 +742,36 @@ const [mapReady, setMapReady] = useState(false);
 
 const remoteSeenActiveRef = useRef(false);
 const inactivePollCountRef = useRef(0);
+const STREAM_STATUS_POLL_INTERVAL_MS = 3000;
+const STREAM_INACTIVE_CONFIRMATION_POLLS = 10;
 
 useEffect(() => {
-  if (!selectedRobotDetail?.deviceSn || !streamPlaybackUrl || isReportOpen) return;
+  if (
+    !selectedRobotDetail?.deviceSn ||
+    !streamPlaybackUrl ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  const deviceSn = selectedRobotDetail.deviceSn;
 
   const timer = window.setInterval(async () => {
     try {
-      const statusRes = await streamApi.status(selectedRobotDetail.deviceSn!);
+      const statusRes = await streamApi.status(deviceSn);
+
+      const remoteSessionStatus =
+        statusRes?.sessionStatus ??
+        statusRes?.session_status ??
+        statusRes?.status;
 
       const active =
         statusRes?.active === true ||
         statusRes?.streaming === true ||
-        statusRes?.sessionStatus === "ACTIVE";
+        remoteSessionStatus === "ACTIVE" ||
+        remoteSessionStatus === "RUNNING" ||
+        remoteSessionStatus === "LIVE" ||
+        remoteSessionStatus === "WORKING";
 
       if (active) {
         remoteSeenActiveRef.current = true;
@@ -767,12 +785,52 @@ useEffect(() => {
 
       inactivePollCountRef.current += 1;
 
-      if (inactivePollCountRef.current < 2) {
+      console.warn("[StreamStatus] Inactive response", {
+        deviceSn,
+        inactivePollCount: inactivePollCountRef.current,
+        remoteSessionStatus,
+        active: statusRes?.active,
+        streaming: statusRes?.streaming,
+      });
+
+      if (
+        inactivePollCountRef.current <
+        STREAM_INACTIVE_CONFIRMATION_POLLS
+      ) {
         return;
       }
 
+      const confirmationRes = await streamApi.status(deviceSn);
+
+      const confirmationStatus =
+        confirmationRes?.sessionStatus ??
+        confirmationRes?.session_status ??
+        confirmationRes?.status;
+
+      const confirmedActive =
+        confirmationRes?.active === true ||
+        confirmationRes?.streaming === true ||
+        confirmationStatus === "ACTIVE" ||
+        confirmationStatus === "RUNNING" ||
+        confirmationStatus === "LIVE" ||
+        confirmationStatus === "WORKING";
+
+      if (confirmedActive) {
+        remoteSeenActiveRef.current = true;
+        inactivePollCountRef.current = 0;
+        return;
+      }
+
+      console.warn("[StreamStatus] Confirmed inactive", {
+        deviceSn,
+        statusRes,
+        confirmationRes,
+      });
+
       const endTime = new Date();
-      const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
+      const endTimeText = endTime
+        .toLocaleString("sv-SE")
+        .replace("T", " ");
 
       playerRef.current?.pause();
 
@@ -788,13 +846,24 @@ useEffect(() => {
         endTime: endTimeText,
         totalTime: formatDuration(elapsedSeconds),
         distance: "-",
-        siteName: siteOptions.find((s) => s.value === values?.site)?.label || "-",
-        deviceName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
-        robotName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
-        missionName: missionOptions.find((m) => m.value === values?.mission)?.label || "-",
+        siteName:
+          siteOptions.find((site) => site.value === values?.site)?.label ||
+          "-",
+        deviceName:
+          selectedRobotDetail.deviceName ||
+          selectedRobotDetail.deviceSn ||
+          "-",
+        robotName:
+          selectedRobotDetail.deviceName ||
+          selectedRobotDetail.deviceSn ||
+          "-",
+        missionName:
+          missionOptions.find(
+            (mission) => mission.value === values?.mission
+          )?.label || "-",
         userName: "sysadmin",
         workerName: "sysadmin",
-        deviceSn: selectedRobotDetail?.deviceSn || "",
+        deviceSn,
         totalRecognition: bookmarks.length,
         bookmarks: [],
         labelCounts: {},
@@ -812,14 +881,18 @@ useEffect(() => {
       setHasConnectedOnce(false);
       setMapReady(false);
       setMapRetryKey(0);
-    } catch (e) {
-      console.error("Failed to poll stream status", e);
+
+      remoteSeenActiveRef.current = false;
+      inactivePollCountRef.current = 0;
+    } catch (error) {
+      console.error("[StreamStatus] Failed to poll stream status", error);
     }
-  }, 3000);
+  }, STREAM_STATUS_POLL_INTERVAL_MS);
 
   return () => window.clearInterval(timer);
 }, [
   selectedRobotDetail?.deviceSn,
+  selectedRobotDetail?.deviceName,
   streamPlaybackUrl,
   isReportOpen,
   values?.company,
@@ -828,6 +901,8 @@ useEffect(() => {
   workStartTime,
   elapsedSeconds,
   bookmarks.length,
+  siteOptions,
+  missionOptions,
 ]);
 
 useEffect(() => {
@@ -1746,7 +1821,6 @@ const SmallStatusBadge = ({
           onClose={handleReportCancel}
           detail={reportDetail}
           reportMeta={reportDetail}
-          autoDownload={false}
         />
       )}
     </div>
