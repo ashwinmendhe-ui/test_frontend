@@ -11,6 +11,7 @@ interface ActionMenuProps {
   isShowDownload?: boolean;
   isShowDelete?: boolean;
   editLabel?: string;
+  isDownloading?: boolean;
 }
 
 export default function ActionMenu({
@@ -21,6 +22,7 @@ export default function ActionMenu({
   isShowDownload = false,
   isShowDelete = true,
   editLabel,
+  isDownloading = false,
 }: ActionMenuProps) {
   const { t } = useTranslation();
 
@@ -28,26 +30,41 @@ export default function ActionMenu({
     <div className="absolute top-0 right-8 bg-white rounded-xl shadow-[4px_4px_4px_0px_#0000000D] overflow-hidden w-[140px]">
       {isShowEdit && (
         <button
-          onClick={onEdit}
-          className="w-full h-11 flex items-center gap-3 px-5 py-4 hover:border-transparent!"
-        >
-          <img src={EditIcon} alt="Edit icon" />
-          <span className="text-xs font-semibold text-[#374151]">
-            {editLabel || t("table_edit")}
-          </span>
-        </button>
+  onClick={onEdit}
+  className="w-full h-11 flex items-center gap-3 px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
+>
+  <img src={EditIcon} alt="Edit icon" />
+
+  <span className="text-xs font-semibold text-[#374151]">
+    {editLabel || t("table_edit")}
+  </span>
+</button>
       )}
 
       {isShowDownload && (
         <>
           <div className="h-px bg-[#E5E7EB]" />
-          <button
+         <button
             onClick={onDownload}
-            className="w-full h-11 flex items-center gap-3 px-5 py-4 hover:border-transparent!"
+            disabled={isDownloading}
+            className={`w-full h-11 flex items-center gap-3 px-5 py-4 hover:border-transparent! ${
+              isDownloading
+                ? "bg-gray-200 cursor-not-allowed opacity-70"
+                : "bg-white hover:bg-gray-50"
+            }`}
           >
-            <img src={DownloadIcon} alt="Download icon" />
-            <span className="text-xs font-semibold text-[#374151]">
-              {t("table_download")}
+            <img
+              src={DownloadIcon}
+              alt="Download icon"
+              className={isDownloading ? "opacity-50" : ""}
+            />
+
+            <span
+              className={`text-xs font-semibold ${
+                isDownloading ? "text-gray-500" : "text-[#374151]"
+              }`}
+            >
+              {isDownloading ? "Downloading..." : t("table_download")}
             </span>
           </button>
         </>
@@ -56,15 +73,16 @@ export default function ActionMenu({
       {isShowDelete && (
         <>
           <div className="h-px bg-[#E5E7EB]" />
-          <button
-            onClick={onDelete}
-            className="w-full h-11 flex items-center gap-3 px-5 py-4 hover:border-transparent!"
-          >
-            <img src={DeleteIcon} alt="Delete icon" />
-            <span className="text-xs font-semibold text-[#374151]">
-              {t("table_delete")}
-            </span>
-          </button>
+         <button
+          onClick={onDelete}
+          className="w-full h-11 flex items-center gap-3 px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
+        >
+          <img src={DeleteIcon} alt="Delete icon" />
+
+          <span className="text-xs font-semibold text-[#374151]">
+            {t("table_delete")}
+          </span>
+        </button>
         </>
       )}
     </div>

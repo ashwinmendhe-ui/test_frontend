@@ -52,7 +52,7 @@ interface Store {
   list: HistoryManagementTable[];
   detail: ReportData;
   getList: (param?: string, from?: string, to?: string) => void;
-  getDetail: (id: string) => void;
+  getDetail: (id: string) => Promise<ReportData>;
   downloadHistory: (id: string) => Promise<{ code?: number | string; message?: string }>;
 }
 
@@ -115,29 +115,34 @@ export const useHistoryStore = create<Store>((set) => ({
     }
   },
 
-  getDetail: async (id) => {
-    try {
-      set({ loading: true });
+ getDetail: async (id) => {
+  try {
+    set({ loading: true });
 
-      const res = await historyApi.getDetail(id);
+    const res = await historyApi.getDetail(id);
 
-      set({
-        detail: {
-          ...res,
-          robotName: res.deviceName,
-          workerName: res.userName,
-          duration: res.totalTime,
-          reportCreatedAt: res.endTime || res.startTime,
-          labelCounts: res.labelCounts || {},
-          bookmarks: res.bookmarks || [],
-        },
-      });
-    } catch (error) {
-      console.error("History detail API error:", error);
-    } finally {
-      set({ loading: false });
-    }
-  },
+    const normalizedDetail: ReportData = {
+      ...res,
+      robotName: res.deviceName,
+      workerName: res.userName,
+      duration: res.totalTime,
+      reportCreatedAt: res.endTime || res.startTime,
+      labelCounts: res.labelCounts || {},
+      bookmarks: res.bookmarks || [],
+    };
+
+    set({
+      detail: normalizedDetail,
+    });
+
+    return normalizedDetail;
+  } catch (error) {
+    console.error("History detail API error:", error);
+    throw error;
+  } finally {
+    set({ loading: false });
+  }
+},
 
   downloadHistory: async () => {
     return { code: 0 };

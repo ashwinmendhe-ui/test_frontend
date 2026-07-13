@@ -2,13 +2,16 @@ import ActionIcon from "@/assets/table-action-icon.svg";
 import ActionMenu from "@/components/common/actionMenu";
 import WorkReportModal from "@/components/common/workReportModal";
 import { SortableTable, type SortableTableColumn } from "@/components/common/table";
-import { useHistoryStore, type HistoryManagementTable } from "@/stores/historyStore";
-import { DatePicker, Dropdown, Input } from "antd";
+import { useHistoryStore, type HistoryManagementTable, type ReportData, } from "@/stores/historyStore";
+import { DatePicker, Dropdown, Input , message} from "antd";
 import type { Dayjs } from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
+
+import WorkReportContent from "@/components/common/WorkReportContent";
+import { downloadWorkReportPdf } from "@/utils/downloadWorkReportPdf";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -18,31 +21,38 @@ export default function History() {
   const { loading, list, getList, getDetail, detail } = useHistoryStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [autoDownload, setAutoDownload] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedHistory, setSelectedHistory] =
     useState<HistoryManagementTable | null>(null);
+
   const handleView = async (record: HistoryManagementTable) => {
-    await getDetail(record.historyId);
-
-    // 🔥 store AFTER API
-    setSelectedHistory(record);
-
-    setAutoDownload(false);
-    setIsModalOpen(true);
-  };
-
+  await getDetail(record.historyId);
+  setSelectedHistory(record);
+  setIsModalOpen(true);
+};
   const handleDownload = async (record: HistoryManagementTable) => {
-    await getDetail(record.historyId);
-    setAutoDownload(true);
-    setIsModalOpen(true);
-  };
+  if (downloadingHistoryId !== null) {
+    return;
+  }
+
+  try {
+    setDownloadingHistoryId(record.historyId);
+
+    const reportDetail = await getDetail(record.historyId);
+
+    setSelectedHistory(record);
+    setDownloadDetail(reportDetail);
+  } catch (error) {
+    console.error("Failed to prepare work report PDF:", error);
+    message.error("Failed to download PDF.");
+    setDownloadingHistoryId(null);
+  }
+};
 
   const handleCancel = () => {
-    setIsModalOpen(false);
-    setAutoDownload(false);
-  };
+  setIsModalOpen(false);
+};
 
   const columns = [
     {
@@ -107,13 +117,14 @@ export default function History() {
           trigger={["hover"]}
           popupRender={() => (
             <ActionMenu
-              onEdit={() => handleView(record)}
-              onDownload={() => handleDownload(record)}
-              isShowEdit={true}
-              isShowDownload={true}
-              isShowDelete={false}
-              editLabel={t("history_view_report")}
-            />
+            onEdit={() => handleView(record)}
+            onDownload={() => handleDownload(record)}
+            isShowEdit={true}
+            isShowDownload={true}
+            isShowDelete={false}
+            editLabel={t("history_view_report")}
+            isDownloading={downloadingHistoryId === record.historyId}
+          />
           )}
         >
           <a onClick={(e) => e.preventDefault()}>
@@ -151,9 +162,63 @@ export default function History() {
     setDateRange(dates);
   };
 
+
+  const directDownloadRef = useRef<HTMLDivElement>(null);
+
+const [downloadDetail, setDownloadDetail] =
+  useState<ReportData | null>(null);
+
+const [downloadingHistoryId, setDownloadingHistoryId] =
+  useState<string | number | null>(null);
+
   useEffect(() => {
     getList();
   }, [getList]);
+
+  useEffect(() => {
+  if (
+    !downloadDetail ||
+    !directDownloadRef.current ||
+    downloadingHistoryId === null
+  ) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const generatePdf = async () => {
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
+      if (cancelled || !directDownloadRef.current) {
+        return;
+      }
+
+      await downloadWorkReportPdf(
+        directDownloadRef.current,
+        downloadDetail
+      );
+    } catch (error) {
+      console.error("Failed to download work report PDF:", error);
+      message.error("Failed to download PDF.");
+    } finally {
+      if (!cancelled) {
+        setDownloadDetail(null);
+        setDownloadingHistoryId(null);
+      }
+    }
+  };
+
+  void generatePdf();
+
+  return () => {
+    cancelled = true;
+  };
+}, [downloadDetail, downloadingHistoryId]);
 
   return (
     <>
@@ -187,9 +252,29 @@ export default function History() {
         open={isModalOpen}
         onClose={handleCancel}
         detail={detail}
-        reportMeta={selectedHistory}   // 🔥 IMPORTANT
-        autoDownload={autoDownload}
+        reportMeta={selectedHistory}
       />
+
+      {downloadDetail && (
+  <div
+    aria-hidden="true"
+    style={{
+      position: "fixed",
+      left: "-10000px",
+      top: 0,
+      width: "1200px",
+      pointerEvents: "none",
+      opacity: 0,
+    }}
+  >
+    <WorkReportContent
+      detail={downloadDetail}
+      reportMeta={selectedHistory}
+      reportRef={directDownloadRef}
+      isExportingPdf={true}
+    />
+  </div>
+)}
     </>
   );
 }
