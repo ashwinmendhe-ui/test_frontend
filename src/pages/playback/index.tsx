@@ -896,8 +896,8 @@ const playbackMapGpsData = useMemo(() => {
 }, [playbackLatitude, playbackLongitude, currentTime]);
 
   return (
-  <div className="w-full h-full overflow-auto">
-    <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
+<div className="w-full h-full overflow-auto text-[#111827] bg-[#F6F7F9]">
+      <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
       <div className="min-w-[700px] flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px] overflow-hidden">
         <Form layout="vertical" form={form}>
           
@@ -1322,7 +1322,7 @@ const playbackMapGpsData = useMemo(() => {
       <div className="grid grid-cols-2 gap-3">
         {/* Robot Status */}
         <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-          <h2 className="text-[20px] font-bold mb-8">
+          <h2 className="text-[20px] font-bold mb-8 text-[#111827]">
             {t("playback_robot_status")}
           </h2>
 
@@ -1359,12 +1359,12 @@ const playbackMapGpsData = useMemo(() => {
 
        {/* Operation Info */}
 <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-  <h2 className="text-[20px] font-bold mb-8">
+  <h2 className="text-[20px] font-bold mb-8 text-[#111827]">
     {t("playback_operation_info")}
   </h2>
 
-  <div className="space-y-6 text-sm">
-    <div className="flex justify-between">
+<div className="space-y-6 text-sm text-[#111827]">
+      <div className="flex justify-between">
       <span>{t("stream_info_altitude")}</span>
       <span className="font-bold text-[#6B7280]">
   {selectedVideoInfo?.altitude != null
@@ -1408,7 +1408,9 @@ const playbackMapGpsData = useMemo(() => {
 
       <div className="w-[390px] shrink-0 px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
         <div className="w-full p-6 bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-4">{t("playback_selected_video")}</h2>
+          <h2 className="text-[20px] font-bold mb-4 text-[#111827]">
+            {t("playback_selected_video")}
+          </h2>
 
           <div className="space-y-3">
             {selectedVideoItems.length === 0 ? (
@@ -1446,12 +1448,14 @@ const playbackMapGpsData = useMemo(() => {
         </div>
 
         <div className="w-full p-6 h-[350px] bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-5">{t("stream_ai_module")}</h2>
+          <h2 className="text-[20px] font-bold mb-5 text-[#111827]">
+            {t("stream_ai_module")}
+          </h2>
 
           <div className="flex gap-3 h-[calc(100%-36px)]">
             <div className="flex-1 flex flex-col">
               <div className="flex items-start justify-between mb-3">
-                <div className="text-[16px] font-bold leading-[1.05]">
+                <div className="text-[16px] font-bold leading-[1.05] text-[#111827]">
                   {t("stream_ai_common")}
                 </div>
                 <div className="text-[13px] text-gray-500 flex items-center">
@@ -1510,7 +1514,7 @@ const playbackMapGpsData = useMemo(() => {
 
             <div className="flex-1 flex flex-col">
               <div className="flex items-start justify-between mb-3">
-                <div className="text-[16px] font-bold leading-[1.05]">
+                <div className="text-[16px] font-bold leading-[1.05] text-[#111827]">
                   {t("stream_ai_danger")}
                 </div>
                 <div className="text-[13px] text-gray-500 flex items-center">
@@ -1570,7 +1574,9 @@ const playbackMapGpsData = useMemo(() => {
         </div>
 
         <div className="w-full p-6 bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-6">{t("playback_route_map")}</h2>
+          <h2 className="text-[20px] font-bold mb-6 text-[#111827]">
+            {t("playback_route_map")}
+          </h2>
           <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] overflow-hidden">
             {selectedVideos.length > 0 ? (
               <LiveMap
