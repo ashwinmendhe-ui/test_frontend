@@ -47,6 +47,11 @@ type PlayerStatus =
 
   const STREAM_SYNC_CHANNEL = "robopilot-stream-sync";
   const ACTIVE_STREAM_KEY = "robopilot-active-stream";
+  const STREAM_OWNER_TAB_KEY = "robopilot-stream-owner-tab";
+
+  const CURRENT_TAB_ID =
+    crypto?.randomUUID?.() ||
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   type StreamSyncMessage = {
     type: "STREAM_STARTED" | "STREAM_STOPPED";
@@ -617,8 +622,7 @@ if (reportRes) {
       }
 };
 
-const STREAM_OWNER_TAB_KEY = "robopilot-stream-owner-tab";
-const CURRENT_TAB_ID = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
