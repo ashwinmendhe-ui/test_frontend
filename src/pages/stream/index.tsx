@@ -63,6 +63,23 @@ type PlayerStatus =
     startAtMs?: number;
   };
 
+  const CLASS_LABELS: Record<number, string> = {
+    0: "Construction",
+    1: "Hardhat",
+    2: "Mask",
+    3: "NO-Hardhat",
+    4: "NO-Mask",
+    5: "NO-Safety Vest",
+    6: "Person",
+    7: "Safety Cone",
+    8: "Safety Vest",
+    9: "Machinery",
+    10: "Vehicle",
+    20: "NO-Hardhat(LLM)",
+    21: "NO-Safety Vest(LLM)",
+    22: "NO-Safety Rope(LLM)",
+  };
+
 export default function StreamIndex() {
   const [reportDetail, setReportDetail] = useState<any>(null);
 const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
@@ -132,22 +149,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
       },
     ];
   }, [companyList, detailUserLogin, userRole]);
-  const CLASS_LABELS: Record<number, string> = {
-    0: "Construction",
-    1: "Hardhat",
-    2: "Mask",
-    3: "NO-Hardhat",
-    4: "NO-Mask",
-    5: "NO-Safety Vest",
-    6: "Person",
-    7: "Safety Cone",
-    8: "Safety Vest",
-    9: "Machinery",
-    10: "Vehicle",
-    20: "NO-Hardhat(LLM)",
-    21: "NO-Safety Vest(LLM)",
-    22: "NO-Safety Rope(LLM)",
-  };
+  
   const siteOptions = useMemo(
     () =>
       siteList.map((item) => ({
@@ -939,22 +941,41 @@ useEffect(() => {
 
 
 useEffect(() => {
-  if (!streamPlaybackUrl || !isStreaming) return;
+  if (!streamPlaybackUrl || !isStreaming) {
+    return;
+  }
+
+  let cancelled = false;
+  let timeoutId: number | null = null;
+  let controller: AbortController | null = null;
 
   const fetchBookmarks = async () => {
+    if (cancelled) {
+      return;
+    }
+
+    controller = new AbortController();
+
     try {
       const bookmarkUrl = streamPlaybackUrl.replace(
         "index.m3u8",
         "bookmark.ndjson"
       );
 
-      const response = await fetch(bookmarkUrl);
+      const response = await fetch(bookmarkUrl, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-      if (!response.ok) {
+      if (!response.ok || cancelled) {
         return;
       }
 
       const text = await response.text();
+
+      if (cancelled) {
+        return;
+      }
 
       const lines = text
         .split("\n")
@@ -962,7 +983,6 @@ useEffect(() => {
         .filter(Boolean);
 
       const parsedRaw = lines.map((line) => JSON.parse(line));
-
       const firstTimestamp = parsedRaw[0]?.m || 0;
 
       const parsed = parsedRaw.map((item, index) => {
@@ -988,17 +1008,33 @@ useEffect(() => {
 
       setBookmarks(parsed);
     } catch (error) {
-      console.error("Failed to fetch bookmarks:", error);}
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      console.error("Failed to fetch bookmarks:", error);
+    } finally {
+      if (!cancelled) {
+        timeoutId = window.setTimeout(fetchBookmarks, 3000);
+      }
+    }
   };
 
   fetchBookmarks();
 
-  const interval = window.setInterval(fetchBookmarks, 3000);
-
   return () => {
-    window.clearInterval(interval);
+    cancelled = true;
+
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    controller?.abort();
   };
-}, [streamPlaybackUrl, isStreaming, CLASS_LABELS]);
+}, [streamPlaybackUrl, isStreaming]);
 
   useEffect(() => {
     if (userRole === 1) {
