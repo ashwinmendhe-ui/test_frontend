@@ -81,7 +81,7 @@ const handleViewDetail = (record: {
 };
 
   return (
-  <Modal open={open} onCancel={onClose} footer={null} width={1250}>
+  <Modal open={open} onCancel={onClose} footer={null} width={1250} closable={false}>
     <div className="flex justify-between items-center mb-4">
       <div className="flex items-end gap-4">
         <h2 className="text-2xl font-semibold">
