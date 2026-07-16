@@ -385,7 +385,8 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
         localStorage.removeItem(ACTIVE_STREAM_KEY);
       }
 
-      streamSyncChannelRef.current?.postMessage(message);
+      // streamSyncChannelRef.current?.postMessage(message);
+      broadcastStreamMessage(message);
         }, []);
 
 
@@ -484,108 +485,116 @@ const handleStopWork = async () => {
 
     await streamApi.stop(streamPayload);
 
-const stoppedDeviceSn = getCurrentDeviceSn();
+    const stoppedDeviceSn = getCurrentDeviceSn();
 
-optimisticStopDevice(stoppedDeviceSn);
+    optimisticStopDevice(stoppedDeviceSn);
 
-// Let backend transaction + history creation finish.
-// WebSocket will confirm server truth.
-// Optional delayed confirmation refetch:
-window.setTimeout(() => {
-  getDashboardSilent();
-  getDashboardStatSilent();
-}, 800);
-streamSyncChannelRef.current?.postMessage({
-  type: "STREAM_STOPPED",
-  deviceSn: stoppedDeviceSn,
-  sessionId,
-});
+    window.setTimeout(() => {
+      getDashboardSilent();
+      getDashboardStatSilent();
+    }, 800);
 
-clearLocalStreamState();
+    broadcastStreamMessage({
+      type: "STREAM_STOPPED",
+      deviceSn: stoppedDeviceSn,
+      sessionId,
+    });
+
+    clearLocalStreamState();
 
     const startTimeText = workStartTime
       ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
       : "-";
 
-    const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
+    const endTimeText = endTime
+      .toLocaleString("sv-SE")
+      .replace("T", " ");
 
     const totalTimeText = formatDuration(elapsedSeconds);
 
     const siteName =
-      siteOptions.find((s) => s.value === values?.site)?.label || "-";
+      siteOptions.find((site) => site.value === values?.site)?.label || "-";
 
     const robotName =
-      selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-";
+      selectedRobotDetail?.deviceName ||
+      selectedRobotDetail?.deviceSn ||
+      "-";
 
     const missionName =
-      missionOptions.find((m) => m.value === values?.mission)?.label || "-";
+      missionOptions.find(
+        (mission) => mission.value === values?.mission
+      )?.label || "-";
 
-    let reportRes: any = null;
+    const fallbackBookmarks = bookmarks.map(
+      (bookmark: any, index: number) => {
+        const label =
+          bookmark.labels?.[0] ||
+          bookmark.label ||
+          bookmark.type ||
+          "Unknown";
 
-if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
-}
+        return {
+          label,
+          mdisplay: bookmark.timeSec
+            ? new Date(bookmark.timeSec * 1000)
+                .toISOString()
+                .substring(11, 19)
+            : "00:00:00",
+          m: bookmark.timeSec || 0,
+          s: bookmark.s || "",
+          o: 0,
+          duration: bookmark.timeSec
+            ? new Date(bookmark.timeSec * 1000)
+                .toISOString()
+                .substring(11, 19)
+            : "00:00:00",
+          id: bookmark.id || `${label}-${index}`,
+        };
+      }
+    );
 
-if (reportRes) {
-  setReportDetail(reportRes);
-} else {
-  const fallbackBookmarks = bookmarks.map((bm: any, index: number) => {
-    const label = bm.labels?.[0] || bm.label || bm.type || "Unknown";
+    const fallbackLabelCounts = fallbackBookmarks.reduce(
+      (acc: Record<string, number>, bookmark: any) => {
+        acc[bookmark.label] =
+          (acc[bookmark.label] || 0) + 1;
 
-    return {
-      label,
-      mdisplay: bm.timeSec
-        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-        : "00:00:00",
-      m: bm.timeSec || 0,
-      s: bm.s || "",
-      o: 0,
-      duration: bm.timeSec
-        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-        : "00:00:00",
-      id: bm.id || `${label}-${index}`,
-    };
-  });
+        return acc;
+      },
+      {}
+    );
 
-  const fallbackLabelCounts = fallbackBookmarks.reduce(
-    (acc: Record<string, number>, bm: any) => {
-      acc[bm.label] = (acc[bm.label] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+    setReportDetail({
+      reportCreatedAt: endTimeText,
+      playbackUrl: streamPlaybackUrl,
+      companyId: values?.company,
+      siteId: values?.site,
+      missionId: values?.mission,
+      startTime: startTimeText,
+      endTime: endTimeText,
+      totalTime: totalTimeText,
+      distance: "-",
+      siteName,
+      deviceName: robotName,
+      robotName,
+      missionName,
+      userName: "sysadmin",
+      workerName: "sysadmin",
+      deviceSn: selectedRobotDetail?.deviceSn || "",
+      totalRecognition: fallbackBookmarks.length,
+      labelCounts: fallbackLabelCounts,
+      bookmarks: fallbackBookmarks,
+    });
 
-  setReportDetail({
-    reportCreatedAt: endTimeText,
-    playbackUrl: streamPlaybackUrl,
-    companyId: values?.company,
-    siteId: values?.site,
-    missionId: values?.mission,
-    startTime: startTimeText,
-    endTime: endTimeText,
-    totalTime: totalTimeText,
-    distance: "-",
-    siteName,
-    deviceName: robotName,
-    robotName,
-    missionName,
-    userName: "sysadmin",
-    workerName: "sysadmin",
-    deviceSn: selectedRobotDetail?.deviceSn || "",
-    totalRecognition: fallbackBookmarks.length,
-    labelCounts: fallbackLabelCounts,
-    bookmarks: fallbackBookmarks,
-  });
-}
+    remoteSeenActiveRef.current = false;
+    inactivePollCountRef.current = 0;
+
+    setIsReportOpen(true);
 
     showNotification(
       "success",
       "Stream stopped",
       "Work session stopped successfully."
     );
-
-    remoteSeenActiveRef.current = false;
-    inactivePollCountRef.current = 0;
-    setIsReportOpen(true);
   } catch (error: any) {
     showNotification(
       "error",
@@ -594,34 +603,14 @@ if (reportRes) {
         error?.message ||
         "Unable to stop stream."
     );
+
+    /*
+     * Important:
+     * Do not clear the active stream UI when the server rejected Stop.
+     */
   } finally {
-    playerRef.current?.pause();
-    remoteSeenActiveRef.current = false;
-    inactivePollCountRef.current = 0;
-
-    setIsStreaming(false);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-
-    setSessionId(null);
-    setStreamPlaybackUrl("");
-    setStreamMapUrl("");
-
-    setBookmarks([]);
-    setLiveDeviceInfo(null);
-    setWorkStartTime(null);
-    setElapsedSeconds(0);
-
-    setHlsRetryCount(0);
-    setHlsRetryKey(0);
-
     setIsLoading(false);
-    setPlayerStatus("OFFLINE");
-    setHasConnectedOnce(false);
-    setMapReady(false);
-    setMapRetryKey(0);
-      }
+  }
 };
 
 
@@ -1049,21 +1038,56 @@ useEffect(() => {
     }
   }, [detailUserLogin, form, getSiteListByCompany, userRole]);
 
-  useEffect(() => {
+ useEffect(() => {
   if (!sessionId || !isStreaming) return;
 
-  const isOwnerTab =
-    localStorage.getItem(STREAM_OWNER_TAB_KEY) === CURRENT_TAB_ID;
+  const claimOwnershipIfNeeded = () => {
+    const currentOwner =
+      localStorage.getItem(STREAM_OWNER_TAB_KEY);
 
-  if (!isOwnerTab) return;
+    if (!currentOwner) {
+      localStorage.setItem(
+        STREAM_OWNER_TAB_KEY,
+        CURRENT_TAB_ID
+      );
 
-  const interval = window.setInterval(() => {
-    heartBeat(sessionId).catch((error) => {
+      return true;
+    }
+
+    return currentOwner === CURRENT_TAB_ID;
+  };
+
+  const sendHeartbeat = async () => {
+    const isOwner = claimOwnershipIfNeeded();
+
+    if (!isOwner) {
+      return;
+    }
+
+    try {
+      await heartBeat(sessionId);
+    } catch (error) {
       console.error("Heartbeat failed:", error);
-    });
-  }, 30000);
+    }
+  };
 
-  return () => window.clearInterval(interval);
+  sendHeartbeat();
+
+  const interval = window.setInterval(
+    sendHeartbeat,
+    30000
+  );
+
+  return () => {
+    window.clearInterval(interval);
+
+    if (
+      localStorage.getItem(STREAM_OWNER_TAB_KEY) ===
+      CURRENT_TAB_ID
+    ) {
+      localStorage.removeItem(STREAM_OWNER_TAB_KEY);
+    }
+  };
 }, [heartBeat, isStreaming, sessionId]);
 
 
