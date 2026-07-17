@@ -56,6 +56,11 @@ const defaultReport: ReportData = {
   bookmarks: [],
 };
 
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
 export const useStreamStore = create<Store>((set) => ({
   loading: false,
   list: [],
@@ -67,32 +72,76 @@ export const useStreamStore = create<Store>((set) => ({
       return null;
     }
 
-    const delay = (ms: number) =>
-      new Promise((resolve) => setTimeout(resolve, ms));
-
     const maxAttempts = 10;
     const intervalMs = 1000;
+
     let lastData: any = null;
 
     set({ loading: true });
 
     try {
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const resp = await streamApi.startStream(id);
-        lastData = resp?.data ?? resp;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          /*
+           * This method is being used to retrieve/poll stream information.
+           * Keep it unchanged until the API method name is verified.
+           */
+          const response = await streamApi.startStream(id);
 
-        const state = lastData?.state;
-        const playbackUrl = lastData?.playback_url;
+          lastData = response?.data ?? response;
 
-        if (state === "RUNNING" && playbackUrl) {
-          set({ list: [lastData] });
-          return lastData;
+          const state =
+            lastData?.state ??
+            lastData?.status ??
+            lastData?.sessionStatus ??
+            lastData?.session_status;
+
+          const playbackUrl =
+            lastData?.playback_url ??
+            lastData?.playbackUrl;
+
+          console.debug("[streamStore] Stream polling result", {
+            id,
+            attempt,
+            state,
+            playbackUrl,
+          });
+
+          const isRunning =
+            state === "RUNNING" ||
+            state === "ACTIVE" ||
+            state === "LIVE" ||
+            state === "WORKING";
+
+          if (isRunning && playbackUrl) {
+            set({
+              list: [lastData],
+            });
+
+            return lastData;
+          }
+        } catch (error) {
+          console.warn("[streamStore] Stream polling failed", {
+            id,
+            attempt,
+            error,
+          });
+
+          /*
+           * Continue polling because the stream info endpoint may temporarily
+           * return 404/400 while the playlist and session are being prepared.
+           */
         }
 
-        await delay(intervalMs);
+        if (attempt < maxAttempts) {
+          await delay(intervalMs);
+        }
       }
 
-      set({ list: lastData ? [lastData] : [] });
+      set({
+        list: lastData ? [lastData] : [],
+      });
+
       return lastData;
     } finally {
       set({ loading: false });
@@ -100,7 +149,11 @@ export const useStreamStore = create<Store>((set) => ({
   },
 
   heartBeat: async (sessionId: string) => {
-    const res = await streamApi.heartBeat(sessionId);
-    return res;
+    if (!sessionId) {
+      console.warn("[streamStore] heartBeat called without sessionId");
+      return null;
+    }
+
+    return streamApi.heartBeat(sessionId);
   },
 }));

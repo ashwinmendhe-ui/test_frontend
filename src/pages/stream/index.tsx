@@ -376,19 +376,23 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   setWorkStartAtMs(null);
 }, []);
 
-  const broadcastStreamMessage = useCallback((message: StreamSyncMessage) => {
+  const broadcastStreamMessage = useCallback(
+  (message: StreamSyncMessage) => {
     if (message.type === "STREAM_STARTED") {
-        localStorage.setItem(ACTIVE_STREAM_KEY, JSON.stringify(message));
-      }
+      localStorage.setItem(
+        ACTIVE_STREAM_KEY,
+        JSON.stringify(message)
+      );
+    }
 
-      if (message.type === "STREAM_STOPPED") {
-        localStorage.removeItem(ACTIVE_STREAM_KEY);
-      }
+    if (message.type === "STREAM_STOPPED") {
+      localStorage.removeItem(ACTIVE_STREAM_KEY);
+    }
 
-      // streamSyncChannelRef.current?.postMessage(message);
-      broadcastStreamMessage(message);
-        }, []);
-
+    streamSyncChannelRef.current?.postMessage(message);
+  },
+  []
+);
 
   const handleStartWork = async () => {
   try {
@@ -422,29 +426,48 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       setWorkStartAtMs(startAtMs);
       setElapsedSeconds(0);
 
-      if (!streamInfo?.playback_url) {
+      const playbackUrl =
+        streamInfo?.playback_url ?? streamInfo?.playbackUrl ?? "";
+
+      const mapUrl =
+        streamInfo?.map_url ?? streamInfo?.mapUrl ?? "";
+
+      if (!playbackUrl) {
         throw new Error("Stream started, but playback URL was not found.");
       }
 
-      setStreamPlaybackUrl(streamInfo.playback_url || "");
-      setStreamMapUrl(streamInfo.map_url || "");
+      setStreamPlaybackUrl(playbackUrl);
+      setStreamMapUrl(mapUrl);
 
       setMapReady(false);
       setMapRetryKey(0);
       setPlayerStatus("LOADING");
       setHlsRetryCount(0);
       setHlsRetryKey(0);
-      setIsStreaming(streamInfo.state === "RUNNING");
+
+      const streamState =
+        streamInfo?.state ??
+        streamInfo?.status ??
+        streamInfo?.sessionStatus ??
+        streamInfo?.session_status;
+
+      const active =
+        streamState === "RUNNING" ||
+        streamState === "ACTIVE" ||
+        streamState === "LIVE" ||
+        streamState === "WORKING";
+
+      setIsStreaming(active);
 
       broadcastStreamMessage({
-      type: "STREAM_STARTED",
-      deviceSn: getCurrentDeviceSn(),
-      sessionId: res?.data?.sessionId || null,
-      playbackUrl: streamInfo.playback_url || "",
-      mapUrl: streamInfo.map_url || "",
-      startTime: now.toISOString(),
-      startAtMs,
-    });
+        type: "STREAM_STARTED",
+        deviceSn: getCurrentDeviceSn(),
+        sessionId: res?.data?.sessionId || null,
+        playbackUrl,
+        mapUrl,
+        startTime: now.toISOString(),
+        startAtMs,
+      });
     }
 
     if (res?.data?.sessionId) {
@@ -1142,12 +1165,13 @@ if (savedActiveStream) {
             statusResponse?.session_status;
 
           if (
-            streamStatus === "ACTIVE" ||
-            streamStatus === "LIVE" ||
-            streamStatus === "WORKING"
-          ) {
-            applyActiveStream(parsed);
-          } else {
+                streamStatus === "ACTIVE" ||
+                streamStatus === "RUNNING" ||
+                streamStatus === "LIVE" ||
+                streamStatus === "WORKING"
+              ) {
+                applyActiveStream(parsed);
+              } else {
             localStorage.removeItem(ACTIVE_STREAM_KEY);
             clearLocalStreamState();
           }
@@ -1277,7 +1301,11 @@ useEffect(() => {
 
       const streamInfo = await startStream(deviceSn);
 
-      setSessionId(deviceSn);
+      setSessionId(
+      statusRes?.sessionId ??
+      statusRes?.session_id ??
+      null
+    );
 
       setStreamPlaybackUrl(
         streamInfo.playback_url || streamInfo.playbackUrl || ""
