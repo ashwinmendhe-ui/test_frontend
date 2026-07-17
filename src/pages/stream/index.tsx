@@ -80,6 +80,28 @@ type PlayerStatus =
     22: "NO-Safety Rope(LLM)",
   };
 
+  const resolveMapUrl = (
+  playbackUrl?: string | null,
+  mapUrl?: string | null
+): string => {
+  const providedMapUrl = mapUrl?.trim();
+
+  if (providedMapUrl) {
+    return providedMapUrl;
+  }
+
+  const providedPlaybackUrl = playbackUrl?.trim();
+
+  if (!providedPlaybackUrl) {
+    return "";
+  }
+
+  return providedPlaybackUrl.replace(
+    /index\.m3u8(?:\?.*)?$/,
+    "map.m3u8"
+  );
+};
+
 export default function StreamIndex() {
   const [reportDetail, setReportDetail] = useState<any>(null);
 const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
@@ -114,6 +136,8 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
     getDetail: getRobotDetail,
   } = useRobotStore();
   const { startStream, heartBeat } = useStreamStore();
+
+
 
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
@@ -428,18 +452,35 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       setElapsedSeconds(0);
 
       const playbackUrl =
-        streamInfo?.playback_url ?? streamInfo?.playbackUrl ?? "";
+  streamInfo?.playback_url ??
+  streamInfo?.playbackUrl ??
+  "";
 
-      const mapUrl =
-        streamInfo?.map_url ?? streamInfo?.mapUrl ?? "";
+const backendMapUrl =
+  streamInfo?.map_url ??
+  streamInfo?.mapUrl ??
+  "";
 
-      if (!playbackUrl) {
-        throw new Error("Stream started, but playback URL was not found.");
-      }
+const resolvedMapUrl = resolveMapUrl(
+  playbackUrl,
+  backendMapUrl
+);
 
-      setStreamPlaybackUrl(playbackUrl);
-      setStreamMapUrl(mapUrl);
+if (!playbackUrl) {
+  throw new Error(
+    "Stream started, but playback URL was not found."
+  );
+}
 
+console.log("[StreamStart] Stream URLs", {
+  playbackUrl,
+  backendMapUrl,
+  resolvedMapUrl,
+  streamInfo,
+});
+
+setStreamPlaybackUrl(playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
       setMapReady(false);
       setMapRetryKey(0);
       setPlayerStatus("LOADING");
@@ -465,7 +506,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
         deviceSn: getCurrentDeviceSn(),
         sessionId: res?.data?.sessionId || null,
         playbackUrl,
-        mapUrl,
+        mapUrl: resolvedMapUrl,
         startTime: now.toISOString(),
         startAtMs,
       });
@@ -590,6 +631,7 @@ const handleStopWork = async () => {
     setReportDetail({
       reportCreatedAt: endTimeText,
       playbackUrl: streamPlaybackUrl,
+      mapUrl: streamMapUrl,
       companyId: values?.company,
       siteId: values?.site,
       missionId: values?.mission,
@@ -1131,9 +1173,14 @@ useEffect(() => {
 
     const startedAt = new Date(startedAtMs);
 
-    setSessionId(message.sessionId || null);
-    setStreamPlaybackUrl(message.playbackUrl);
-    setStreamMapUrl(message.mapUrl || "");
+   const resolvedMapUrl = resolveMapUrl(
+  message.playbackUrl,
+  message.mapUrl
+);
+
+setSessionId(message.sessionId || null);
+setStreamPlaybackUrl(message.playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
     setWorkStartTime(startedAt);
     setWorkStartAtMs(startedAtMs);
     setElapsedSeconds(
@@ -1346,12 +1393,30 @@ useEffect(() => {
       null
     );
 
-      setStreamPlaybackUrl(
-        streamInfo.playback_url || streamInfo.playbackUrl || ""
-      );
+      const playbackUrl =
+  streamInfo?.playback_url ??
+  streamInfo?.playbackUrl ??
+  "";
 
-      setStreamMapUrl(streamInfo.map_url || streamInfo.mapUrl || "");
+const backendMapUrl =
+  streamInfo?.map_url ??
+  streamInfo?.mapUrl ??
+  "";
 
+const resolvedMapUrl = resolveMapUrl(
+  playbackUrl,
+  backendMapUrl
+);
+
+console.log("[DashboardStream] Stream URLs", {
+  playbackUrl,
+  backendMapUrl,
+  resolvedMapUrl,
+  streamInfo,
+});
+
+setStreamPlaybackUrl(playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
       setMapReady(false);
       setMapRetryKey(0);
 
@@ -1625,7 +1690,7 @@ const SmallStatusBadge = ({
 
               {isStreaming && streamMapUrl && mapReady ? (
                 <HLSPlayer
-                  key={`vector-${streamMapUrl}`}
+                  key={`vector-${streamMapUrl}-${mapRetryKey}`}
                   src={streamMapUrl}
                   metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
                   className="w-full h-full object-contain bg-black"
