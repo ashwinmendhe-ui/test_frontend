@@ -59,6 +59,7 @@ type PlayerStatus =
     sessionId?: string | null;
     playbackUrl?: string;
     mapUrl?: string;
+    missionId?: string | null;
     startTime?: string;
     startAtMs?: number;
   };
@@ -137,7 +138,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   } = useRobotStore();
   const { startStream, heartBeat } = useStreamStore();
 
-
+  const pendingMissionRestoreRef = useRef<string | null>(null);
 
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
@@ -194,28 +195,56 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   );
 
   const missionOptions = useMemo(() => {
-    if (!values?.device) {
-      return missionList.map((item) => ({
-        value: item.missionId,
-        label: item.missionName,
-      }));
-    }
-
-    const selectedDevice = robotList.find(
-      (item) => item.deviceId === values.device
-    );
-
-    const filteredMissions = missionList.filter((item) => {
-      if (!selectedDevice?.deviceType) return true;
-      return item.deviceType === selectedDevice.deviceType;
-    });
-
-    return filteredMissions.map((item) => ({
+  if (!values?.device) {
+    return missionList.map((item) => ({
       value: item.missionId,
       label: item.missionName,
     }));
-  }, [missionList, robotList, values?.device]);
+  }
 
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values.device
+  );
+
+  const filteredMissions = missionList.filter((item) => {
+    if (!selectedDevice?.deviceType) {
+      return true;
+    }
+
+    return item.deviceType === selectedDevice.deviceType;
+  });
+
+  return filteredMissions.map((item) => ({
+    value: item.missionId,
+    label: item.missionName,
+  }));
+}, [missionList, robotList, values?.device]);
+
+const restoreMissionSelection = useCallback(
+  (missionId?: string | null) => {
+    if (!missionId) {
+      return;
+    }
+
+    pendingMissionRestoreRef.current = missionId;
+
+    const missionExists = missionOptions.some(
+      (mission) => mission.value === missionId
+    );
+
+    if (!missionExists) {
+      return;
+    }
+
+    form.setFieldValue("mission", missionId);
+    pendingMissionRestoreRef.current = null;
+
+    console.info("[MissionRestore] Mission restored", {
+      missionId,
+    });
+  },
+  [form, missionOptions]
+);
 
   const playerStatusConfig: Record<
   PlayerStatus,
@@ -501,15 +530,24 @@ setStreamMapUrl(resolvedMapUrl);
 
       setIsStreaming(active);
 
-      broadcastStreamMessage({
-        type: "STREAM_STARTED",
-        deviceSn: getCurrentDeviceSn(),
-        sessionId: res?.data?.sessionId || null,
-        playbackUrl,
-        mapUrl: resolvedMapUrl,
-        startTime: now.toISOString(),
-        startAtMs,
-      });
+     const activeMissionId =
+  res?.data?.missionId ??
+  res?.data?.mission_id ??
+  streamInfo?.missionId ??
+  streamInfo?.mission_id ??
+  values?.mission ??
+  null;
+
+broadcastStreamMessage({
+  type: "STREAM_STARTED",
+  deviceSn: getCurrentDeviceSn(),
+  sessionId: res?.data?.sessionId || null,
+  playbackUrl,
+  mapUrl: resolvedMapUrl,
+  missionId: activeMissionId,
+  startTime: now.toISOString(),
+  startAtMs,
+});
     }
 
     if (res?.data?.sessionId) {
@@ -1167,6 +1205,9 @@ useEffect(() => {
     const currentDeviceSn = getCurrentDeviceSn();
     if (!currentDeviceSn || currentDeviceSn !== message.deviceSn) return;
 
+    restoreMissionSelection(message.missionId);
+
+
     const startedAtMs =
       message.startAtMs ||
       (message.startTime ? new Date(message.startTime).getTime() : Date.now());
@@ -1218,7 +1259,28 @@ if (savedActiveStream) {
                 streamStatus === "LIVE" ||
                 streamStatus === "WORKING"
               ) {
-                applyActiveStream(parsed);
+                const restoredMissionId =
+  statusResponse?.missionId ??
+  statusResponse?.mission_id ??
+  parsed?.missionId ??
+  null;
+
+const restoredStream: StreamSyncMessage = {
+  ...parsed,
+  sessionId:
+    statusResponse?.sessionId ??
+    statusResponse?.session_id ??
+    parsed?.sessionId ??
+    null,
+  missionId: restoredMissionId,
+};
+
+localStorage.setItem(
+  ACTIVE_STREAM_KEY,
+  JSON.stringify(restoredStream)
+);
+
+applyActiveStream(restoredStream);
               } else {
             localStorage.removeItem(ACTIVE_STREAM_KEY);
             clearLocalStreamState();
@@ -1255,7 +1317,7 @@ if (savedActiveStream) {
     channel.close();
     streamSyncChannelRef.current = null;
   };
-}, [clearLocalStreamState, getCurrentDeviceSn]);
+}, [clearLocalStreamState, getCurrentDeviceSn, restoreMissionSelection]);
 
 
 useEffect(() => {
@@ -1381,9 +1443,13 @@ useEffect(() => {
 
       if (!statusRes?.streaming) return;
 
-      if (statusRes?.missionId) {
-        form.setFieldValue("mission", statusRes.missionId);
-      }
+      const activeMissionId =
+  statusRes?.missionId ??
+  statusRes?.mission_id ??
+  dashboardPrefill?.missionId ??
+  null;
+
+restoreMissionSelection(activeMissionId);
 
       const streamInfo = await startStream(deviceSn);
 
@@ -1440,9 +1506,36 @@ setStreamMapUrl(resolvedMapUrl);
   routeDeviceId,
   missionList,
   startStream,
+  restoreMissionSelection,
 ]);
 
+useEffect(() => {
+  const missionId = pendingMissionRestoreRef.current;
 
+  if (!missionId || missionOptions.length === 0) {
+    return;
+  }
+
+  const missionExists = missionOptions.some(
+    (mission) => mission.value === missionId
+  );
+
+  if (!missionExists) {
+    console.warn("[MissionRestore] Mission not found in current options", {
+      missionId,
+      missionOptions,
+    });
+
+    return;
+  }
+
+  form.setFieldValue("mission", missionId);
+  pendingMissionRestoreRef.current = null;
+
+  console.info("[MissionRestore] Mission restored", {
+    missionId,
+  });
+}, [form, missionOptions]);
 
   const showCommonDetection =
   selectedModules.some((m) =>
