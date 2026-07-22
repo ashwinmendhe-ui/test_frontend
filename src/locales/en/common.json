@@ -573,6 +573,11 @@
 "user_duplicate_username": "This user name is already in use.",
 "user_duplicate_email_username": "The email address and user name are already in use.",
 "user_validation_email_exists": "This email address is already in use.",
-"user_validation_username_exists": "This user name is already in use."
+"user_validation_username_exists": "This user name is already in use.",
+"user_change_password_success": "Password changed successfully.",
+"user_change_password_failed": "Failed to change the password.",
+"user_current_password_incorrect": "The current password is incorrect.",
+"user_new_password_same_as_current": "The new password must be different from the current password.",
+"user_password_user_not_found": "User information could not be found."
 
   }

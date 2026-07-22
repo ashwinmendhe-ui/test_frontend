@@ -7,6 +7,12 @@ export interface RoleOption {
   roleKey: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export const userApi = {
   getListRole: async () => {
     const res = await axiosClient.get<RoleOption[]>("/v1/roles");
@@ -82,4 +88,15 @@ export const userApi = {
     const res = await axiosClient.post(`/v1/users/delete/${id}`);
     return res.data;
   },
+  changePassword: async (
+  id: string,
+  data: ChangePasswordPayload
+) => {
+  const res = await axiosClient.post(
+    `/v1/users/${id}/change-password`,
+    data
+  );
+
+  return res.data;
+},
 };

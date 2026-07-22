@@ -7,7 +7,7 @@ import ActionMenu from "./actionMenu";
 import ActionIcon from "@/assets/table-action-icon.svg";
 import { useUserStore } from "@/stores/userStore";
 import { useTranslation } from "react-i18next";
-import { companyApi } from "@/api";
+import { companyApi, userApi } from "@/api";
 import { siteApi } from "@/api/siteApi";
 import { missionApi } from "@/api/missionApi";
 import { robotApi } from "@/api/robotApi";
@@ -23,6 +23,7 @@ export interface AssignedSiteRow {
 }
 
 export interface UserFormValue {
+  id?: string;
   role?: number;
   roleIds?: number[];
   email: string;
@@ -39,6 +40,11 @@ export interface UserFormValue {
   sites?: AssignedSiteRow[];
 }
 
+interface ChangePasswordFormValue {
+  oldPassword: string;
+  password: string;
+  confirmPassword: string;
+}
 interface Props {
   mode: "add" | "edit";
   initialValues?: UserFormValue;
@@ -102,6 +108,115 @@ export default function UserForm({
 
   const { detailUserLogin } = useUserStore();
   const userRole = detailUserLogin?.roles?.[0];
+
+  const handleChangePassword = async (
+  passwordValues: ChangePasswordFormValue
+) => {
+  const userId = initialValues?.id;
+
+  if (!userId) {
+    message.error(
+      t(
+        "user_password_user_not_found",
+        "User information could not be found."
+      )
+    );
+    return;
+  }
+
+  try {
+    await userApi.changePassword(userId, {
+      currentPassword: passwordValues.oldPassword,
+      newPassword: passwordValues.password,
+      confirmPassword: passwordValues.confirmPassword,
+    });
+
+    await message.success(
+      t(
+        "user_change_password_success",
+        "Password changed successfully."
+      ),
+      2
+    );
+
+    setIsChangePassOpen(false);
+    formChangePass.resetFields();
+  } catch (error: unknown) {
+    console.error("Change password failed:", error);
+
+    let errorMessage = t(
+      "user_change_password_failed",
+      "Failed to change the password."
+    );
+
+    if (axios.isAxiosError(error)) {
+      const responseData = error.response?.data as
+        | {
+            message?: string;
+            error?: string;
+          }
+        | undefined;
+
+      const backendMessage = String(
+        responseData?.message ??
+          responseData?.error ??
+          ""
+      ).toLowerCase();
+
+      if (
+        backendMessage.includes("current password") &&
+        backendMessage.includes("incorrect")
+      ) {
+        errorMessage = t(
+          "user_current_password_incorrect",
+          "The current password is incorrect."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "oldPassword",
+            errors: [errorMessage],
+          },
+        ]);
+      } else if (
+        backendMessage.includes("different from")
+      ) {
+        errorMessage = t(
+          "user_new_password_same_as_current",
+          "The new password must be different from the current password."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "password",
+            errors: [errorMessage],
+          },
+        ]);
+      } else if (
+        backendMessage.includes("do not match")
+      ) {
+        errorMessage = t(
+          "user_validation_password_mismatch",
+          "The passwords do not match."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "confirmPassword",
+            errors: [errorMessage],
+          },
+        ]);
+      } else {
+        errorMessage =
+          responseData?.message ||
+          responseData?.error ||
+          errorMessage;
+      }
+    }
+
+    message.error(errorMessage);
+  }
+};
 
   const roleOptions = useMemo(
     () => [
@@ -944,14 +1059,15 @@ export default function UserForm({
         title={t("user_change_password")}
         open={isChangePassOpen}
         onOk={() => formChangePass.submit()}
-        onCancel={() => setIsChangePassOpen(false)}
+        onCancel={() => {
+  setIsChangePassOpen(false);
+  formChangePass.resetFields();
+}}
         content={
           <Form
             layout="vertical"
             form={formChangePass}
-            onFinish={(passwordValues) => {
-              setIsChangePassOpen(false);
-            }}
+            onFinish={handleChangePassword}
           >
             <Form.Item
               label={t("user_current_password")}

@@ -652,5 +652,10 @@
 "user_duplicate_username": "이미 사용 중인 사용자 이름입니다.",
 "user_duplicate_email_username": "이메일 주소와 사용자 이름이 모두 이미 사용 중입니다.",
 "user_validation_email_exists": "이미 사용 중인 이메일 주소입니다.",
-"user_validation_username_exists": "이미 사용 중인 사용자 이름입니다."
+"user_validation_username_exists": "이미 사용 중인 사용자 이름입니다.",
+"user_change_password_success": "비밀번호가 성공적으로 변경되었습니다.",
+"user_change_password_failed": "비밀번호 변경에 실패했습니다.",
+"user_current_password_incorrect": "현재 비밀번호가 올바르지 않습니다.",
+"user_new_password_same_as_current": "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+"user_password_user_not_found": "사용자 정보를 찾을 수 없습니다."
 }
