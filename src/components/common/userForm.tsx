@@ -11,6 +11,7 @@ import { companyApi } from "@/api";
 import { siteApi } from "@/api/siteApi";
 import { missionApi } from "@/api/missionApi";
 import { robotApi } from "@/api/robotApi";
+import axios from "axios";
 
 export interface AssignedSiteRow {
   id: number;
@@ -277,25 +278,24 @@ export default function UserForm({
   }, [values?.role, form]);
 
   const handleFinish = async (formValues: UserFormValue) => {
-    const mergedMissionIds = Array.from(
-      new Set(sites.flatMap((site) => site.missionList ?? []))
-    );
+  const mergedMissionIds = Array.from(
+    new Set(sites.flatMap((site) => site.missionList ?? []))
+  );
 
-    const mergedDeviceIds = Array.from(
-      new Set(sites.flatMap((site) => site.deviceList ?? []))
-    );
+  const mergedDeviceIds = Array.from(
+    new Set(sites.flatMap((site) => site.deviceList ?? []))
+  );
 
-    const payload: UserFormValue = {
-      ...formValues,
-      siteIds: values?.role === 3 ? sites.map((site) => site.siteId) : [],
-      missionIds: values?.role === 3 ? mergedMissionIds : [],
-      deviceIds: values?.role === 3 ? mergedDeviceIds : [],
-      sites: values?.role === 3 ? sites : [],
-    };
+  const payload: UserFormValue = {
+    ...formValues,
+    siteIds: values?.role === 3 ? sites.map((site) => site.siteId) : [],
+    missionIds: values?.role === 3 ? mergedMissionIds : [],
+    deviceIds: values?.role === 3 ? mergedDeviceIds : [],
+    sites: values?.role === 3 ? sites : [],
+  };
 
-
+  try {
     const res = await onSubmit(payload);
-
 
     if (!res) return;
 
@@ -303,8 +303,10 @@ export default function UserForm({
       res.code === -1 ||
       res.code === "BAD_REQUEST" ||
       res.code === "ERROR" ||
+      res.code === "CONFLICT" ||
       res.code === 400 ||
       res.code === 403 ||
+      res.code === 409 ||
       res.code === 500
     ) {
       message.error(res.message || t("common_save_failed"));
@@ -319,7 +321,121 @@ export default function UserForm({
     );
 
     navigate("/settings/user");
-  };
+  } catch (error: unknown) {
+    console.error("User save failed:", error);
+
+    let errorMessage = t(
+      "common_save_failed",
+      "Failed to save user. Please try again."
+    );
+
+    if (axios.isAxiosError(error)) {
+      const responseData = error.response?.data as
+        | {
+            code?: string | number;
+            message?: string;
+            error?: string;
+          }
+        | undefined;
+
+      const errorCode = String(responseData?.code ?? "").toUpperCase();
+
+      const backendMessage = String(
+        responseData?.message ?? responseData?.error ?? ""
+      ).toLowerCase();
+
+      const duplicateMessage =
+        backendMessage.includes("already exist") ||
+        backendMessage.includes("already in use") ||
+        backendMessage.includes("duplicate") ||
+        error.response?.status === 409;
+
+      const emailExists =
+        errorCode.includes("EMAIL_ALREADY") ||
+        errorCode.includes("DUPLICATE_EMAIL") ||
+        (
+          backendMessage.includes("email") &&
+          duplicateMessage
+        );
+
+      const usernameExists =
+        errorCode.includes("USERNAME_ALREADY") ||
+        errorCode.includes("NAME_ALREADY") ||
+        errorCode.includes("DUPLICATE_USERNAME") ||
+        (
+          (
+            backendMessage.includes("username") ||
+            backendMessage.includes("user name")
+          ) &&
+          duplicateMessage
+        );
+
+      const duplicateFields: Array<{
+        name: "email" | "username";
+        errors: string[];
+      }> = [];
+
+      if (emailExists) {
+        duplicateFields.push({
+          name: "email",
+          errors: [
+            t(
+              "user_validation_email_exists",
+              "This email address is already in use."
+            ),
+          ],
+        });
+      }
+
+      if (usernameExists) {
+        duplicateFields.push({
+          name: "username",
+          errors: [
+            t(
+              "user_validation_username_exists",
+              "This user name is already in use."
+            ),
+          ],
+        });
+      }
+
+      if (duplicateFields.length > 0) {
+        form.setFields(duplicateFields);
+      }
+
+      if (emailExists && usernameExists) {
+        errorMessage = t(
+          "user_duplicate_email_username",
+          "The email address and user name are already in use."
+        );
+      } else if (emailExists) {
+        errorMessage = t(
+          "user_duplicate_email",
+          "This email address is already in use."
+        );
+      } else if (usernameExists) {
+        errorMessage = t(
+          "user_duplicate_username",
+          "This user name is already in use."
+        );
+      } else if (error.response?.status === 409) {
+        errorMessage = t(
+          "user_duplicate_error",
+          "Email address and user name must be unique."
+        );
+      } else {
+        errorMessage =
+          responseData?.message ||
+          responseData?.error ||
+          errorMessage;
+      }
+    } else if (error instanceof Error && error.message) {
+      errorMessage = error.message;
+    }
+
+    message.error(errorMessage);
+  }
+};
 
   const handleAssignSiteSubmit = async (assignValues: { siteId: string }) => {
     const selectedSite = siteOptions.find(
@@ -582,9 +698,17 @@ export default function UserForm({
                 className="flex-1 mb-0"
               >
                 <Input
-                  placeholder={t("user_placeholder_email")}
-                  className="h-[41px]"
-                />
+  placeholder={t("user_placeholder_email")}
+  className="h-[41px]"
+  onChange={() => {
+    form.setFields([
+      {
+        name: "email",
+        errors: [],
+      },
+    ]);
+  }}
+/>
               </Form.Item>
 
               {mode === "edit" && (
@@ -690,9 +814,17 @@ export default function UserForm({
               ]}
             >
               <Input
-                placeholder={t("user_placeholder_name")}
-                className="h-[41px]"
-              />
+  placeholder={t("user_placeholder_name")}
+  className="h-[41px]"
+  onChange={() => {
+    form.setFields([
+      {
+        name: "username",
+        errors: [],
+      },
+    ]);
+  }}
+/>
             </Form.Item>
 
             <Form.Item

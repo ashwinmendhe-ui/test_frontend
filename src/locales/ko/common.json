@@ -647,5 +647,10 @@
 "work_report_view_details": "상세 보기",
 "common_no_data": "데이터 없음",
 "stream_ai_mask": "Mask",
-"stream_ai_vehicle": "Vehicle"
+"stream_ai_vehicle": "Vehicle",
+"user_duplicate_email": "이미 사용 중인 이메일 주소입니다.",
+"user_duplicate_username": "이미 사용 중인 사용자 이름입니다.",
+"user_duplicate_email_username": "이메일 주소와 사용자 이름이 모두 이미 사용 중입니다.",
+"user_validation_email_exists": "이미 사용 중인 이메일 주소입니다.",
+"user_validation_username_exists": "이미 사용 중인 사용자 이름입니다."
 }

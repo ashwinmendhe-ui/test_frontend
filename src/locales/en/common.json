@@ -568,6 +568,11 @@
 "work_report_view_details": "View Details",
 "common_no_data": "No data",
 "stream_ai_mask": "Mask",
-"stream_ai_vehicle": "Vehicle"
+"stream_ai_vehicle": "Vehicle",
+"user_duplicate_email": "This email address is already in use.",
+"user_duplicate_username": "This user name is already in use.",
+"user_duplicate_email_username": "The email address and user name are already in use.",
+"user_validation_email_exists": "This email address is already in use.",
+"user_validation_username_exists": "This user name is already in use."
 
   }
