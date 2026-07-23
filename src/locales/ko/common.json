@@ -657,5 +657,6 @@
 "user_change_password_failed": "비밀번호 변경에 실패했습니다.",
 "user_current_password_incorrect": "현재 비밀번호가 올바르지 않습니다.",
 "user_new_password_same_as_current": "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
-"user_password_user_not_found": "사용자 정보를 찾을 수 없습니다."
+"user_password_user_not_found": "사용자 정보를 찾을 수 없습니다.",
+"robot_validation_enter_serial_number": "시리얼 번호를 입력해주세요."
 }

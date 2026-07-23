@@ -578,6 +578,7 @@
 "user_change_password_failed": "Failed to change the password.",
 "user_current_password_incorrect": "The current password is incorrect.",
 "user_new_password_same_as_current": "The new password must be different from the current password.",
-"user_password_user_not_found": "User information could not be found."
+"user_password_user_not_found": "User information could not be found.",
+"robot_validation_enter_serial_number": "Please enter serial number"
 
   }

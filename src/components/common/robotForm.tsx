@@ -246,6 +246,12 @@ export default function RobotForm({
               </div>
             }
             name="deviceSn"
+            rules={[
+              {
+                required: true,
+                message: t("robot_validation_enter_serial_number"),
+              },
+            ]}
           >
             <Input
               placeholder={t("robot_placeholder_serial_number")}
