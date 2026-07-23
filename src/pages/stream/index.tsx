@@ -158,7 +158,6 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
     getDashboardSilent,
     getDashboardStatSilent,
   } = useDashboardStore();
-  const resyncingRef = useRef(false);
   const companyOptions = useMemo(() => {
     if (userRole === 1) {
       return companyList.map((item) => ({
@@ -1327,44 +1326,6 @@ useEffect(() => {
     }
   };
 }, []);
-
-useEffect(() => {
-  const syncToLiveStream = () => {
-  if (document.visibilityState !== "visible") {
-    return;
-  }
-
-  if (!isStreaming || !streamPlaybackUrl) {
-    return;
-  }
-
-  if (resyncingRef.current) {
-    return;
-  }
-
-  resyncingRef.current = true;
-
-  setPlayerStatus("RECONNECTING");
-  setIsPlaying(false);
-  setHlsRetryKey((prev) => prev + 1);
-
-  window.setTimeout(() => {
-    resyncingRef.current = false;
-  }, 1000);
-};
-
-  document.addEventListener("visibilitychange", syncToLiveStream);
-  window.addEventListener("focus", syncToLiveStream);
-
-  return () => {
-    document.removeEventListener(
-      "visibilitychange",
-      syncToLiveStream
-    );
-
-    window.removeEventListener("focus", syncToLiveStream);
-  };
-}, [isStreaming, streamPlaybackUrl]);
 
 useEffect(() => {
   if (!isStreaming || !workStartAtMs) return;
