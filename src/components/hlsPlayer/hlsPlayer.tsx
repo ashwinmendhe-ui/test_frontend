@@ -12,9 +12,7 @@ import type { HLSPlayerRef } from "./types";
 const getFileName = (path: string) => {
   return path.split("/").pop()?.split("?")[0] || path;
 };
-const getBasePathFromUrl = (url: string) => {
-      return url.substring(0, url.lastIndexOf("/"));
-    };
+
 
 type BookmarkPayload = {
   m?: number;
@@ -93,7 +91,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const lastDetectionsRef = useRef<any[]>([]);
     const sessionStartTimeRef = useRef<number | null>(null);
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
-    const metadataLoadedKeyRef = useRef<string>("");
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const labelsMapRef = useRef<LabelsMap>({});
@@ -118,7 +115,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     });
 
 
-
+    const onErrorRef = useRef(onError);
 
     const safeJsonFetch = async (url: string) => {
   try {
@@ -271,43 +268,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
       return next;
     };
-
-    const getBookmarkTimeSec = (bookmark: BookmarkPayload): number | null => {
-      if (typeof bookmark.timeSec === "number") {
-        return bookmark.timeSec;
-      }
-
-      if (bookmark.s && typeof bookmark.o === "number") {
-          const bookmarkSegmentName = getFileName(bookmark.s);
-
-          const segment = playlistSegmentsRef.current.find(
-            (item) => item.name === bookmarkSegmentName
-          );
-
-          if (!segment) {
-            console.error("Segment not found for bookmark:", {
-              bookmarkSegmentName,
-              availableSegments: playlistSegmentsRef.current.slice(0, 10),
-            });
-          }
-
-          if (segment) {
-            return segment.startSec + Number(bookmark.o || 0) / 1000;
-          }
-        }
-
-      if (
-        typeof bookmark.m === "number" &&
-        typeof sessionStartTimeRef.current === "number"
-      ) {
-        return (bookmark.m - sessionStartTimeRef.current) / 1000;
-      }
-
-      return null;
-    };
-
-
-
   const getLabelName = useCallback((classId?: number) => {
       if (classId == null) return "unknown";
       return labelsMapRef.current[classId] || `Class${classId}`;
@@ -558,25 +518,23 @@ const isDanger =
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      // console.error("[HLS ERROR]", data);
+  const isLoadError =
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
+    data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
+    data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT;
 
-      if (
-        data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
-        data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
-        data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT
-      ) {
-        onError?.(data);
-      }
+  if (isLoadError || data.fatal) {
+    onErrorRef.current?.(data);
+  }
 
-      if (data.fatal) {
-        hls.destroy();
-        hlsRef.current = null;
-        onError?.(data);
-      }
-    });
+  if (data.fatal) {
+    hls.destroy();
+    hlsRef.current = null;
+  }
+});
 
     hlsRef.current = hls;
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -593,13 +551,10 @@ const isDanger =
       hlsRef.current = null;
     }
   };
-}, [src, autoPlay, onError]);
+}, [src, autoPlay]);
 
     useEffect(() => {
   let cancelled = false;
-
-  const metadataKey = `${src || ""}_${metadataBaseUrl || ""}`;
-
   const getFileName = (value?: string) => {
     return value?.split("/").pop()?.split("?")[0] || "";
   };
@@ -824,6 +779,11 @@ try {
     window.clearInterval(interval);
   };
 }, [src, metadataBaseUrl]);
+
+
+useEffect(() => {
+  onErrorRef.current = onError;
+}, [onError]);
 
     return (
   <div className="relative w-full h-full bg-black overflow-hidden">
