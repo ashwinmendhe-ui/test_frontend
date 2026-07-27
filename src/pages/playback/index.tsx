@@ -28,7 +28,7 @@ type PlaybackFormValues = {
 type AICategory = "common" | "danger";
 
 type AIModuleItem = {
-  value: string;
+  value: number;
   label: string;
   category: string;
   type: AICategory;
@@ -289,26 +289,110 @@ export default function Playback() {
 
   const aiModules: AIModuleItem[] = useMemo(
   () => [
-    { value: "construction", label: "Construction", category: "YOLO", type: "common", color: "#8B6F63" },
-    { value: "hardhat", label: "HardHat", category: "YOLO", type: "common", color: "#FFD600" },
-    { value: "machinery", label: "Machinery", category: "YOLO", type: "common", color: "#14B8C8" },
-    { value: "mask", label: "Mask", category: "YOLO", type: "common", color: "#A855F7" },
-    { value: "person", label: "Person", category: "YOLO", type: "common", color: "#22C55E" },
-    { value: "vest", label: "Safety Vest", category: "YOLO", type: "common", color: "#1683FF" },
-    { value: "vehicle", label: "Vehicle", category: "YOLO", type: "common", color: "#1683FF" },
-    { value: "cone", label: "Safety Cone", category: "YOLO", type: "common", color: "#FF8A00" },
+    {
+      value: 0,
+      label: "Construction",
+      category: "YOLO",
+      type: "common",
+      color: "#8B6F63",
+    },
+    {
+      value: 1,
+      label: "HardHat",
+      category: "YOLO",
+      type: "common",
+      color: "#FFD600",
+    },
+    {
+      value: 9,
+      label: "Machinery",
+      category: "YOLO",
+      type: "common",
+      color: "#14B8C8",
+    },
+    {
+      value: 2,
+      label: "Mask",
+      category: "YOLO",
+      type: "common",
+      color: "#A855F7",
+    },
+    {
+      value: 6,
+      label: "Person",
+      category: "YOLO",
+      type: "common",
+      color: "#22C55E",
+    },
+    {
+      value: 8,
+      label: "Safety Vest",
+      category: "YOLO",
+      type: "common",
+      color: "#1683FF",
+    },
+    {
+      value: 10,
+      label: "Vehicle",
+      category: "YOLO",
+      type: "common",
+      color: "#1683FF",
+    },
+    {
+      value: 7,
+      label: "Safety Cone",
+      category: "YOLO",
+      type: "common",
+      color: "#FF8A00",
+    },
 
-    { value: "no-hardhat", label: "No HardHat", category: "YOLO", type: "danger", color: "#FF2D55" },
-    { value: "no-vest", label: "No Safety Vest", category: "YOLO", type: "danger", color: "#FF8A00" },
-    { value: "no-mask", label: "No Mask", category: "YOLO", type: "danger", color: "#D100D8" },
-    { value: "llm-hardhat", label: "No HardHat", category: "LLM", type: "danger", color: "#FF2D55" },
-    { value: "llm-vest", label: "No Safety Vest", category: "LLM", type: "danger", color: "#FF8A00" },
-    { value: "llm-rope", label: "No Safety Rope", category: "LLM", type: "danger", color: "#FF2D55" },
+    {
+      value: 3,
+      label: "No HardHat",
+      category: "YOLO",
+      type: "danger",
+      color: "#FF2D55",
+    },
+    {
+      value: 5,
+      label: "No Safety Vest",
+      category: "YOLO",
+      type: "danger",
+      color: "#FF8A00",
+    },
+    {
+      value: 4,
+      label: "No Mask",
+      category: "YOLO",
+      type: "danger",
+      color: "#D100D8",
+    },
+    {
+      value: 20,
+      label: "No HardHat",
+      category: "LLM",
+      type: "danger",
+      color: "#FF2D55",
+    },
+    {
+      value: 21,
+      label: "No Safety Vest",
+      category: "LLM",
+      type: "danger",
+      color: "#FF8A00",
+    },
+    {
+      value: 22,
+      label: "No Safety Rope",
+      category: "LLM",
+      type: "danger",
+      color: "#FF2D55",
+    },
   ],
   []
 );
 
-const [selectedModules, setSelectedModules] = useState<string[]>(() =>
+const [selectedModules, setSelectedModules] = useState<number[]>(() =>
   aiModules.map((item) => item.value)
 );
 
@@ -339,27 +423,7 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
     return next;
   }, [selectedVideos]);
 
-  const selectedModuleIdsByVideo = useMemo(() => {
-    const result: Record<string, number[]> = {};
-
-    selectedVideos.forEach((videoUrl) => {
-      const labels = labelsByVideo[videoUrl] || {};
-      const matchedIds = Object.entries(labels)
-        .filter(([, label]) => {
-          const normalizedLabel = normalizeText(label);
-          return selectedModules.some((moduleValue) =>
-            normalizedLabel.includes(normalizeText(moduleValue))
-          );
-        })
-        .map(([id]) => Number(id))
-        .filter((id) => Number.isFinite(id));
-
-      result[videoUrl] = matchedIds;
-    });
-
-    return result;
-  }, [labelsByVideo, selectedModules, selectedVideos]);
-
+  
   const mainDuration = useMemo(() => {
     if (selectedVideos.length === 0) return 0;
     const durations = selectedVideos.map((url) => videoDurations[url] || 0);
@@ -755,7 +819,7 @@ if (removedVideo) {
   }
 };
 
-  const toggleModule = (value: string) => {
+  const toggleModule = (value: number) => {
     setSelectedModules((prev) =>
       prev.includes(value)
         ? prev.filter((item) => item !== value)
@@ -957,12 +1021,28 @@ const allSelectedVideosUnavailable =
 
 
     return bookmarks
-      .filter((bookmark) => bookmark.timeSec != null)
+        .filter((bookmark) => {
+          if (bookmark.timeSec == null) {
+            return false;
+          }
+
+          if (!Array.isArray(bookmark.c_ar) || bookmark.c_ar.length === 0) {
+            return false;
+          }
+
+          return bookmark.c_ar.some((classId) =>
+          selectedModules.includes(Number(classId))
+        );
+      })
       .map((bookmark, index) => {
-        const markerLabels =
-          bookmark.c_ar
-            ?.map((id) => labelsMap[Number(id)])
-            .filter((label): label is string => Boolean(label)) || [];
+        const selectedBookmarkClassIds =
+          bookmark.c_ar?.filter((classId) =>
+            selectedModules.includes(Number(classId))
+          ) || [];
+
+        const markerLabels = selectedBookmarkClassIds
+          .map((classId) => labelsMap[Number(classId)])
+          .filter((label): label is string => Boolean(label));
 
         const primaryLabel = markerLabels[0] || "";
 
@@ -978,9 +1058,9 @@ const allSelectedVideosUnavailable =
           timeSec: Number(bookmark.timeSec?.toFixed(1) || 0),
           type: getMarkerTypeFromLabel(primaryLabel),
           label: fallbackLabel,
-          confidence: getMarkerConfidence(bookmark.c_ar),
+          confidence: getMarkerConfidence(selectedBookmarkClassIds),
           position,
-          classIds: bookmark.c_ar,
+          classIds: selectedBookmarkClassIds,
           labels: markerLabels,
         };
 
@@ -1008,6 +1088,7 @@ const allSelectedVideosUnavailable =
   bookmarksByVideo,
   labelsByVideo,
   selectedVideos,
+  selectedModules,
   mainDuration,
   t,
 ]);
@@ -1205,11 +1286,7 @@ const playbackMapGpsData = useMemo(() => {
                       ? metadataBaseByVideo[selectedVideos[0]]
                       : undefined
                   }
-                  selectedClassIds={
-                    selectedVideos[0]
-                      ? selectedModuleIdsByVideo[selectedVideos[0]] ?? []
-                      : []
-                  }
+                  selectedClassIds={selectedModules}
                   showCommonDetection={selectedModules.some((value) =>
                     aiModules.some(
                       (item) =>
@@ -1352,9 +1429,7 @@ const playbackMapGpsData = useMemo(() => {
                           }}
                           onDeviceInfoUpdate={handleDeviceInfoUpdate}
                           metadataBaseUrl={metadataBaseByVideo[video.value]}
-                          selectedClassIds={
-                            selectedModuleIdsByVideo[video.value] ?? []
-                          }
+                          selectedClassIds={selectedModules}
                           showCommonDetection={selectedModules.some((value) =>
                             aiModules.some(
                               (item) =>
