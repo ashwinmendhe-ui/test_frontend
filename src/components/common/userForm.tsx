@@ -7,10 +7,11 @@ import ActionMenu from "./actionMenu";
 import ActionIcon from "@/assets/table-action-icon.svg";
 import { useUserStore } from "@/stores/userStore";
 import { useTranslation } from "react-i18next";
-import { companyApi } from "@/api";
+import { companyApi, userApi } from "@/api";
 import { siteApi } from "@/api/siteApi";
 import { missionApi } from "@/api/missionApi";
 import { robotApi } from "@/api/robotApi";
+import axios from "axios";
 
 export interface AssignedSiteRow {
   id: number;
@@ -22,6 +23,7 @@ export interface AssignedSiteRow {
 }
 
 export interface UserFormValue {
+  id?: string;
   role?: number;
   roleIds?: number[];
   email: string;
@@ -38,6 +40,11 @@ export interface UserFormValue {
   sites?: AssignedSiteRow[];
 }
 
+interface ChangePasswordFormValue {
+  oldPassword: string;
+  password: string;
+  confirmPassword: string;
+}
 interface Props {
   mode: "add" | "edit";
   initialValues?: UserFormValue;
@@ -101,6 +108,115 @@ export default function UserForm({
 
   const { detailUserLogin } = useUserStore();
   const userRole = detailUserLogin?.roles?.[0];
+
+  const handleChangePassword = async (
+  passwordValues: ChangePasswordFormValue
+) => {
+  const userId = initialValues?.id;
+
+  if (!userId) {
+    message.error(
+      t(
+        "user_password_user_not_found",
+        "User information could not be found."
+      )
+    );
+    return;
+  }
+
+  try {
+    await userApi.changePassword(userId, {
+      currentPassword: passwordValues.oldPassword,
+      newPassword: passwordValues.password,
+      confirmPassword: passwordValues.confirmPassword,
+    });
+
+    await message.success(
+      t(
+        "user_change_password_success",
+        "Password changed successfully."
+      ),
+      2
+    );
+
+    setIsChangePassOpen(false);
+    formChangePass.resetFields();
+  } catch (error: unknown) {
+    console.error("Change password failed:", error);
+
+    let errorMessage = t(
+      "user_change_password_failed",
+      "Failed to change the password."
+    );
+
+    if (axios.isAxiosError(error)) {
+      const responseData = error.response?.data as
+        | {
+            message?: string;
+            error?: string;
+          }
+        | undefined;
+
+      const backendMessage = String(
+        responseData?.message ??
+          responseData?.error ??
+          ""
+      ).toLowerCase();
+
+      if (
+        backendMessage.includes("current password") &&
+        backendMessage.includes("incorrect")
+      ) {
+        errorMessage = t(
+          "user_current_password_incorrect",
+          "The current password is incorrect."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "oldPassword",
+            errors: [errorMessage],
+          },
+        ]);
+      } else if (
+        backendMessage.includes("different from")
+      ) {
+        errorMessage = t(
+          "user_new_password_same_as_current",
+          "The new password must be different from the current password."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "password",
+            errors: [errorMessage],
+          },
+        ]);
+      } else if (
+        backendMessage.includes("do not match")
+      ) {
+        errorMessage = t(
+          "user_validation_password_mismatch",
+          "The passwords do not match."
+        );
+
+        formChangePass.setFields([
+          {
+            name: "confirmPassword",
+            errors: [errorMessage],
+          },
+        ]);
+      } else {
+        errorMessage =
+          responseData?.message ||
+          responseData?.error ||
+          errorMessage;
+      }
+    }
+
+    message.error(errorMessage);
+  }
+};
 
   const roleOptions = useMemo(
     () => [
@@ -277,27 +393,24 @@ export default function UserForm({
   }, [values?.role, form]);
 
   const handleFinish = async (formValues: UserFormValue) => {
-    const mergedMissionIds = Array.from(
-      new Set(sites.flatMap((site) => site.missionList ?? []))
-    );
+  const mergedMissionIds = Array.from(
+    new Set(sites.flatMap((site) => site.missionList ?? []))
+  );
 
-    const mergedDeviceIds = Array.from(
-      new Set(sites.flatMap((site) => site.deviceList ?? []))
-    );
+  const mergedDeviceIds = Array.from(
+    new Set(sites.flatMap((site) => site.deviceList ?? []))
+  );
 
-    const payload: UserFormValue = {
-      ...formValues,
-      siteIds: values?.role === 3 ? sites.map((site) => site.siteId) : [],
-      missionIds: values?.role === 3 ? mergedMissionIds : [],
-      deviceIds: values?.role === 3 ? mergedDeviceIds : [],
-      sites: values?.role === 3 ? sites : [],
-    };
+  const payload: UserFormValue = {
+    ...formValues,
+    siteIds: values?.role === 3 ? sites.map((site) => site.siteId) : [],
+    missionIds: values?.role === 3 ? mergedMissionIds : [],
+    deviceIds: values?.role === 3 ? mergedDeviceIds : [],
+    sites: values?.role === 3 ? sites : [],
+  };
 
-    console.log("user form submit payload:", JSON.stringify(payload, null, 2));
-
+  try {
     const res = await onSubmit(payload);
-
-    console.log("user form submit response:", JSON.stringify(res, null, 2));
 
     if (!res) return;
 
@@ -305,8 +418,10 @@ export default function UserForm({
       res.code === -1 ||
       res.code === "BAD_REQUEST" ||
       res.code === "ERROR" ||
+      res.code === "CONFLICT" ||
       res.code === 400 ||
       res.code === 403 ||
+      res.code === 409 ||
       res.code === 500
     ) {
       message.error(res.message || t("common_save_failed"));
@@ -321,7 +436,121 @@ export default function UserForm({
     );
 
     navigate("/settings/user");
-  };
+  } catch (error: unknown) {
+    console.error("User save failed:", error);
+
+    let errorMessage = t(
+      "common_save_failed",
+      "Failed to save user. Please try again."
+    );
+
+    if (axios.isAxiosError(error)) {
+      const responseData = error.response?.data as
+        | {
+            code?: string | number;
+            message?: string;
+            error?: string;
+          }
+        | undefined;
+
+      const errorCode = String(responseData?.code ?? "").toUpperCase();
+
+      const backendMessage = String(
+        responseData?.message ?? responseData?.error ?? ""
+      ).toLowerCase();
+
+      const duplicateMessage =
+        backendMessage.includes("already exist") ||
+        backendMessage.includes("already in use") ||
+        backendMessage.includes("duplicate") ||
+        error.response?.status === 409;
+
+      const emailExists =
+        errorCode.includes("EMAIL_ALREADY") ||
+        errorCode.includes("DUPLICATE_EMAIL") ||
+        (
+          backendMessage.includes("email") &&
+          duplicateMessage
+        );
+
+      const usernameExists =
+        errorCode.includes("USERNAME_ALREADY") ||
+        errorCode.includes("NAME_ALREADY") ||
+        errorCode.includes("DUPLICATE_USERNAME") ||
+        (
+          (
+            backendMessage.includes("username") ||
+            backendMessage.includes("user name")
+          ) &&
+          duplicateMessage
+        );
+
+      const duplicateFields: Array<{
+        name: "email" | "username";
+        errors: string[];
+      }> = [];
+
+      if (emailExists) {
+        duplicateFields.push({
+          name: "email",
+          errors: [
+            t(
+              "user_validation_email_exists",
+              "This email address is already in use."
+            ),
+          ],
+        });
+      }
+
+      if (usernameExists) {
+        duplicateFields.push({
+          name: "username",
+          errors: [
+            t(
+              "user_validation_username_exists",
+              "This user name is already in use."
+            ),
+          ],
+        });
+      }
+
+      if (duplicateFields.length > 0) {
+        form.setFields(duplicateFields);
+      }
+
+      if (emailExists && usernameExists) {
+        errorMessage = t(
+          "user_duplicate_email_username",
+          "The email address and user name are already in use."
+        );
+      } else if (emailExists) {
+        errorMessage = t(
+          "user_duplicate_email",
+          "This email address is already in use."
+        );
+      } else if (usernameExists) {
+        errorMessage = t(
+          "user_duplicate_username",
+          "This user name is already in use."
+        );
+      } else if (error.response?.status === 409) {
+        errorMessage = t(
+          "user_duplicate_error",
+          "Email address and user name must be unique."
+        );
+      } else {
+        errorMessage =
+          responseData?.message ||
+          responseData?.error ||
+          errorMessage;
+      }
+    } else if (error instanceof Error && error.message) {
+      errorMessage = error.message;
+    }
+
+    message.error(errorMessage);
+  }
+};
 
   const handleAssignSiteSubmit = async (assignValues: { siteId: string }) => {
     const selectedSite = siteOptions.find(
@@ -584,9 +813,17 @@ export default function UserForm({
                 className="flex-1 mb-0"
               >
                 <Input
-                  placeholder={t("user_placeholder_email")}
-                  className="h-[41px]"
-                />
+  placeholder={t("user_placeholder_email")}
+  className="h-[41px]"
+  onChange={() => {
+    form.setFields([
+      {
+        name: "email",
+        errors: [],
+      },
+    ]);
+  }}
+/>
               </Form.Item>
 
               {mode === "edit" && (
@@ -673,9 +910,9 @@ export default function UserForm({
               ) : (
                 <Select
                   placeholder={t("user_placeholder_select_company")}
-                  className="h-[41px]"
                   options={companyOptions}
                   loading={companyLoading}
+                  disabled={userRole === 2 || userRole === 3}
                 />
               )}
             </Form.Item>
@@ -692,9 +929,17 @@ export default function UserForm({
               ]}
             >
               <Input
-                placeholder={t("user_placeholder_name")}
-                className="h-[41px]"
-              />
+  placeholder={t("user_placeholder_name")}
+  className="h-[41px]"
+  onChange={() => {
+    form.setFields([
+      {
+        name: "username",
+        errors: [],
+      },
+    ]);
+  }}
+/>
             </Form.Item>
 
             <Form.Item
@@ -814,15 +1059,15 @@ export default function UserForm({
         title={t("user_change_password")}
         open={isChangePassOpen}
         onOk={() => formChangePass.submit()}
-        onCancel={() => setIsChangePassOpen(false)}
+        onCancel={() => {
+  setIsChangePassOpen(false);
+  formChangePass.resetFields();
+}}
         content={
           <Form
             layout="vertical"
             form={formChangePass}
-            onFinish={(passwordValues) => {
-              console.log("Password changed:", passwordValues);
-              setIsChangePassOpen(false);
-            }}
+            onFinish={handleChangePassword}
           >
             <Form.Item
               label={t("user_current_password")}

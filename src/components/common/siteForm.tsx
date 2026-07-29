@@ -60,11 +60,9 @@ export default function SiteForm({
       userRole !== 1 ? detailUserLogin?.user?.companyName : values.companyName,
   };
 
-  console.log("site form submit values:", JSON.stringify(newValues, null, 2));
 
   const res = await onSubmit(newValues);
 
-  console.log("site form submit response:", JSON.stringify(res, null, 2));
 
   if (!res) return;
 

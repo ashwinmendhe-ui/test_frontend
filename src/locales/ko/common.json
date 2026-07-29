@@ -625,5 +625,41 @@
 "stream_active_after_start": "작업 시작 이후 활성화됩니다",
 "stream_vector_space_loading": "벡터 공간 로딩 중...",
 "stream_emergency_stop": "비상 정지",
-"playback_map_idle_message": "영상 첨부 이후 활성화됩니다"
+"playback_map_idle_message": "영상 첨부 이후 활성화됩니다",
+
+"work_report_created": "보고서 생성",
+"work_report_download_pdf": "PDF 다운로드",
+
+"work_report_start_work": "작업 시작",
+"work_report_end_task": "작업 종료",
+"work_report_travel_distance": "이동 거리",
+"work_report_time_taken": "소요 시간",
+"work_report_site_name": "현장명",
+"work_report_robot_name": "로봇명",
+"work_report_mission_name": "미션명",
+"work_report_worker": "작업자",
+
+"work_report_total": "총계",
+
+"work_report_number": "번호",
+"work_report_recognition_content": "감지 내용",
+"work_report_detection_types": "감지 유형",
+"work_report_view_details": "상세 보기",
+"common_no_data": "데이터 없음",
+"stream_ai_mask": "Mask",
+"stream_ai_vehicle": "Vehicle",
+"user_duplicate_email": "이미 사용 중인 이메일 주소입니다.",
+"user_duplicate_username": "이미 사용 중인 사용자 이름입니다.",
+"user_duplicate_email_username": "이메일 주소와 사용자 이름이 모두 이미 사용 중입니다.",
+"user_validation_email_exists": "이미 사용 중인 이메일 주소입니다.",
+"user_validation_username_exists": "이미 사용 중인 사용자 이름입니다.",
+"user_change_password_success": "비밀번호가 성공적으로 변경되었습니다.",
+"user_change_password_failed": "비밀번호 변경에 실패했습니다.",
+"user_current_password_incorrect": "현재 비밀번호가 올바르지 않습니다.",
+"user_new_password_same_as_current": "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+"user_password_user_not_found": "사용자 정보를 찾을 수 없습니다.",
+"robot_validation_enter_serial_number": "시리얼 번호를 입력해주세요.",
+"playback_unavailable_status": "사용 불가",
+"playback_recording_unavailable": "녹화 영상을 사용할 수 없습니다",
+"playback_recording_unavailable_description": "이 녹화 영상은 불완전하거나 손상되어 재생할 수 없습니다."
 }

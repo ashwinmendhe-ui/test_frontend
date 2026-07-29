@@ -17,6 +17,7 @@ import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
 import ControlBar from "@/components/common/controlBar";
 import WorkReportModal from "@/components/common/workReportModal";
 import { LiveMap } from "@/components/map/liveMap";
+import { useDashboardStore } from "@/stores/dashboardStore";
 
 
 
@@ -46,6 +47,11 @@ type PlayerStatus =
 
   const STREAM_SYNC_CHANNEL = "robopilot-stream-sync";
   const ACTIVE_STREAM_KEY = "robopilot-active-stream";
+  const STREAM_OWNER_TAB_KEY = "robopilot-stream-owner-tab";
+
+  const CURRENT_TAB_ID =
+    crypto?.randomUUID?.() ||
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   type StreamSyncMessage = {
     type: "STREAM_STARTED" | "STREAM_STOPPED";
@@ -53,9 +59,49 @@ type PlayerStatus =
     sessionId?: string | null;
     playbackUrl?: string;
     mapUrl?: string;
+    missionId?: string | null;
     startTime?: string;
     startAtMs?: number;
   };
+
+  const CLASS_LABELS: Record<number, string> = {
+    0: "Construction",
+    1: "Hardhat",
+    2: "Mask",
+    3: "NO-Hardhat",
+    4: "NO-Mask",
+    5: "NO-Safety Vest",
+    6: "Person",
+    7: "Safety Cone",
+    8: "Safety Vest",
+    9: "Machinery",
+    10: "Vehicle",
+    20: "NO-Hardhat(LLM)",
+    21: "NO-Safety Vest(LLM)",
+    22: "NO-Safety Rope(LLM)",
+  };
+
+  const resolveMapUrl = (
+  playbackUrl?: string | null,
+  mapUrl?: string | null
+): string => {
+  const providedMapUrl = mapUrl?.trim();
+
+  if (providedMapUrl) {
+    return providedMapUrl;
+  }
+
+  const providedPlaybackUrl = playbackUrl?.trim();
+
+  if (!providedPlaybackUrl) {
+    return "";
+  }
+
+  return providedPlaybackUrl.replace(
+    /index\.m3u8(?:\?.*)?$/,
+    "map.m3u8"
+  );
+};
 
 export default function StreamIndex() {
   const [reportDetail, setReportDetail] = useState<any>(null);
@@ -92,6 +138,8 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   } = useRobotStore();
   const { startStream, heartBeat } = useStreamStore();
 
+  const pendingMissionRestoreRef = useRef<string | null>(null);
+
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
   const playerRef = useRef<HLSPlayerRef | null>(null);
@@ -105,7 +153,11 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [streamMapUrl, setStreamMapUrl] = useState("");
 
   const userRole = detailUserLogin?.roles?.[0];
-
+  const {
+    optimisticStopDevice,
+    getDashboardSilent,
+    getDashboardStatSilent,
+  } = useDashboardStore();
   const companyOptions = useMemo(() => {
     if (userRole === 1) {
       return companyList.map((item) => ({
@@ -114,6 +166,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
       }));
     }
 
+
     return [
       {
         value: detailUserLogin?.user?.companyId || "",
@@ -121,22 +174,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
       },
     ];
   }, [companyList, detailUserLogin, userRole]);
-  const CLASS_LABELS: Record<number, string> = {
-    0: "Construction",
-    1: "Hardhat",
-    2: "Mask",
-    3: "NO-Hardhat",
-    4: "NO-Mask",
-    5: "NO-Safety Vest",
-    6: "Person",
-    7: "Safety Cone",
-    8: "Safety Vest",
-    9: "Machinery",
-    10: "Vehicle",
-    20: "NO-Hardhat(LLM)",
-    21: "NO-Safety Vest(LLM)",
-    22: "NO-Safety Rope(LLM)",
-  };
+  
   const siteOptions = useMemo(
     () =>
       siteList.map((item) => ({
@@ -156,28 +194,56 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   );
 
   const missionOptions = useMemo(() => {
-    if (!values?.device) {
-      return missionList.map((item) => ({
-        value: item.missionId,
-        label: item.missionName,
-      }));
-    }
-
-    const selectedDevice = robotList.find(
-      (item) => item.deviceId === values.device
-    );
-
-    const filteredMissions = missionList.filter((item) => {
-      if (!selectedDevice?.deviceType) return true;
-      return item.deviceType === selectedDevice.deviceType;
-    });
-
-    return filteredMissions.map((item) => ({
+  if (!values?.device) {
+    return missionList.map((item) => ({
       value: item.missionId,
       label: item.missionName,
     }));
-  }, [missionList, robotList, values?.device]);
+  }
 
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values.device
+  );
+
+  const filteredMissions = missionList.filter((item) => {
+    if (!selectedDevice?.deviceType) {
+      return true;
+    }
+
+    return item.deviceType === selectedDevice.deviceType;
+  });
+
+  return filteredMissions.map((item) => ({
+    value: item.missionId,
+    label: item.missionName,
+  }));
+}, [missionList, robotList, values?.device]);
+
+const restoreMissionSelection = useCallback(
+  (missionId?: string | null) => {
+    if (!missionId) {
+      return;
+    }
+
+    pendingMissionRestoreRef.current = missionId;
+
+    const missionExists = missionOptions.some(
+      (mission) => mission.value === missionId
+    );
+
+    if (!missionExists) {
+      return;
+    }
+
+    form.setFieldValue("mission", missionId);
+    pendingMissionRestoreRef.current = null;
+
+    console.info("[MissionRestore] Mission restored", {
+      missionId,
+    });
+  },
+  [form, missionOptions]
+);
 
   const playerStatusConfig: Record<
   PlayerStatus,
@@ -213,66 +279,25 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
 const currentPlayerStatus = playerStatusConfig[playerStatus];
 
   const aiModules: AIModuleItem[] = useMemo(
-    () => [
-      {
-        value: "construction",
-        label: t("stream_ai_construction"),
-        category: "YOLO",
-        type: "common",
-        color: "#8D6E63",
-      },
-      {
-        value: "hardhat",
-        label: t("stream_ai_hardhat"),
-        category: "YOLO",
-        type: "common",
-        color: "#F4C20D",
-      },
-      {
-        value: "machinery",
-        label: t("stream_ai_machinery"),
-        category: "YOLO",
-        type: "common",
-        color: "#1FB6CF",
-      },
-      {
-        value: "person",
-        label: t("stream_ai_person"),
-        category: "YOLO",
-        type: "common",
-        color: "#7C4DFF",
-      },
-      {
-        value: "no_hardhat",
-        label: t("stream_ai_no_hardhat"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF2D55",
-      },
-      {
-        value: "no_safety_vest",
-        label: t("stream_ai_no_safety_vest"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF9500",
-      },
-      {
-        value: "no_mask",
-        label: t("stream_ai_no_mask"),
-        category: "YOLO",
-        type: "danger",
-        color: "#C218F3",
-      },
-      {
-        value: "fire",
-        label: t("stream_ai_fire"),
-        category: "YOLO",
-        type: "danger",
-        color: "#FF3B30",
-      },
-    ],
-    [t]
-  );
+  () => [
+    { value: "construction", label: t("stream_ai_construction"), category: "YOLO", type: "common", color: "#8D6E63" },
+    { value: "hardhat", label: t("stream_ai_hardhat"), category: "YOLO", type: "common", color: "#F4C20D" },
+    { value: "machinery", label: t("stream_ai_machinery"), category: "YOLO", type: "common", color: "#1FB6CF" },
+    { value: "mask", label: t("stream_ai_mask"), category: "YOLO", type: "common", color: "#00BCD4" },
+    { value: "no_mask_common", label: t("stream_ai_no_mask"), category: "YOLO", type: "common", color: "#C218F3" },
+    { value: "person", label: t("stream_ai_person"), category: "YOLO", type: "common", color: "#7C4DFF" },
+    { value: "vehicle", label: t("stream_ai_vehicle"), category: "YOLO", type: "common", color: "#607D8B" },
+    { value: "safety_vest", label: t("stream_ai_vest"), category: "YOLO", type: "common", color: "#34C759" },
+
+    { value: "no_hardhat", label: t("stream_ai_no_hardhat"), category: "YOLO", type: "danger", color: "#FF2D55" },
+    { value: "no_safety_vest", label: t("stream_ai_no_safety_vest"), category: "YOLO", type: "danger", color: "#FF9500" },
+    { value: "no_mask", label: t("stream_ai_no_mask"), category: "YOLO", type: "danger", color: "#C218F3" },
+    { value: "fire", label: t("stream_ai_fire"), category: "YOLO", type: "danger", color: "#FF3B30" },
+    { value: "llm_no_hardhat", label: t("stream_ai_no_hardhat"), category: "LLM", type: "danger", color: "#FF2D55" },
+    { value: "llm_no_safety_vest", label: t("stream_ai_no_safety_vest"), category: "LLM", type: "danger", color: "#FF9500" },
+  ],
+  [t]
+);
 
   const [selectedModules, setSelectedModules] = useState<string[]>(
     aiModules.map((item) => item.value)
@@ -361,7 +386,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       deviceSn: selectedRobotDetail?.deviceSn || "",
       urlType: 1,
       videoId: {
-        droneSn: selectedRobotDetail?.droneSn || "1581F7FVC25A700DF473",
+        droneSn: selectedRobotDetail?.droneSn || selectedRobotDetail?.deviceSn || "",
         payloadIndex: {
           type: selectedRobotDetail?.subDeviceInfo?.type || 99,
           subType: selectedRobotDetail?.subDeviceInfo?.subType || 0,
@@ -404,18 +429,23 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   setWorkStartAtMs(null);
 }, []);
 
-  const broadcastStreamMessage = useCallback((message: StreamSyncMessage) => {
+  const broadcastStreamMessage = useCallback(
+  (message: StreamSyncMessage) => {
     if (message.type === "STREAM_STARTED") {
-        localStorage.setItem(ACTIVE_STREAM_KEY, JSON.stringify(message));
-      }
+      localStorage.setItem(
+        ACTIVE_STREAM_KEY,
+        JSON.stringify(message)
+      );
+    }
 
-      if (message.type === "STREAM_STOPPED") {
-        localStorage.removeItem(ACTIVE_STREAM_KEY);
-      }
+    if (message.type === "STREAM_STOPPED") {
+      localStorage.removeItem(ACTIVE_STREAM_KEY);
+    }
 
-      streamSyncChannelRef.current?.postMessage(message);
-        }, []);
-
+    streamSyncChannelRef.current?.postMessage(message);
+  },
+  []
+);
 
   const handleStartWork = async () => {
   try {
@@ -449,29 +479,74 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       setWorkStartAtMs(startAtMs);
       setElapsedSeconds(0);
 
-      if (!streamInfo?.playback_url) {
-        throw new Error("Stream started, but playback URL was not found.");
-      }
+      const playbackUrl =
+  streamInfo?.playback_url ??
+  streamInfo?.playbackUrl ??
+  "";
 
-      setStreamPlaybackUrl(streamInfo.playback_url || "");
-      setStreamMapUrl(streamInfo.map_url || "");
+const backendMapUrl =
+  streamInfo?.map_url ??
+  streamInfo?.mapUrl ??
+  "";
 
+const resolvedMapUrl = resolveMapUrl(
+  playbackUrl,
+  backendMapUrl
+);
+
+if (!playbackUrl) {
+  throw new Error(
+    "Stream started, but playback URL was not found."
+  );
+}
+
+console.log("[StreamStart] Stream URLs", {
+  playbackUrl,
+  backendMapUrl,
+  resolvedMapUrl,
+  streamInfo,
+});
+
+setStreamPlaybackUrl(playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
       setMapReady(false);
       setMapRetryKey(0);
       setPlayerStatus("LOADING");
       setHlsRetryCount(0);
       setHlsRetryKey(0);
-      setIsStreaming(streamInfo.state === "RUNNING");
 
-      broadcastStreamMessage({
-      type: "STREAM_STARTED",
-      deviceSn: getCurrentDeviceSn(),
-      sessionId: res?.data?.sessionId || null,
-      playbackUrl: streamInfo.playback_url || "",
-      mapUrl: streamInfo.map_url || "",
-      startTime: now.toISOString(),
-      startAtMs,
-    });
+      const streamState =
+        streamInfo?.state ??
+        streamInfo?.status ??
+        streamInfo?.sessionStatus ??
+        streamInfo?.session_status;
+
+      const active =
+        streamState === "RUNNING" ||
+        streamState === "ACTIVE" ||
+        streamState === "LIVE" ||
+        streamState === "WORKING";
+
+      setIsStreaming(active);
+
+     const activeMissionId =
+  res?.data?.missionId ??
+  res?.data?.mission_id ??
+  streamInfo?.missionId ??
+  streamInfo?.mission_id ??
+  values?.mission ??
+  null;
+
+broadcastStreamMessage({
+  type: "STREAM_STARTED",
+  deviceSn: getCurrentDeviceSn(),
+  sessionId: res?.data?.sessionId || null,
+  playbackUrl,
+  mapUrl: resolvedMapUrl,
+  missionId: activeMissionId,
+  startTime: now.toISOString(),
+  startAtMs,
+});
     }
 
     if (res?.data?.sessionId) {
@@ -511,98 +586,118 @@ const handleStopWork = async () => {
     const endTime = new Date();
 
     await streamApi.stop(streamPayload);
+
     const stoppedDeviceSn = getCurrentDeviceSn();
 
-    streamSyncChannelRef.current?.postMessage({
+    optimisticStopDevice(stoppedDeviceSn);
+
+    window.setTimeout(() => {
+      getDashboardSilent();
+      getDashboardStatSilent();
+    }, 800);
+
+    broadcastStreamMessage({
       type: "STREAM_STOPPED",
       deviceSn: stoppedDeviceSn,
       sessionId,
     });
+
     clearLocalStreamState();
 
     const startTimeText = workStartTime
       ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
       : "-";
 
-    const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
+    const endTimeText = endTime
+      .toLocaleString("sv-SE")
+      .replace("T", " ");
 
     const totalTimeText = formatDuration(elapsedSeconds);
 
     const siteName =
-      siteOptions.find((s) => s.value === values?.site)?.label || "-";
+      siteOptions.find((site) => site.value === values?.site)?.label || "-";
 
     const robotName =
-      selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-";
+      selectedRobotDetail?.deviceName ||
+      selectedRobotDetail?.deviceSn ||
+      "-";
 
     const missionName =
-      missionOptions.find((m) => m.value === values?.mission)?.label || "-";
+      missionOptions.find(
+        (mission) => mission.value === values?.mission
+      )?.label || "-";
 
-    let reportRes: any = null;
+    const fallbackBookmarks = bookmarks.map(
+      (bookmark: any, index: number) => {
+        const label =
+          bookmark.labels?.[0] ||
+          bookmark.label ||
+          bookmark.type ||
+          "Unknown";
 
-if (streamPlaybackUrl && selectedRobotDetail?.deviceSn && values?.mission) {
-}
+        return {
+          label,
+          mdisplay: bookmark.timeSec
+            ? new Date(bookmark.timeSec * 1000)
+                .toISOString()
+                .substring(11, 19)
+            : "00:00:00",
+          m: bookmark.timeSec || 0,
+          s: bookmark.s || "",
+          o: 0,
+          duration: bookmark.timeSec
+            ? new Date(bookmark.timeSec * 1000)
+                .toISOString()
+                .substring(11, 19)
+            : "00:00:00",
+          id: bookmark.id || `${label}-${index}`,
+        };
+      }
+    );
 
-if (reportRes) {
-  setReportDetail(reportRes);
-} else {
-  const fallbackBookmarks = bookmarks.map((bm: any, index: number) => {
-    const label = bm.labels?.[0] || bm.label || bm.type || "Unknown";
+    const fallbackLabelCounts = fallbackBookmarks.reduce(
+      (acc: Record<string, number>, bookmark: any) => {
+        acc[bookmark.label] =
+          (acc[bookmark.label] || 0) + 1;
 
-    return {
-      label,
-      mdisplay: bm.timeSec
-        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-        : "00:00:00",
-      m: bm.timeSec || 0,
-      s: bm.s || "",
-      o: 0,
-      duration: bm.timeSec
-        ? new Date(bm.timeSec * 1000).toISOString().substring(11, 19)
-        : "00:00:00",
-      id: bm.id || `${label}-${index}`,
-    };
-  });
+        return acc;
+      },
+      {}
+    );
 
-  const fallbackLabelCounts = fallbackBookmarks.reduce(
-    (acc: Record<string, number>, bm: any) => {
-      acc[bm.label] = (acc[bm.label] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+    setReportDetail({
+      reportCreatedAt: endTimeText,
+      playbackUrl: streamPlaybackUrl,
+      mapUrl: streamMapUrl,
+      companyId: values?.company,
+      siteId: values?.site,
+      missionId: values?.mission,
+      startTime: startTimeText,
+      endTime: endTimeText,
+      totalTime: totalTimeText,
+      distance: "-",
+      siteName,
+      deviceName: robotName,
+      robotName,
+      missionName,
+      userName: "sysadmin",
+      workerName: "sysadmin",
+      deviceSn: selectedRobotDetail?.deviceSn || "",
+      totalRecognition: fallbackBookmarks.length,
+      labelCounts: fallbackLabelCounts,
+      bookmarks: fallbackBookmarks,
+    });
 
-  setReportDetail({
-    reportCreatedAt: endTimeText,
-    playbackUrl: streamPlaybackUrl,
-    companyId: values?.company,
-    siteId: values?.site,
-    missionId: values?.mission,
-    startTime: startTimeText,
-    endTime: endTimeText,
-    totalTime: totalTimeText,
-    distance: "-",
-    siteName,
-    deviceName: robotName,
-    robotName,
-    missionName,
-    userName: "sysadmin",
-    workerName: "sysadmin",
-    deviceSn: selectedRobotDetail?.deviceSn || "",
-    totalRecognition: fallbackBookmarks.length,
-    labelCounts: fallbackLabelCounts,
-    bookmarks: fallbackBookmarks,
-  });
-}
+    remoteSeenActiveRef.current = false;
+    inactivePollCountRef.current = 0;
+
+    setIsReportOpen(true);
 
     showNotification(
       "success",
       "Stream stopped",
       "Work session stopped successfully."
     );
-
-    remoteSeenActiveRef.current = false;
-    inactivePollCountRef.current = 0;
-    setIsReportOpen(true);
   } catch (error: any) {
     showNotification(
       "error",
@@ -611,38 +706,17 @@ if (reportRes) {
         error?.message ||
         "Unable to stop stream."
     );
+
+    /*
+     * Important:
+     * Do not clear the active stream UI when the server rejected Stop.
+     */
   } finally {
-    playerRef.current?.pause();
-    remoteSeenActiveRef.current = false;
-    inactivePollCountRef.current = 0;
-
-    setIsStreaming(false);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-
-    setSessionId(null);
-    setStreamPlaybackUrl("");
-    setStreamMapUrl("");
-
-    setBookmarks([]);
-    setLiveDeviceInfo(null);
-    setWorkStartTime(null);
-    setElapsedSeconds(0);
-
-    setHlsRetryCount(0);
-    setHlsRetryKey(0);
-
     setIsLoading(false);
-    setPlayerStatus("OFFLINE");
-    setHasConnectedOnce(false);
-    setMapReady(false);
-    setMapRetryKey(0);
-      }
+  }
 };
 
-const STREAM_OWNER_TAB_KEY = "robopilot-stream-owner-tab";
-const CURRENT_TAB_ID = crypto.randomUUID();
+
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -766,18 +840,36 @@ const [mapReady, setMapReady] = useState(false);
 
 const remoteSeenActiveRef = useRef(false);
 const inactivePollCountRef = useRef(0);
+const STREAM_STATUS_POLL_INTERVAL_MS = 3000;
+const STREAM_INACTIVE_CONFIRMATION_POLLS = 10;
 
 useEffect(() => {
-  if (!selectedRobotDetail?.deviceSn || !streamPlaybackUrl || isReportOpen) return;
+  if (
+    !selectedRobotDetail?.deviceSn ||
+    !streamPlaybackUrl ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  const deviceSn = selectedRobotDetail.deviceSn;
 
   const timer = window.setInterval(async () => {
     try {
-      const statusRes = await streamApi.status(selectedRobotDetail.deviceSn!);
+      const statusRes = await streamApi.status(deviceSn);
+
+      const remoteSessionStatus =
+        statusRes?.sessionStatus ??
+        statusRes?.session_status ??
+        statusRes?.status;
 
       const active =
         statusRes?.active === true ||
         statusRes?.streaming === true ||
-        statusRes?.sessionStatus === "ACTIVE";
+        remoteSessionStatus === "ACTIVE" ||
+        remoteSessionStatus === "RUNNING" ||
+        remoteSessionStatus === "LIVE" ||
+        remoteSessionStatus === "WORKING";
 
       if (active) {
         remoteSeenActiveRef.current = true;
@@ -791,12 +883,52 @@ useEffect(() => {
 
       inactivePollCountRef.current += 1;
 
-      if (inactivePollCountRef.current < 2) {
+      console.warn("[StreamStatus] Inactive response", {
+        deviceSn,
+        inactivePollCount: inactivePollCountRef.current,
+        remoteSessionStatus,
+        active: statusRes?.active,
+        streaming: statusRes?.streaming,
+      });
+
+      if (
+        inactivePollCountRef.current <
+        STREAM_INACTIVE_CONFIRMATION_POLLS
+      ) {
         return;
       }
 
+      const confirmationRes = await streamApi.status(deviceSn);
+
+      const confirmationStatus =
+        confirmationRes?.sessionStatus ??
+        confirmationRes?.session_status ??
+        confirmationRes?.status;
+
+      const confirmedActive =
+        confirmationRes?.active === true ||
+        confirmationRes?.streaming === true ||
+        confirmationStatus === "ACTIVE" ||
+        confirmationStatus === "RUNNING" ||
+        confirmationStatus === "LIVE" ||
+        confirmationStatus === "WORKING";
+
+      if (confirmedActive) {
+        remoteSeenActiveRef.current = true;
+        inactivePollCountRef.current = 0;
+        return;
+      }
+
+      console.warn("[StreamStatus] Confirmed inactive", {
+        deviceSn,
+        statusRes,
+        confirmationRes,
+      });
+
       const endTime = new Date();
-      const endTimeText = endTime.toLocaleString("sv-SE").replace("T", " ");
+      const endTimeText = endTime
+        .toLocaleString("sv-SE")
+        .replace("T", " ");
 
       playerRef.current?.pause();
 
@@ -812,13 +944,24 @@ useEffect(() => {
         endTime: endTimeText,
         totalTime: formatDuration(elapsedSeconds),
         distance: "-",
-        siteName: siteOptions.find((s) => s.value === values?.site)?.label || "-",
-        deviceName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
-        robotName: selectedRobotDetail?.deviceName || selectedRobotDetail?.deviceSn || "-",
-        missionName: missionOptions.find((m) => m.value === values?.mission)?.label || "-",
+        siteName:
+          siteOptions.find((site) => site.value === values?.site)?.label ||
+          "-",
+        deviceName:
+          selectedRobotDetail.deviceName ||
+          selectedRobotDetail.deviceSn ||
+          "-",
+        robotName:
+          selectedRobotDetail.deviceName ||
+          selectedRobotDetail.deviceSn ||
+          "-",
+        missionName:
+          missionOptions.find(
+            (mission) => mission.value === values?.mission
+          )?.label || "-",
         userName: "sysadmin",
         workerName: "sysadmin",
-        deviceSn: selectedRobotDetail?.deviceSn || "",
+        deviceSn,
         totalRecognition: bookmarks.length,
         bookmarks: [],
         labelCounts: {},
@@ -836,14 +979,18 @@ useEffect(() => {
       setHasConnectedOnce(false);
       setMapReady(false);
       setMapRetryKey(0);
-    } catch (e) {
-      console.error("Failed to poll stream status", e);
+
+      remoteSeenActiveRef.current = false;
+      inactivePollCountRef.current = 0;
+    } catch (error) {
+      console.error("[StreamStatus] Failed to poll stream status", error);
     }
-  }, 3000);
+  }, STREAM_STATUS_POLL_INTERVAL_MS);
 
   return () => window.clearInterval(timer);
 }, [
   selectedRobotDetail?.deviceSn,
+  selectedRobotDetail?.deviceName,
   streamPlaybackUrl,
   isReportOpen,
   values?.company,
@@ -852,6 +999,8 @@ useEffect(() => {
   workStartTime,
   elapsedSeconds,
   bookmarks.length,
+  siteOptions,
+  missionOptions,
 ]);
 
 useEffect(() => {
@@ -884,22 +1033,41 @@ useEffect(() => {
 
 
 useEffect(() => {
-  if (!streamPlaybackUrl || !isStreaming) return;
+  if (!streamPlaybackUrl || !isStreaming) {
+    return;
+  }
+
+  let cancelled = false;
+  let timeoutId: number | null = null;
+  let controller: AbortController | null = null;
 
   const fetchBookmarks = async () => {
+    if (cancelled) {
+      return;
+    }
+
+    controller = new AbortController();
+
     try {
       const bookmarkUrl = streamPlaybackUrl.replace(
         "index.m3u8",
         "bookmark.ndjson"
       );
 
-      const response = await fetch(bookmarkUrl);
+      const response = await fetch(bookmarkUrl, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-      if (!response.ok) {
+      if (!response.ok || cancelled) {
         return;
       }
 
       const text = await response.text();
+
+      if (cancelled) {
+        return;
+      }
 
       const lines = text
         .split("\n")
@@ -907,7 +1075,6 @@ useEffect(() => {
         .filter(Boolean);
 
       const parsedRaw = lines.map((line) => JSON.parse(line));
-
       const firstTimestamp = parsedRaw[0]?.m || 0;
 
       const parsed = parsedRaw.map((item, index) => {
@@ -933,17 +1100,33 @@ useEffect(() => {
 
       setBookmarks(parsed);
     } catch (error) {
-      console.error("Failed to fetch bookmarks:", error);}
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      console.error("Failed to fetch bookmarks:", error);
+    } finally {
+      if (!cancelled) {
+        timeoutId = window.setTimeout(fetchBookmarks, 3000);
+      }
+    }
   };
 
   fetchBookmarks();
 
-  const interval = window.setInterval(fetchBookmarks, 3000);
-
   return () => {
-    window.clearInterval(interval);
+    cancelled = true;
+
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+
+    controller?.abort();
   };
-}, [streamPlaybackUrl, isStreaming, CLASS_LABELS]);
+}, [streamPlaybackUrl, isStreaming]);
 
   useEffect(() => {
     if (userRole === 1) {
@@ -958,21 +1141,56 @@ useEffect(() => {
     }
   }, [detailUserLogin, form, getSiteListByCompany, userRole]);
 
-  useEffect(() => {
+ useEffect(() => {
   if (!sessionId || !isStreaming) return;
 
-  const isOwnerTab =
-    localStorage.getItem(STREAM_OWNER_TAB_KEY) === CURRENT_TAB_ID;
+  const claimOwnershipIfNeeded = () => {
+    const currentOwner =
+      localStorage.getItem(STREAM_OWNER_TAB_KEY);
 
-  if (!isOwnerTab) return;
+    if (!currentOwner) {
+      localStorage.setItem(
+        STREAM_OWNER_TAB_KEY,
+        CURRENT_TAB_ID
+      );
 
-  const interval = window.setInterval(() => {
-    heartBeat(sessionId).catch((error) => {
+      return true;
+    }
+
+    return currentOwner === CURRENT_TAB_ID;
+  };
+
+  const sendHeartbeat = async () => {
+    const isOwner = claimOwnershipIfNeeded();
+
+    if (!isOwner) {
+      return;
+    }
+
+    try {
+      await heartBeat(sessionId);
+    } catch (error) {
       console.error("Heartbeat failed:", error);
-    });
-  }, 30000);
+    }
+  };
 
-  return () => window.clearInterval(interval);
+  sendHeartbeat();
+
+  const interval = window.setInterval(
+    sendHeartbeat,
+    30000
+  );
+
+  return () => {
+    window.clearInterval(interval);
+
+    if (
+      localStorage.getItem(STREAM_OWNER_TAB_KEY) ===
+      CURRENT_TAB_ID
+    ) {
+      localStorage.removeItem(STREAM_OWNER_TAB_KEY);
+    }
+  };
 }, [heartBeat, isStreaming, sessionId]);
 
 
@@ -986,15 +1204,23 @@ useEffect(() => {
     const currentDeviceSn = getCurrentDeviceSn();
     if (!currentDeviceSn || currentDeviceSn !== message.deviceSn) return;
 
+    restoreMissionSelection(message.missionId);
+
+
     const startedAtMs =
       message.startAtMs ||
       (message.startTime ? new Date(message.startTime).getTime() : Date.now());
 
     const startedAt = new Date(startedAtMs);
 
-    setSessionId(message.sessionId || null);
-    setStreamPlaybackUrl(message.playbackUrl);
-    setStreamMapUrl(message.mapUrl || "");
+   const resolvedMapUrl = resolveMapUrl(
+  message.playbackUrl,
+  message.mapUrl
+);
+
+setSessionId(message.sessionId || null);
+setStreamPlaybackUrl(message.playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
     setWorkStartTime(startedAt);
     setWorkStartAtMs(startedAtMs);
     setElapsedSeconds(
@@ -1027,12 +1253,34 @@ if (savedActiveStream) {
             statusResponse?.session_status;
 
           if (
-            streamStatus === "ACTIVE" ||
-            streamStatus === "LIVE" ||
-            streamStatus === "WORKING"
-          ) {
-            applyActiveStream(parsed);
-          } else {
+                streamStatus === "ACTIVE" ||
+                streamStatus === "RUNNING" ||
+                streamStatus === "LIVE" ||
+                streamStatus === "WORKING"
+              ) {
+                const restoredMissionId =
+  statusResponse?.missionId ??
+  statusResponse?.mission_id ??
+  parsed?.missionId ??
+  null;
+
+const restoredStream: StreamSyncMessage = {
+  ...parsed,
+  sessionId:
+    statusResponse?.sessionId ??
+    statusResponse?.session_id ??
+    parsed?.sessionId ??
+    null,
+  missionId: restoredMissionId,
+};
+
+localStorage.setItem(
+  ACTIVE_STREAM_KEY,
+  JSON.stringify(restoredStream)
+);
+
+applyActiveStream(restoredStream);
+              } else {
             localStorage.removeItem(ACTIVE_STREAM_KEY);
             clearLocalStreamState();
           }
@@ -1068,7 +1316,7 @@ if (savedActiveStream) {
     channel.close();
     streamSyncChannelRef.current = null;
   };
-}, [clearLocalStreamState, getCurrentDeviceSn]);
+}, [clearLocalStreamState, getCurrentDeviceSn, restoreMissionSelection]);
 
 
 useEffect(() => {
@@ -1156,20 +1404,46 @@ useEffect(() => {
 
       if (!statusRes?.streaming) return;
 
-      if (statusRes?.missionId) {
-        form.setFieldValue("mission", statusRes.missionId);
-      }
+      const activeMissionId =
+  statusRes?.missionId ??
+  statusRes?.mission_id ??
+  dashboardPrefill?.missionId ??
+  null;
+
+restoreMissionSelection(activeMissionId);
 
       const streamInfo = await startStream(deviceSn);
 
-      setSessionId(deviceSn);
+      setSessionId(
+      statusRes?.sessionId ??
+      statusRes?.session_id ??
+      null
+    );
 
-      setStreamPlaybackUrl(
-        streamInfo.playback_url || streamInfo.playbackUrl || ""
-      );
+      const playbackUrl =
+  streamInfo?.playback_url ??
+  streamInfo?.playbackUrl ??
+  "";
 
-      setStreamMapUrl(streamInfo.map_url || streamInfo.mapUrl || "");
+const backendMapUrl =
+  streamInfo?.map_url ??
+  streamInfo?.mapUrl ??
+  "";
 
+const resolvedMapUrl = resolveMapUrl(
+  playbackUrl,
+  backendMapUrl
+);
+
+console.log("[DashboardStream] Stream URLs", {
+  playbackUrl,
+  backendMapUrl,
+  resolvedMapUrl,
+  streamInfo,
+});
+
+setStreamPlaybackUrl(playbackUrl);
+setStreamMapUrl(resolvedMapUrl);
       setMapReady(false);
       setMapRetryKey(0);
 
@@ -1193,9 +1467,36 @@ useEffect(() => {
   routeDeviceId,
   missionList,
   startStream,
+  restoreMissionSelection,
 ]);
 
+useEffect(() => {
+  const missionId = pendingMissionRestoreRef.current;
 
+  if (!missionId || missionOptions.length === 0) {
+    return;
+  }
+
+  const missionExists = missionOptions.some(
+    (mission) => mission.value === missionId
+  );
+
+  if (!missionExists) {
+    console.warn("[MissionRestore] Mission not found in current options", {
+      missionId,
+      missionOptions,
+    });
+
+    return;
+  }
+
+  form.setFieldValue("mission", missionId);
+  pendingMissionRestoreRef.current = null;
+
+  console.info("[MissionRestore] Mission restored", {
+    missionId,
+  });
+}, [form, missionOptions]);
 
   const showCommonDetection =
   selectedModules.some((m) =>
@@ -1380,19 +1681,9 @@ const SmallStatusBadge = ({
                     handleDeviceInfoUpdate(deviceInfo);
                   }}
                   onReady={() => {
-                    if (hasConnectedOnce) {
-                      setPlayerStatus("LIVE");
-                      setIsPlaying(true);
-                      return;
-                    }
-
-                    setPlayerStatus("CONNECTING");
-
-                    setTimeout(() => {
-                      setHasConnectedOnce(true);
-                      setPlayerStatus("LIVE");
-                      setIsPlaying(true);
-                    }, 400);
+                    setHasConnectedOnce(true);
+                    setPlayerStatus("LIVE");
+                    setIsPlaying(true);
                   }}
                   onError={handleHlsError}
                   onLoadedMetadata={() => {
@@ -1453,7 +1744,7 @@ const SmallStatusBadge = ({
 
               {isStreaming && streamMapUrl && mapReady ? (
                 <HLSPlayer
-                  key={`vector-${streamMapUrl}`}
+                  key={`vector-${streamMapUrl}-${mapRetryKey}`}
                   src={streamMapUrl}
                   metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
                   className="w-full h-full object-contain bg-black"
@@ -1770,7 +2061,6 @@ const SmallStatusBadge = ({
           onClose={handleReportCancel}
           detail={reportDetail}
           reportMeta={reportDetail}
-          autoDownload={false}
         />
       )}
     </div>

@@ -183,7 +183,6 @@ export default function KPIPage() {
   const handleDownloadPdf = () => {
     // Placeholder for future PDF export integration
     // Can later connect to backend report generation or frontend PDF export
-    console.log("Download KPI PDF");
   };
 
   return (

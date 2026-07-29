@@ -290,9 +290,7 @@ export const useUserStore = create<Store>((set) => ({
   updateUser: async (id, param) => {
     set({ loading: true });
     try {
-      // console.log("updateUser payload:", JSON.stringify(param, null, 2));
       const res = await userApi.updateUser(id, param);
-      // console.log("updateUser response:", JSON.stringify(res, null, 2));
       set({ loading: false });
       return res;
     } catch (error: any) {

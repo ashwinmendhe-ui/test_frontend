@@ -28,7 +28,7 @@ type PlaybackFormValues = {
 type AICategory = "common" | "danger";
 
 type AIModuleItem = {
-  value: string;
+  value: number;
   label: string;
   category: string;
   type: AICategory;
@@ -67,6 +67,12 @@ type TimelineMarker = {
 };
 
 type LabelsMap = Record<number, string>;
+
+type PlaybackHlsError = {
+  fatal?: boolean;
+  details?: string;
+  type?: string;
+};
 
 const getMetadataBaseUrl = (videoUrl: string) => {
   return videoUrl
@@ -194,6 +200,13 @@ export default function Playback() {
   const [videoTimes, setVideoTimes] = useState<Record<string, number>>({});
   const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
   const [videoLoading, setVideoLoading] = useState<Record<string, boolean>>({});
+  const [videoUnavailable, setVideoUnavailable] = useState<
+    Record<string, boolean>
+  >({});
+
+  const playbackErrorCountRef = useRef<Record<string, number>>({});
+
+  const PLAYBACK_ERROR_LIMIT = 5;
   const [bookmarksByVideo, setBookmarksByVideo] = useState<
     Record<string, VideoBookmark[]>
   >({});
@@ -276,26 +289,110 @@ export default function Playback() {
 
   const aiModules: AIModuleItem[] = useMemo(
   () => [
-    { value: "construction", label: "Construction", category: "YOLO", type: "common", color: "#8B6F63" },
-    { value: "hardhat", label: "HardHat", category: "YOLO", type: "common", color: "#FFD600" },
-    { value: "machinery", label: "Machinery", category: "YOLO", type: "common", color: "#14B8C8" },
-    { value: "mask", label: "Mask", category: "YOLO", type: "common", color: "#A855F7" },
-    { value: "person", label: "Person", category: "YOLO", type: "common", color: "#22C55E" },
-    { value: "vest", label: "Safety Vest", category: "YOLO", type: "common", color: "#1683FF" },
-    { value: "vehicle", label: "Vehicle", category: "YOLO", type: "common", color: "#1683FF" },
-    { value: "cone", label: "Safety Cone", category: "YOLO", type: "common", color: "#FF8A00" },
+    {
+      value: 0,
+      label: "Construction",
+      category: "YOLO",
+      type: "common",
+      color: "#8B6F63",
+    },
+    {
+      value: 1,
+      label: "HardHat",
+      category: "YOLO",
+      type: "common",
+      color: "#FFD600",
+    },
+    {
+      value: 9,
+      label: "Machinery",
+      category: "YOLO",
+      type: "common",
+      color: "#14B8C8",
+    },
+    {
+      value: 2,
+      label: "Mask",
+      category: "YOLO",
+      type: "common",
+      color: "#A855F7",
+    },
+    {
+      value: 6,
+      label: "Person",
+      category: "YOLO",
+      type: "common",
+      color: "#22C55E",
+    },
+    {
+      value: 8,
+      label: "Safety Vest",
+      category: "YOLO",
+      type: "common",
+      color: "#1683FF",
+    },
+    {
+      value: 10,
+      label: "Vehicle",
+      category: "YOLO",
+      type: "common",
+      color: "#1683FF",
+    },
+    {
+      value: 7,
+      label: "Safety Cone",
+      category: "YOLO",
+      type: "common",
+      color: "#FF8A00",
+    },
 
-    { value: "no-hardhat", label: "No HardHat", category: "YOLO", type: "danger", color: "#FF2D55" },
-    { value: "no-vest", label: "No Safety Vest", category: "YOLO", type: "danger", color: "#FF8A00" },
-    { value: "no-mask", label: "No Mask", category: "YOLO", type: "danger", color: "#D100D8" },
-    { value: "llm-hardhat", label: "No HardHat", category: "LLM", type: "danger", color: "#FF2D55" },
-    { value: "llm-vest", label: "No Safety Vest", category: "LLM", type: "danger", color: "#FF8A00" },
-    { value: "llm-rope", label: "No Safety Rope", category: "LLM", type: "danger", color: "#FF2D55" },
+    {
+      value: 3,
+      label: "No HardHat",
+      category: "YOLO",
+      type: "danger",
+      color: "#FF2D55",
+    },
+    {
+      value: 5,
+      label: "No Safety Vest",
+      category: "YOLO",
+      type: "danger",
+      color: "#FF8A00",
+    },
+    {
+      value: 4,
+      label: "No Mask",
+      category: "YOLO",
+      type: "danger",
+      color: "#D100D8",
+    },
+    {
+      value: 20,
+      label: "No HardHat",
+      category: "LLM",
+      type: "danger",
+      color: "#FF2D55",
+    },
+    {
+      value: 21,
+      label: "No Safety Vest",
+      category: "LLM",
+      type: "danger",
+      color: "#FF8A00",
+    },
+    {
+      value: 22,
+      label: "No Safety Rope",
+      category: "LLM",
+      type: "danger",
+      color: "#FF2D55",
+    },
   ],
   []
 );
 
-const [selectedModules, setSelectedModules] = useState<string[]>(() =>
+const [selectedModules, setSelectedModules] = useState<number[]>(() =>
   aiModules.map((item) => item.value)
 );
 
@@ -326,27 +423,7 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
     return next;
   }, [selectedVideos]);
 
-  const selectedModuleIdsByVideo = useMemo(() => {
-    const result: Record<string, number[]> = {};
-
-    selectedVideos.forEach((videoUrl) => {
-      const labels = labelsByVideo[videoUrl] || {};
-      const matchedIds = Object.entries(labels)
-        .filter(([, label]) => {
-          const normalizedLabel = normalizeText(label);
-          return selectedModules.some((moduleValue) =>
-            normalizedLabel.includes(normalizeText(moduleValue))
-          );
-        })
-        .map(([id]) => Number(id))
-        .filter((id) => Number.isFinite(id));
-
-      result[videoUrl] = matchedIds;
-    });
-
-    return result;
-  }, [labelsByVideo, selectedModules, selectedVideos]);
-
+  
   const mainDuration = useMemo(() => {
     if (selectedVideos.length === 0) return 0;
     const durations = selectedVideos.map((url) => videoDurations[url] || 0);
@@ -362,6 +439,68 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
       return currentDuration > longestDuration ? current : longest;
     }, selectedVideos[0]);
   }, [selectedVideos, videoDurations]);
+
+  const handlePlaybackError = useCallback(
+  (videoUrl: string, error?: unknown) => {
+    const hlsError = error as PlaybackHlsError | undefined;
+    const isFatal = Boolean(hlsError?.fatal);
+
+    const nextErrorCount =
+      (playbackErrorCountRef.current[videoUrl] || 0) + 1;
+
+    playbackErrorCountRef.current[videoUrl] = nextErrorCount;
+
+    console.warn("[Playback] Video load error", {
+      videoUrl,
+      errorCount: nextErrorCount,
+      fatal: isFatal,
+      details: hlsError?.details,
+      error,
+    });
+
+    if (!isFatal && nextErrorCount < PLAYBACK_ERROR_LIMIT) {
+      return;
+    }
+
+    console.error("[Playback] Recording unavailable", {
+      videoUrl,
+      errorCount: nextErrorCount,
+      fatal: isFatal,
+      details: hlsError?.details,
+      error,
+    });
+
+    playerRefs.current[videoUrl]?.pause();
+
+    setVideoLoading((prev) => ({
+      ...prev,
+      [videoUrl]: false,
+    }));
+
+    setVideoUnavailable((prev) => ({
+      ...prev,
+      [videoUrl]: true,
+    }));
+
+    setVideoTimes((prev) => ({
+      ...prev,
+      [videoUrl]: 0,
+    }));
+
+    setVideoDurations((prev) => ({
+      ...prev,
+      [videoUrl]: 0,
+    }));
+
+    if (videoUrl === mainVideoUrl) {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+    }
+  },
+  [mainVideoUrl]
+);
+
 
   const getMainPlayer = () => {
     if (!mainVideoUrl) return null;
@@ -477,6 +616,8 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
     setVideoTimes({});
     setVideoDurations({});
     setVideoLoading({});
+    setVideoUnavailable({});
+    playbackErrorCountRef.current = {};
     setBookmarksByVideo((prev) => {
       const next: Record<string, VideoBookmark[]> = {};
       limited.forEach((url) => {
@@ -505,6 +646,20 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
       if (removedVideo) delete next[removedVideo];
       return next;
     });
+
+    setVideoUnavailable((prev) => {
+  const next = { ...prev };
+
+  if (removedVideo) {
+    delete next[removedVideo];
+  }
+
+  return next;
+});
+
+if (removedVideo) {
+  delete playbackErrorCountRef.current[removedVideo];
+}
 
     setSelectedVideos((prev) => prev.filter((_, i) => i !== index));
     setCurrentTime(0);
@@ -536,97 +691,135 @@ const [selectedModules, setSelectedModules] = useState<string[]>(() =>
     });
   };
 
-  const handlePlayPause = async () => {
-    if (selectedVideos.length === 0) return;
+ const handlePlayPause = async () => {
+  if (selectedVideos.length === 0) return;
 
-    try {
-      const players = selectedVideos
-        .map((url) => playerRefs.current[url])
-        .filter(Boolean) as HLSPlayerRef[];
+  try {
+    const availablePlayers = selectedVideos
+      .filter((videoUrl) => !videoUnavailable[videoUrl])
+      .map((videoUrl) => ({
+        videoUrl,
+        player: playerRefs.current[videoUrl],
+      }))
+      .filter(
+        (
+          item
+        ): item is {
+          videoUrl: string;
+          player: HLSPlayerRef;
+        } => Boolean(item.player)
+      );
 
-      if (players.length === 0) return;
+    if (availablePlayers.length === 0) return;
 
-      const shouldPlay = players.some((player) => player.isPaused());
+    const shouldPlay = availablePlayers.some(({ player }) =>
+      player.isPaused()
+    );
 
-      if (shouldPlay) {
-        await Promise.all(
-          players.map(async (player, index) => {
-            const videoUrl = selectedVideos[index];
-            const current = videoTimes[videoUrl] || 0;
-            const videoDuration = videoDurations[videoUrl] || 0;
+    if (shouldPlay) {
+      await Promise.all(
+        availablePlayers.map(async ({ videoUrl, player }) => {
+          const current = videoTimes[videoUrl] || 0;
+          const videoDuration = videoDurations[videoUrl] || 0;
 
-            if (videoDuration > 0 && current >= videoDuration) {
-              player.seekTo(Math.max(0, videoDuration - 0.1));
-            }
+          if (videoDuration > 0 && current >= videoDuration) {
+            player.seekTo(Math.max(0, videoDuration - 0.1));
+          }
 
-            await player.play();
-          })
-        );
-        setIsPlaying(true);
-      } else {
-        players.forEach((player) => player.pause());
-        setIsPlaying(false);
-      }
-    } catch (error) {
-      console.error("Playback toggle failed:", error);
+          await player.play();
+        })
+      );
+
+      setIsPlaying(true);
+    } else {
+      availablePlayers.forEach(({ player }) => {
+        player.pause();
+      });
+
+      setIsPlaying(false);
     }
-  };
+  } catch (error) {
+    console.error("Playback toggle failed:", error);
+  }
+};
 
   const handlePrevious = () => {
-    const players = selectedVideos
-      .map((url) => playerRefs.current[url])
-      .filter(Boolean) as HLSPlayerRef[];
+  let hasAvailablePlayer = false;
 
-    if (players.length === 0) return;
+  selectedVideos.forEach((videoUrl) => {
+    if (videoUnavailable[videoUrl]) return;
 
-    players.forEach((player, index) => {
-      const videoUrl = selectedVideos[index];
-      const current = videoTimes[videoUrl] || 0;
-      const next = Math.max(0, current - 10);
-      player.seekTo(next);
-    });
+    const player = playerRefs.current[videoUrl];
+    if (!player) return;
 
-    const nextMainTime = Math.max(0, currentTime - 10);
-    setCurrentTime(nextMainTime);
-  };
+    hasAvailablePlayer = true;
 
-  const handleNext = () => {
-    const players = selectedVideos
-      .map((url) => playerRefs.current[url])
-      .filter(Boolean) as HLSPlayerRef[];
+    const current = videoTimes[videoUrl] || 0;
+    const next = Math.max(0, current - 10);
 
-    if (players.length === 0) return;
+    player.seekTo(next);
+  });
 
-    players.forEach((player, index) => {
-      const videoUrl = selectedVideos[index];
-      const current = videoTimes[videoUrl] || 0;
-      const videoDuration = videoDurations[videoUrl] || 0;
-      const next = Math.min(videoDuration, current + 10);
-      player.seekTo(next);
-    });
+  if (!hasAvailablePlayer) return;
 
-    const nextMainTime = Math.min(mainDuration, currentTime + 10);
-    setCurrentTime(nextMainTime);
-  };
+  setCurrentTime((prev) => Math.max(0, prev - 10));
+};
+
+ const handleNext = () => {
+  let hasAvailablePlayer = false;
+
+  selectedVideos.forEach((videoUrl) => {
+    if (videoUnavailable[videoUrl]) return;
+
+    const player = playerRefs.current[videoUrl];
+    if (!player) return;
+
+    hasAvailablePlayer = true;
+
+    const current = videoTimes[videoUrl] || 0;
+    const videoDuration = videoDurations[videoUrl] || 0;
+    const next = Math.min(videoDuration, current + 10);
+
+    player.seekTo(next);
+  });
+
+  if (!hasAvailablePlayer) return;
+
+  setCurrentTime((prev) =>
+    Math.min(mainDuration, prev + 10)
+  );
+};
 
   const handleSliderChange = (value: number) => {
     setCurrentTime(value);
   };
 
   const handleTimeChangeComplete = (value: number) => {
-    selectedVideos.forEach((url) => {
-      const player = playerRefs.current[url];
-      const videoDuration = videoDurations[url] || 0;
-      if (!player) return;
+  let hasAvailablePlayer = false;
 
-      const clampedValue = Math.min(value, videoDuration || value);
-      player.seekTo(clampedValue);
-    });
+  selectedVideos.forEach((videoUrl) => {
+    if (videoUnavailable[videoUrl]) return;
 
+    const player = playerRefs.current[videoUrl];
+    if (!player) return;
+
+    hasAvailablePlayer = true;
+
+    const videoDuration = videoDurations[videoUrl] || 0;
+    const clampedValue = Math.min(
+      value,
+      videoDuration || value
+    );
+
+    player.seekTo(clampedValue);
+  });
+
+  if (hasAvailablePlayer) {
     setCurrentTime(value);
-  };
+  }
+};
 
-  const toggleModule = (value: string) => {
+  const toggleModule = (value: number) => {
     setSelectedModules((prev) =>
       prev.includes(value)
         ? prev.filter((item) => item !== value)
@@ -708,7 +901,8 @@ useEffect(() => {
 // Load robots + missions
 useEffect(() => {
   if (values?.site) {
-    getRobotListBySite(values.site);
+
+    getRobotListBySite(values.site, "site");
     getMissionListBySite(values.site);
   }
 }, [values?.site, getRobotListBySite, getMissionListBySite]);
@@ -776,25 +970,38 @@ useEffect(() => {
 }, [selectedVideos]);
 
   const getVideoStatus = (videoUrl: string) => {
-    if (videoLoading[videoUrl]) {
-      return {
-        label: "Loading...",
-        dotClass: "bg-[#F59E0B]",
-      };
-    }
-
-    if (isPlaying) {
-      return {
-        label: "PLAY",
-        dotClass: "bg-[#22C55E]",
-      };
-    }
-
+  if (videoUnavailable[videoUrl]) {
     return {
-      label: "PAUSE",
+      label: t("playback_unavailable_status"),
+      dotClass: "bg-[#EF4444]",
+    };
+  }
+
+  if (videoLoading[videoUrl]) {
+    return {
+      label: t("playback_loading"),
       dotClass: "bg-[#F59E0B]",
     };
+  }
+
+  if (isPlaying) {
+    return {
+      label: "PLAY",
+      dotClass: "bg-[#22C55E]",
+    };
+  }
+
+  return {
+    label: "PAUSE",
+    dotClass: "bg-[#F59E0B]",
   };
+};
+
+const allSelectedVideosUnavailable =
+  selectedVideos.length > 0 &&
+  selectedVideos.every(
+    (videoUrl) => videoUnavailable[videoUrl]
+  );
 
   const timelineMarkers = useMemo(() => {
   if (mainDuration <= 0) {
@@ -814,12 +1021,28 @@ useEffect(() => {
 
 
     return bookmarks
-      .filter((bookmark) => bookmark.timeSec != null)
+        .filter((bookmark) => {
+          if (bookmark.timeSec == null) {
+            return false;
+          }
+
+          if (!Array.isArray(bookmark.c_ar) || bookmark.c_ar.length === 0) {
+            return false;
+          }
+
+          return bookmark.c_ar.some((classId) =>
+          selectedModules.includes(Number(classId))
+        );
+      })
       .map((bookmark, index) => {
-        const markerLabels =
-          bookmark.c_ar
-            ?.map((id) => labelsMap[Number(id)])
-            .filter((label): label is string => Boolean(label)) || [];
+        const selectedBookmarkClassIds =
+          bookmark.c_ar?.filter((classId) =>
+            selectedModules.includes(Number(classId))
+          ) || [];
+
+        const markerLabels = selectedBookmarkClassIds
+          .map((classId) => labelsMap[Number(classId)])
+          .filter((label): label is string => Boolean(label));
 
         const primaryLabel = markerLabels[0] || "";
 
@@ -835,9 +1058,9 @@ useEffect(() => {
           timeSec: Number(bookmark.timeSec?.toFixed(1) || 0),
           type: getMarkerTypeFromLabel(primaryLabel),
           label: fallbackLabel,
-          confidence: getMarkerConfidence(bookmark.c_ar),
+          confidence: getMarkerConfidence(selectedBookmarkClassIds),
           position,
-          classIds: bookmark.c_ar,
+          classIds: selectedBookmarkClassIds,
           labels: markerLabels,
         };
 
@@ -848,7 +1071,6 @@ useEffect(() => {
           marker.timeSec >= 0 && marker.timeSec <= mainDuration;
 
         if (!valid) {
-          console.log("marker filtered by duration:", marker);
         }
 
         return valid;
@@ -866,6 +1088,7 @@ useEffect(() => {
   bookmarksByVideo,
   labelsByVideo,
   selectedVideos,
+  selectedModules,
   mainDuration,
   t,
 ]);
@@ -896,8 +1119,8 @@ const playbackMapGpsData = useMemo(() => {
 }, [playbackLatitude, playbackLongitude, currentTime]);
 
   return (
-  <div className="w-full h-full overflow-auto">
-    <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
+<div className="w-full h-full overflow-auto text-[#111827] bg-[#F6F7F9]">
+      <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
       <div className="min-w-[700px] flex flex-col bg-[#F6F7F9] px-6 py-7 gap-4 rounded-[10px] overflow-hidden">
         <Form layout="vertical" form={form}>
           
@@ -1028,6 +1251,25 @@ const playbackMapGpsData = useMemo(() => {
                   </span>
                 </div>
 
+                {videoUnavailable[selectedVideos[0]] ? (
+                <div className="w-full h-[410px] flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+                  <img
+                    src={NoVideoIcon}
+                    alt={t("playback_recording_unavailable")}
+                    className="w-20 h-20 opacity-80"
+                  />
+
+                  <div>
+                    <h3 className="text-white text-[18px] font-bold">
+                      {t("playback_recording_unavailable")}
+                    </h3>
+
+                    <p className="mt-2 text-[#D1D5DB] text-[14px]">
+                      {t("playback_recording_unavailable_description")}
+                    </p>
+                  </div>
+                </div>
+              ) : (
                 <HLSPlayer
                   ref={(instance) => {
                     if (selectedVideos[0]) {
@@ -1035,66 +1277,79 @@ const playbackMapGpsData = useMemo(() => {
                     }
                   }}
                   src={selectedVideos[0]}
+                  onError={(error) => {
+                    handlePlaybackError(selectedVideos[0], error);
+                  }}
                   onDeviceInfoUpdate={handleDeviceInfoUpdate}
                   metadataBaseUrl={
-                    selectedVideos[0] ? metadataBaseByVideo[selectedVideos[0]] : undefined
-                  }
-                  selectedClassIds={
                     selectedVideos[0]
-                      ? selectedModuleIdsByVideo[selectedVideos[0]] ?? []
-                      : []
+                      ? metadataBaseByVideo[selectedVideos[0]]
+                      : undefined
                   }
+                  selectedClassIds={selectedModules}
                   showCommonDetection={selectedModules.some((value) =>
                     aiModules.some(
-                      (item) => item.value === value && item.type === "common"
+                      (item) =>
+                        item.value === value &&
+                        item.type === "common"
                     )
                   )}
-                  
                   showDangerDetection={selectedModules.some((value) =>
                     aiModules.some(
-                      (item) => item.value === value && item.type === "danger"
+                      (item) =>
+                        item.value === value &&
+                        item.type === "danger"
                     )
                   )}
                   onBookmarksChange={handleBookmarksChange}
                   onLabelsLoaded={handleLabelsLoaded}
-                  
                   className="w-full h-[410px] object-contain bg-black"
                   autoPlay={false}
                   muted={true}
                   controls={false}
                   onLoadedMetadata={() => {
-                    const player = selectedVideos[0]
-                      ? playerRefs.current[selectedVideos[0]]
+                    const videoUrl = selectedVideos[0];
+
+                    const player = videoUrl
+                      ? playerRefs.current[videoUrl]
                       : null;
 
                     const playerDuration = player?.getDuration() || 0;
 
-                    if (selectedVideos[0]) {
+                    if (videoUrl) {
+                      playbackErrorCountRef.current[videoUrl] = 0;
+
                       setVideoLoading((prev) => ({
                         ...prev,
-                        [selectedVideos[0]]: false,
+                        [videoUrl]: false,
                       }));
-                    }
 
-                    if (selectedVideos[0]) {
+                      setVideoUnavailable((prev) => ({
+                        ...prev,
+                        [videoUrl]: false,
+                      }));
+
                       setVideoDurations((prev) => ({
                         ...prev,
-                        [selectedVideos[0]]: playerDuration,
+                        [videoUrl]: playerDuration,
                       }));
                     }
 
                     setDuration(playerDuration);
 
                     if (
-                      selectedVideos[0] === historyPlaybackState?.playbackUrl &&
+                      videoUrl === historyPlaybackState?.playbackUrl &&
                       historySeekTime > 0
                     ) {
                       player?.seekTo(historySeekTime);
                       setCurrentTime(historySeekTime);
-                      setVideoTimes((prev) => ({
-                        ...prev,
-                        [selectedVideos[0]]: historySeekTime,
-                      }));
+
+                      if (videoUrl) {
+                        setVideoTimes((prev) => ({
+                          ...prev,
+                          [videoUrl]: historySeekTime,
+                        }));
+                      }
                     }
                   }}
                   onTimeUpdate={() => {
@@ -1125,6 +1380,7 @@ const playbackMapGpsData = useMemo(() => {
                     setIsPlaying(false);
                   }}
                 />
+              )}
               </div>
             </div>
           ) : (
@@ -1144,25 +1400,50 @@ const playbackMapGpsData = useMemo(() => {
                       </div>
 
                       <div className="w-full h-full">
+                      {videoUnavailable[video.value] ? (
+                        <div className="w-full h-[410px] flex flex-col items-center justify-center gap-4 bg-black px-5 text-center">
+                          <img
+                            src={NoVideoIcon}
+                            alt={t("playback_recording_unavailable")}
+                            className="w-16 h-16 opacity-80"
+                          />
+
+                          <div>
+                            <h3 className="text-white text-[16px] font-bold">
+                              {t("playback_recording_unavailable")}
+                            </h3>
+
+                            <p className="mt-2 text-[#D1D5DB] text-[13px]">
+                              {t("playback_recording_unavailable_description")}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
                         <HLSPlayer
                           ref={(instance) => {
                             playerRefs.current[video.value] = instance;
                           }}
                           src={video.value}
+                          onError={(error) => {
+                            handlePlaybackError(video.value, error);
+                          }}
                           onDeviceInfoUpdate={handleDeviceInfoUpdate}
                           metadataBaseUrl={metadataBaseByVideo[video.value]}
-                          selectedClassIds={selectedModuleIdsByVideo[video.value] ?? []}
+                          selectedClassIds={selectedModules}
                           showCommonDetection={selectedModules.some((value) =>
-                              aiModules.some(
-                                (item) => item.value === value && item.type === "common"
-                              )
-                            )}
-
-                            showDangerDetection={selectedModules.some((value) =>
-                              aiModules.some(
-                                (item) => item.value === value && item.type === "danger"
-                              )
-                            )}
+                            aiModules.some(
+                              (item) =>
+                                item.value === value &&
+                                item.type === "common"
+                            )
+                          )}
+                          showDangerDetection={selectedModules.some((value) =>
+                            aiModules.some(
+                              (item) =>
+                                item.value === value &&
+                                item.type === "danger"
+                            )
+                          )}
                           onBookmarksChange={handleBookmarksChange}
                           onLabelsLoaded={handleLabelsLoaded}
                           className="w-full h-[410px] object-contain bg-black"
@@ -1171,15 +1452,23 @@ const playbackMapGpsData = useMemo(() => {
                           controls={false}
                           onLoadedMetadata={() => {
                             const player = playerRefs.current[video.value];
+                            const playerDuration = player?.getDuration() || 0;
+
+                            playbackErrorCountRef.current[video.value] = 0;
 
                             setVideoLoading((prev) => ({
                               ...prev,
                               [video.value]: false,
                             }));
 
+                            setVideoUnavailable((prev) => ({
+                              ...prev,
+                              [video.value]: false,
+                            }));
+
                             setVideoDurations((prev) => ({
                               ...prev,
-                              [video.value]: player?.getDuration() || 0,
+                              [video.value]: playerDuration,
                             }));
 
                             if (video.value === selectedVideos[0]) {
@@ -1187,11 +1476,12 @@ const playbackMapGpsData = useMemo(() => {
                               setDuration(mainPlayer?.getDuration() || 0);
                             }
 
-                          if (
+                            if (
                               video.value === historyPlaybackState?.playbackUrl &&
                               historySeekTime > 0
                             ) {
                               player?.seekTo(historySeekTime);
+
                               setVideoTimes((prev) => ({
                                 ...prev,
                                 [video.value]: historySeekTime,
@@ -1201,26 +1491,36 @@ const playbackMapGpsData = useMemo(() => {
                                 setCurrentTime(historySeekTime);
                               }
                             }
-
                           }}
                           onTimeUpdate={() => {
                             const player = playerRefs.current[video.value];
 
                             setVideoTimes((prev) => ({
                               ...prev,
-                              [video.value]: player?.getCurrentTime() || 0,
+                              [video.value]:
+                                player?.getCurrentTime() || 0,
                             }));
 
                             setVideoDurations((prev) => ({
                               ...prev,
-                              [video.value]: player?.getDuration() || 0,
+                              [video.value]:
+                                player?.getDuration() || 0,
                             }));
 
                             if (video.value === selectedVideos[0]) {
                               const mainPlayer = getMainPlayer();
-                              setCurrentTime(mainPlayer?.getCurrentTime() || 0);
-                              setDuration(mainPlayer?.getDuration() || 0);
-                              setIsPlaying(!(mainPlayer?.isPaused() ?? true));
+
+                              setCurrentTime(
+                                mainPlayer?.getCurrentTime() || 0
+                              );
+
+                              setDuration(
+                                mainPlayer?.getDuration() || 0
+                              );
+
+                              setIsPlaying(
+                                !(mainPlayer?.isPaused() ?? true)
+                              );
                             }
                           }}
                           onEnded={() => {
@@ -1229,7 +1529,8 @@ const playbackMapGpsData = useMemo(() => {
                             }
                           }}
                         />
-                      </div>
+                      )}
+                    </div>
                     </div>
 
                     <div className="bg-[#F3F4F6] rounded-[10px] px-5 py-4">
@@ -1293,19 +1594,25 @@ const playbackMapGpsData = useMemo(() => {
           onNext={handleNext}
           onTimeChange={handleSliderChange}
           onTimeChangeComplete={handleTimeChangeComplete}
-          disabled={selectedVideos.length === 0}
+          disabled={
+            selectedVideos.length === 0 ||
+            allSelectedVideosUnavailable
+          }
           bookmarks={timelineMarkers}
           showCommonDetection={selectedModules.some((value) =>
-              aiModules.some(
-                (item) => item.value === value && item.type === "common"
-              )
-            )}
-
-            showDangerDetection={selectedModules.some((value) =>
-              aiModules.some(
-                (item) => item.value === value && item.type === "danger"
-              )
-            )}
+            aiModules.some(
+              (item) =>
+                item.value === value &&
+                item.type === "common"
+            )
+          )}
+          showDangerDetection={selectedModules.some((value) =>
+            aiModules.some(
+              (item) =>
+                item.value === value &&
+                item.type === "danger"
+            )
+          )}
         />
         </div>
         <div
@@ -1322,7 +1629,7 @@ const playbackMapGpsData = useMemo(() => {
       <div className="grid grid-cols-2 gap-3">
         {/* Robot Status */}
         <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-          <h2 className="text-[20px] font-bold mb-8">
+          <h2 className="text-[20px] font-bold mb-8 text-[#111827]">
             {t("playback_robot_status")}
           </h2>
 
@@ -1359,12 +1666,12 @@ const playbackMapGpsData = useMemo(() => {
 
        {/* Operation Info */}
 <div className="bg-white rounded-[10px] p-6 min-h-[250px]">
-  <h2 className="text-[20px] font-bold mb-8">
+  <h2 className="text-[20px] font-bold mb-8 text-[#111827]">
     {t("playback_operation_info")}
   </h2>
 
-  <div className="space-y-6 text-sm">
-    <div className="flex justify-between">
+<div className="space-y-6 text-sm text-[#111827]">
+      <div className="flex justify-between">
       <span>{t("stream_info_altitude")}</span>
       <span className="font-bold text-[#6B7280]">
   {selectedVideoInfo?.altitude != null
@@ -1408,7 +1715,9 @@ const playbackMapGpsData = useMemo(() => {
 
       <div className="w-[390px] shrink-0 px-6 py-7 flex flex-col gap-3 bg-[#F6F7F9] rounded-[10px]">
         <div className="w-full p-6 bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-4">{t("playback_selected_video")}</h2>
+          <h2 className="text-[20px] font-bold mb-4 text-[#111827]">
+            {t("playback_selected_video")}
+          </h2>
 
           <div className="space-y-3">
             {selectedVideoItems.length === 0 ? (
@@ -1446,12 +1755,14 @@ const playbackMapGpsData = useMemo(() => {
         </div>
 
         <div className="w-full p-6 h-[350px] bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-5">{t("stream_ai_module")}</h2>
+          <h2 className="text-[20px] font-bold mb-5 text-[#111827]">
+            {t("stream_ai_module")}
+          </h2>
 
           <div className="flex gap-3 h-[calc(100%-36px)]">
             <div className="flex-1 flex flex-col">
               <div className="flex items-start justify-between mb-3">
-                <div className="text-[16px] font-bold leading-[1.05]">
+                <div className="text-[16px] font-bold leading-[1.05] text-[#111827]">
                   {t("stream_ai_common")}
                 </div>
                 <div className="text-[13px] text-gray-500 flex items-center">
@@ -1510,7 +1821,7 @@ const playbackMapGpsData = useMemo(() => {
 
             <div className="flex-1 flex flex-col">
               <div className="flex items-start justify-between mb-3">
-                <div className="text-[16px] font-bold leading-[1.05]">
+                <div className="text-[16px] font-bold leading-[1.05] text-[#111827]">
                   {t("stream_ai_danger")}
                 </div>
                 <div className="text-[13px] text-gray-500 flex items-center">
@@ -1570,7 +1881,9 @@ const playbackMapGpsData = useMemo(() => {
         </div>
 
         <div className="w-full p-6 bg-white rounded-[10px]">
-          <h2 className="text-[20px] font-bold mb-6">{t("playback_route_map")}</h2>
+          <h2 className="text-[20px] font-bold mb-6 text-[#111827]">
+            {t("playback_route_map")}
+          </h2>
           <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] overflow-hidden">
             {selectedVideos.length > 0 ? (
               <LiveMap

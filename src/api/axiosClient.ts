@@ -131,8 +131,9 @@ axiosClient.interceptors.response.use(
       error.config as RetryRequestConfig;
 
     const status = error.response?.status;
-    const code = error.response?.data?.code;
-
+    const code =
+      error.response?.data?.code ||
+      error.response?.data?.message;
     const isTokenExpired =
       status === 401 && code === "TOKEN_EXPIRED";
 
@@ -177,13 +178,19 @@ axiosClient.interceptors.response.use(
       }
     }
 
-    // invalid token / forbidden / refresh failed
-    if (
-      (status === 401 || status === 403) &&
-      !isLoginApi
-    ) {
-      clearAuthAndRedirect();
-    }
+   const isAuthFailure =
+  status === 401 &&
+  (
+    code === "TOKEN_INVALID" ||
+    code === "INVALID_TOKEN" ||
+    code === "TOKEN_EXPIRED" ||
+    code === "REFRESH_TOKEN_EXPIRED" ||
+    code === "REFRESH_TOKEN_INVALID"
+  );
+
+if (isAuthFailure && !isLoginApi && !isRefreshApi) {
+  clearAuthAndRedirect();
+}
 
     return Promise.reject(error);
   }

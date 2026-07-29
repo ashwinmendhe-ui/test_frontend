@@ -78,8 +78,6 @@ export default function Dashboard() {
 
   const handleDashboardDeviceMessage = useCallback(
   (message: any) => {
-    console.log("[WS][Dashboard] received", message);
-
     getDashboardSilent();
     getDashboardStatSilent();
   },

@@ -12,9 +12,7 @@ import type { HLSPlayerRef } from "./types";
 const getFileName = (path: string) => {
   return path.split("/").pop()?.split("?")[0] || path;
 };
-const getBasePathFromUrl = (url: string) => {
-      return url.substring(0, url.lastIndexOf("/"));
-    };
+
 
 type BookmarkPayload = {
   m?: number;
@@ -93,7 +91,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const lastDetectionsRef = useRef<any[]>([]);
     const sessionStartTimeRef = useRef<number | null>(null);
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
-    const metadataLoadedKeyRef = useRef<string>("");
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const labelsMapRef = useRef<LabelsMap>({});
@@ -118,7 +115,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     });
 
 
-
+    const onErrorRef = useRef(onError);
 
     const safeJsonFetch = async (url: string) => {
   try {
@@ -271,43 +268,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
       return next;
     };
-
-    const getBookmarkTimeSec = (bookmark: BookmarkPayload): number | null => {
-      if (typeof bookmark.timeSec === "number") {
-        return bookmark.timeSec;
-      }
-
-      if (bookmark.s && typeof bookmark.o === "number") {
-          const bookmarkSegmentName = getFileName(bookmark.s);
-
-          const segment = playlistSegmentsRef.current.find(
-            (item) => item.name === bookmarkSegmentName
-          );
-
-          if (!segment) {
-            console.error("Segment not found for bookmark:", {
-              bookmarkSegmentName,
-              availableSegments: playlistSegmentsRef.current.slice(0, 10),
-            });
-          }
-
-          if (segment) {
-            return segment.startSec + Number(bookmark.o || 0) / 1000;
-          }
-        }
-
-      if (
-        typeof bookmark.m === "number" &&
-        typeof sessionStartTimeRef.current === "number"
-      ) {
-        return (bookmark.m - sessionStartTimeRef.current) / 1000;
-      }
-
-      return null;
-    };
-
-
-
   const getLabelName = useCallback((classId?: number) => {
       if (classId == null) return "unknown";
       return labelsMapRef.current[classId] || `Class${classId}`;
@@ -453,16 +413,35 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       return;
     }
 
-    const convertDetection = (det: any, type: "yolo" | "llm") => {
-      const classId =
+   const convertDetection = (det: any, type: "yolo" | "llm") => {
+      const rawClassIds =
         type === "llm" && Array.isArray(det.cids)
-          ? det.cids[0]
-          : det.cid ?? det.class_id ?? det.c;
+          ? det.cids
+              .map((id: unknown) => Number(id))
+              .filter((id: number) => Number.isFinite(id))
+          : undefined;
+
+      const selectedLlmClassIds =
+        type === "llm" && rawClassIds
+          ? rawClassIds.filter((id: number) =>
+              selectedClassIds.includes(id)
+            )
+          : undefined;
 
       const classIds =
-        type === "llm" && Array.isArray(det.cids) ? det.cids : undefined;
+        type === "llm"
+          ? selectedLlmClassIds
+          : undefined;
 
-      const classNames = classIds?.map((cid: number) => getLabelName(cid));
+      const classId =
+        type === "llm"
+          ? classIds?.[0]
+          : Number(det.cid ?? det.class_id ?? det.c);
+
+      const classNames = classIds?.map((id: number) =>
+        getLabelName(id)
+      );
+
       const bb = Array.isArray(det.bb) ? det.bb : null;
 
       return {
@@ -470,52 +449,95 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
         y: bb ? Number(bb[1] || 0) / 1000 : Number(det.y || 0),
         w: bb ? Number(bb[2] || 0) / 1000 : Number(det.w || 0),
         h: bb ? Number(bb[3] || 0) / 1000 : Number(det.h || 0),
-        class: det.class || det.label || getLabelName(classId),
+        class:
+          type === "llm"
+            ? getLabelName(classId)
+            : det.class || det.label || getLabelName(classId),
         classId,
         classIds,
         classNames,
-        confidence: det.cf ? Number(det.cf) / 1000 : Number(det.confidence || 0),
+        confidence: det.cf
+          ? Number(det.cf) / 1000
+          : Number(det.confidence || 0),
         type,
         properties: type === "llm" ? det.p : undefined,
       };
     };
 
-    const yoloDetections = yoloSource.map((det: any) =>
-      convertDetection(det, "yolo")
-    );
+      if (selectedClassIds.length === 0) {
+        lastDetectionsRef.current = [];
+        clearCanvas();
+        rafIdRef.current = requestAnimationFrame(syncLoop);
+        return;
+      }
 
-    const llmDetections = llmSource.map((det: any) =>
-      convertDetection(det, "llm")
-    );
+      const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
 
-    const detections = [...yoloDetections, ...llmDetections].filter((det: any) => {
-  if (!(det.w > 0 && det.h > 0)) return false;
+      const yoloDetections = yoloSource
+        .map((det: any) => convertDetection(det, "yolo"))
+        .filter((det: any) => {
+          if (!(det.w > 0 && det.h > 0)) {
+            return false;
+          }
 
-  const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
+          const classId = Number(det.classId);
 
-const isDanger =
-  det.type === "llm" ||
-  DANGER_CLASS_IDS.includes(Number(det.classId)) ||
-  (Array.isArray(det.classIds) &&
-    det.classIds.some((id: number) =>
-      DANGER_CLASS_IDS.includes(Number(id))
-    ));
+          if (!Number.isFinite(classId)) {
+            return false;
+          }
 
-  if (isDanger && !showDangerDetection) return false;
-  if (!isDanger && !showCommonDetection) return false;
+          if (!selectedClassIds.includes(classId)) {
+            return false;
+          }
 
-  return true;
-});
+          const isDanger = DANGER_CLASS_IDS.includes(classId);
+
+          if (isDanger && !showDangerDetection) {
+            return false;
+          }
+
+          if (!isDanger && !showCommonDetection) {
+            return false;
+          }
+
+          return true;
+        });
+
+      const llmDetections = llmSource
+        .map((det: any) => convertDetection(det, "llm"))
+        .filter((det: any) => {
+          if (!(det.w > 0 && det.h > 0)) {
+            return false;
+          }
+
+          const matchingClassIds = Array.isArray(det.classIds)
+            ? det.classIds.filter((id: number) =>
+                selectedClassIds.includes(Number(id))
+              )
+            : [];
+
+          if (matchingClassIds.length === 0) {
+            return false;
+          }
+
+          if (!showDangerDetection) {
+            return false;
+          }
+
+          return true;
+        });
+
+      const detections = [...yoloDetections, ...llmDetections];
+
+
+
     if (detections.length > 0) {
-      if (detections.length > 0) {
         lastDetectionsRef.current = detections;
         drawDetections(detections);
       } else {
-        drawDetections(lastDetectionsRef.current);
+        lastDetectionsRef.current = [];
+        clearCanvas();
       }
-    } else {
-      clearCanvas();
-    }
 
     rafIdRef.current = requestAnimationFrame(syncLoop);
     };
@@ -526,8 +548,11 @@ const isDanger =
   drawDetections,
   getLabelName,
   loadSegmentMetadata,
+  selectedClassIds,
   showCommonDetection,
   showDangerDetection,
+  onDeviceInfoUpdate,
+  src,
 ]);
 
     useEffect(() => {
@@ -558,25 +583,23 @@ const isDanger =
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-      // console.error("[HLS ERROR]", data);
+  const isLoadError =
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
+    data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
+    data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT;
 
-      if (
-        data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
-        data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
-        data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
-        data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT
-      ) {
-        onError?.(data);
-      }
+  if (isLoadError || data.fatal) {
+    onErrorRef.current?.(data);
+  }
 
-      if (data.fatal) {
-        hls.destroy();
-        hlsRef.current = null;
-        onError?.(data);
-      }
-    });
+  if (data.fatal) {
+    hls.destroy();
+    hlsRef.current = null;
+  }
+});
 
     hlsRef.current = hls;
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -593,13 +616,10 @@ const isDanger =
       hlsRef.current = null;
     }
   };
-}, [src, autoPlay, onError]);
+}, [src, autoPlay]);
 
     useEffect(() => {
   let cancelled = false;
-
-  const metadataKey = `${src || ""}_${metadataBaseUrl || ""}`;
-
   const getFileName = (value?: string) => {
     return value?.split("/").pop()?.split("?")[0] || "";
   };
@@ -661,7 +681,7 @@ const isDanger =
 
     try {
   const info = await safeJsonFetch(`${baseUrl}/info.json`);
-  const labelsMap = normalizeLabels(info);
+  labelsMap = normalizeLabels(info);
 
   labelsMapRef.current = labelsMap;
 
@@ -824,6 +844,11 @@ try {
     window.clearInterval(interval);
   };
 }, [src, metadataBaseUrl]);
+
+
+useEffect(() => {
+  onErrorRef.current = onError;
+}, [onError]);
 
     return (
   <div className="relative w-full h-full bg-black overflow-hidden">

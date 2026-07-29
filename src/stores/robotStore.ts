@@ -51,7 +51,7 @@ interface Store {
   list: RobotManagementTable[];
   detail: DetailDevice;
   getList: (param?: string, from?: string, to?: string) => Promise<void>;
-  getListBySite: (siteId?: string) => Promise<void>;
+  getListBySite: (siteId?: string, scope?: string) => Promise<void>;
   getDetail: (id: string) => Promise<DetailDevice | void>;
   createRobot: (
     param: DetailDevice
@@ -159,10 +159,10 @@ export const useRobotStore = create<Store>((set, get) => ({
     }
   },
 
-  getListBySite: async (siteId) => {
+  getListBySite: async (siteId, scope) => {
     set({ loading: true });
     try {
-      const res = await robotApi.getListBySite(siteId);
+      const res = await robotApi.getListBySite(siteId, scope);
       const data = Array.isArray(res) ? res : res?.data || res?.content || [];
       set({
         loading: false,

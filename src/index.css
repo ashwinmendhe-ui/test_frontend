@@ -2,9 +2,9 @@
 
 /* ================= THEME ================= */
 @theme {
-  --color-primary: #16A34A;
-  --color-primary-dark: #15803D;
-  --color-disable: #6E7784;
+  --color-primary: #16a34a;
+  --color-primary-dark: #15803d;
+  --color-disable: #6e7784;
 
   --font-sans: "Pretendard Variable", sans-serif;
 }
@@ -15,7 +15,14 @@
   line-height: 1.4;
   font-weight: 500;
 
-  color-scheme: light dark;
+  /*
+   * ROBOPILOT currently uses a fixed light application theme.
+   * Prevent browser/OS dark mode from changing inherited form and text colors.
+   */
+  color-scheme: light;
+
+  color: #111827;
+  background-color: #f6f7f9;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,6 +30,15 @@
 }
 
 /* Reset */
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  color: #111827;
+  background-color: #f6f7f9;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -30,7 +46,6 @@ body {
 
 /* Root container */
 #root {
-  width: 100%;
   min-height: 100vh;
 }
 
@@ -41,9 +56,7 @@ a {
 
 /* ================= OPTIONAL (ONLY IF NEEDED) ================= */
 
-/* Example: Scoped AntD customization */
 .custom-tabs .ant-tabs-tab-active {
   background: #f2f4f7;
   border-radius: 9999px;
 }
-

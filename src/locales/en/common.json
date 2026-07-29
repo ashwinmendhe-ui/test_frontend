@@ -545,5 +545,44 @@
 "stream_emergency_stop": "Emergency stop",
 "stream_vector_space_loading": "Loading vector space...",
 "playback_map_idle_message": "It will be activated after attaching a video",
-"status_working": "working"
+"status_working": "working",
+
+"work_report_created": "Report Created",
+"work_report_download_pdf": "Download PDF",
+
+"work_report_start_work": "Start work",
+"work_report_end_task": "End task",
+"work_report_travel_distance": "Travel distance",
+"work_report_time_taken": "Time taken",
+"work_report_site_name": "Site name",
+"work_report_robot_name": "Robot name",
+"work_report_mission_name": "Mission Name",
+"work_report_worker": "Worker",
+
+"work_report_total": "Total",
+
+"work_report_number": "Number",
+
+"work_report_recognition_content": "Recognition Content",
+"work_report_detection_types": "Detection Type",
+"work_report_view_details": "View Details",
+"common_no_data": "No data",
+"stream_ai_mask": "Mask",
+"stream_ai_vehicle": "Vehicle",
+"user_duplicate_email": "This email address is already in use.",
+"user_duplicate_username": "This user name is already in use.",
+"user_duplicate_email_username": "The email address and user name are already in use.",
+"user_validation_email_exists": "This email address is already in use.",
+"user_validation_username_exists": "This user name is already in use.",
+"user_change_password_success": "Password changed successfully.",
+"user_change_password_failed": "Failed to change the password.",
+"user_current_password_incorrect": "The current password is incorrect.",
+"user_new_password_same_as_current": "The new password must be different from the current password.",
+"user_password_user_not_found": "User information could not be found.",
+"robot_validation_enter_serial_number": "Please enter serial number",
+"playback_loading": "Loading...",
+"playback_unavailable_status": "UNAVAILABLE",
+"playback_recording_unavailable": "Recording Unavailable",
+"playback_recording_unavailable_description": "This recording is incomplete or corrupted and cannot be played."
+
   }
