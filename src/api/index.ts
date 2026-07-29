@@ -8,3 +8,7 @@ export { robotApi } from "./robotApi";
 export { playbackApi } from "./playbackApi";
 export { dashboardApi } from "./dashboardApi";
 export { default as axiosClient } from "./axiosClient";
+export type {
+  DeviceLoginRequest,
+  DeviceLoginResponse,
+} from "./authApi";
