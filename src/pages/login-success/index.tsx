@@ -73,33 +73,24 @@ export default function LoginSuccessPage() {
       localStorage.getItem(STORAGE_KEYS.workspaceId) ?? "";
 
     window.reg_callback = (...args: any[]) => {
-      console.info(
-        "DJI Thing registration callback:",
-        ...args
-      );
+  console.info(
+    "DJI Thing registration callback:",
+    ...args
+  );
 
-      const isConnected =
-        apiPilot.thingGetConnectState();
+  setConnected(true);
 
-      setConnected(isConnected);
+  message.success(
+    "DJI Pilot connected successfully."
+  );
+};
 
-      if (isConnected) {
-        message.success(
-          "DJI Pilot connected successfully."
-        );
-      }
-    };
-
-    window.connectCallback = (arg: any) => {
-      console.info(
-        "DJI Thing connection callback:",
-        arg
-      );
-
-      setConnected(
-        apiPilot.thingGetConnectState()
-      );
-    };
+window.liveStatusCallback = (arg: any) => {
+  console.info(
+    "DJI LiveShare status callback:",
+    arg
+  );
+};
 
     window.liveStatusCallback = (arg: any) => {
       console.info(
@@ -139,82 +130,72 @@ export default function LoginSuccessPage() {
       }
 
       try {
-          apiPilot.setWorkspaceId(workspaceId);
+  apiPilot.setWorkspaceId(workspaceId);
 
-          const thingConfig = JSON.stringify({
-          host: droneConnectHost,
-          connectCallback: "connectCallback",
-          username: deviceSn,
-          password: token,
-        });
+  const thingConfig = JSON.stringify({
+    host: droneConnectHost,
+    connectCallback: "reg_callback",
+    username: deviceSn,
+    password: token,
+  });
 
-        apiPilot.setComponentParam(
-          ComponentName.Thing,
-          thingConfig
-        );
+  apiPilot.loadComponent(
+    ComponentName.Thing,
+    thingConfig
+  );
 
-        apiPilot.loadComponent(
-          ComponentName.Thing,
-          thingConfig
-        );
+  await delay(COMPONENT_LOAD_DELAY_MS);
 
-        await delay(COMPONENT_LOAD_DELAY_MS);
+  apiPilot.thingConnect(
+    deviceSn,
+    token,
+    "reg_callback"
+  );
 
-        apiPilot.thingConnect(
-          deviceSn,
-          token,
-          "connectCallback"
-        );
+  await delay(COMPONENT_LOAD_DELAY_MS);
 
-        await delay(COMPONENT_LOAD_DELAY_MS);
+  const liveshareConfig = JSON.stringify({
+    videoPublishType:
+      "video-demand-aux-manual",
+    statusCallback:
+      "liveStatusCallback",
+  });
 
-        const liveshareConfig = JSON.stringify({
-          videoPublishType:
-            "video-demand-aux-manual",
-          statusCallback:
-            "liveStatusCallback",
-        });
+  components.set(
+    ComponentName.LiveShare,
+    liveshareConfig
+  );
 
-        apiPilot.setComponentParam(
-          ComponentName.LiveShare,
-          liveshareConfig
-        );
+  await delay(COMPONENT_LOAD_DELAY_MS);
 
-        await delay(COMPONENT_LOAD_DELAY_MS);
+  apiPilot.loadComponent(
+    ComponentName.LiveShare,
+    components.get(ComponentName.LiveShare) ?? ""
+  );
+} catch (connectionError: any) {
+  console.error(
+    "DJI Pilot connection failed:",
+    connectionError
+  );
 
-        apiPilot.loadComponent(
-  ComponentName.LiveShare,
-  liveshareConfig
-);
+  setError(
+    connectionError?.message ||
+      "DJI Pilot connection failed."
+  );
 
-        setConnected(
-          apiPilot.thingGetConnectState()
-        );
-      } catch (connectionError: any) {
-        console.error(
-          "DJI Pilot connection failed:",
-          connectionError
-        );
-
-        setError(
-          connectionError?.message ||
-            "DJI Pilot connection failed."
-        );
-
-        message.error(
-          connectionError?.message ||
-            "DJI Pilot connection failed."
-        );
-      } finally {
-        setInitializing(false);
-      }
+  message.error(
+    connectionError?.message ||
+      "DJI Pilot connection failed."
+  );
+} finally {
+  setInitializing(false);
+}
     };
 
     void startConnection();
 
     return () => {
       delete window.reg_callback;
-      delete window.connectCallback;
       delete window.liveStatusCallback;
     };
   }, [navigate]);
