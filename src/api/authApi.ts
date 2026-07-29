@@ -20,6 +20,48 @@ export interface LoginResponse {
   };
 }
 
+/**
+ * DJI Pilot device authentication request.
+ *
+ * flag is retained because it is required by the existing
+ * DJI/FPT device-login contract.
+ */
+export interface DeviceLoginRequest {
+  username: string;
+  password: string;
+  flag: number;
+  deviceSn: string;
+}
+
+/**
+ * DJI device-login responses may be returned either directly
+ * or inside the data property.
+ */
+export interface DeviceLoginResponse {
+  token?: string;
+  accessToken?: string;
+  workspaceId?: string;
+  workspace_id?: string;
+  username?: string;
+  userId?: string;
+  user_id?: string;
+  deviceSn?: string;
+  device_sn?: string;
+  code?: string | number;
+  message?: string;
+  data?: {
+    token?: string;
+    accessToken?: string;
+    workspaceId?: string;
+    workspace_id?: string;
+    username?: string;
+    userId?: string;
+    user_id?: string;
+    deviceSn?: string;
+    device_sn?: string;
+  };
+}
+
 const ACCESS_TOKEN_KEY = "token";
 const REFRESH_TOKEN_KEY = "refreshToken";
 
@@ -84,6 +126,37 @@ export const authApi = {
           error?.response?.data?.message ||
           error?.message ||
           "Login failed",
+      };
+    }
+  },
+
+  /**
+   * Authenticates DJI Pilot using the remote-controller serial number.
+   *
+   * Storage is intentionally not handled here. The /dronelogin page
+   * will validate and store the DJI-specific token, workspace ID,
+   * username, user ID and device serial number.
+   */
+  deviceLogin: async (
+    data: DeviceLoginRequest
+  ): Promise<DeviceLoginResponse> => {
+    try {
+      const response = await axiosClient.post<DeviceLoginResponse>(
+        "/v1/device/auth/login",
+        data
+      );
+
+      return response.data;
+    } catch (error: any) {
+      return {
+        code:
+          error?.response?.status === 401
+            ? "UNAUTHORIZED"
+            : error?.response?.status || "ERROR",
+        message:
+          error?.response?.data?.message ||
+          error?.message ||
+          "DJI device login failed",
       };
     }
   },

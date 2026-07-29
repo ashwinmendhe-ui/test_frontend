@@ -5,6 +5,8 @@ import PrivateLayout from "./components/privateLayout";
 import Dashboard from "./pages/dashboard";
 import User from "./pages/settings/user";
 import Login from "./pages/login";
+import DroneLogin from "./pages/dronelogin";
+import LoginSuccess from "./pages/login-success";
 import UserCreateForm from "./pages/settings/user/create";
 import UserEditForm from "./pages/settings/user/[id]/edit";
 import Company from "@/pages/settings/company";
@@ -23,8 +25,6 @@ import History from "./pages/history";
 import KPI from "./pages/kpi";
 
 import Stream from "./pages/stream";
-import StreamDetail from "./pages/stream/[id]";
-
 import Playback from "./pages/playback";
 
 export default function AppRouter() {
@@ -32,6 +32,14 @@ export default function AppRouter() {
     {
       path: "/login",
       element: <Login />,
+    },
+    {
+      path: "/dronelogin",
+      element: <DroneLogin />,
+    },
+    {
+      path: "/login-success",
+      element: <LoginSuccess />,
     },
     {
       path: "/",
@@ -57,23 +65,74 @@ export default function AppRouter() {
           path: "settings/user/:id/edit",
           element: <UserEditForm />,
         },
-        { path: "settings/company", element: <Company /> },
-        { path: "settings/company/create", element: <CompanyCreateForm /> },
-        { path: "settings/company/:id/edit", element: <CompanyEditForm /> },
-        { path: "settings/site", element: <Site /> },
-        { path: "settings/site/create", element: <SiteCreateForm /> },
-        { path: "settings/site/:id/edit", element: <SiteEditForm /> },
-        { path: "settings/mission", element: <Mission /> },
-        { path: "settings/mission/create", element: <MissionCreateForm /> },
-        { path: "settings/mission/:id/edit", element: <MissionEditForm /> },
-        { path: "settings/robot", element: <Robot /> },
-        { path: "settings/robot/create", element: <RobotCreateForm /> },
-        { path: "settings/robot/:id/edit", element: <RobotEditForm /> },
-        { path: "history", element: <History /> },
-        { path: "kpi", element: <KPI /> },
-        { path: "stream", element: <Stream /> },
-        { path: "stream/:id", element: <Stream /> },
-        { path: "playback", element: <Playback /> },
+        {
+          path: "settings/company",
+          element: <Company />,
+        },
+        {
+          path: "settings/company/create",
+          element: <CompanyCreateForm />,
+        },
+        {
+          path: "settings/company/:id/edit",
+          element: <CompanyEditForm />,
+        },
+        {
+          path: "settings/site",
+          element: <Site />,
+        },
+        {
+          path: "settings/site/create",
+          element: <SiteCreateForm />,
+        },
+        {
+          path: "settings/site/:id/edit",
+          element: <SiteEditForm />,
+        },
+        {
+          path: "settings/mission",
+          element: <Mission />,
+        },
+        {
+          path: "settings/mission/create",
+          element: <MissionCreateForm />,
+        },
+        {
+          path: "settings/mission/:id/edit",
+          element: <MissionEditForm />,
+        },
+        {
+          path: "settings/robot",
+          element: <Robot />,
+        },
+        {
+          path: "settings/robot/create",
+          element: <RobotCreateForm />,
+        },
+        {
+          path: "settings/robot/:id/edit",
+          element: <RobotEditForm />,
+        },
+        {
+          path: "history",
+          element: <History />,
+        },
+        {
+          path: "kpi",
+          element: <KPI />,
+        },
+        {
+          path: "stream",
+          element: <Stream />,
+        },
+        {
+          path: "stream/:id",
+          element: <Stream />,
+        },
+        {
+          path: "playback",
+          element: <Playback />,
+        },
       ],
     },
   ]);
