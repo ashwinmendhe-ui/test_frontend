@@ -139,12 +139,11 @@ export default function LoginSuccessPage() {
       }
 
       try {
-        apiPilot.setWorkspaceId(workspaceId);
-        apiPilot.setToken(token);
+          apiPilot.setWorkspaceId(workspaceId);
 
-        const thingConfig = JSON.stringify({
+          const thingConfig = JSON.stringify({
           host: droneConnectHost,
-          connectCallback: "reg_callback",
+          connectCallback: "connectCallback",
           username: deviceSn,
           password: token,
         });
@@ -184,11 +183,9 @@ export default function LoginSuccessPage() {
         await delay(COMPONENT_LOAD_DELAY_MS);
 
         apiPilot.loadComponent(
-          ComponentName.LiveShare,
-          components.get(
-            ComponentName.LiveShare
-          ) ?? liveshareConfig
-        );
+  ComponentName.LiveShare,
+  liveshareConfig
+);
 
         setConnected(
           apiPilot.thingGetConnectState()
