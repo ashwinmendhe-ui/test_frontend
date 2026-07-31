@@ -13,7 +13,7 @@ import { useRobotStore } from "@/stores/robotStore";
 import { useMissionStore } from "@/stores/missionStore";
 import { usePlaybackStore } from "@/stores/playbackStore";
 import ControlBar from "@/components/common/controlBar";
-import { Form, Select, Switch } from "antd";
+import { Form, Select, Slider, Switch } from "antd";
 import { formatTime } from "@/utils/date";
 import { useLocation } from "react-router-dom";
 import { LiveMap } from "@/components/map/liveMap";
@@ -33,19 +33,6 @@ type AIModuleItem = {
   category: string;
   type: AICategory;
   color: string;
-};
-
-type DeviceInfo = {
-  deviceName: string;
-  companyName: string;
-  siteName: string;
-  missionName: string;
-  status: string;
-  deviceSn: string;
-  startTime: string;
-  operatingHour: string;
-  latitude: string;
-  longitude: string;
 };
 
 type VideoBookmark = {
@@ -199,6 +186,7 @@ export default function Playback() {
 
   const [videoTimes, setVideoTimes] = useState<Record<string, number>>({});
   const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
+  const [videoOffsets, setVideoOffsets] = useState<Record<string, number>>({});
   const [videoLoading, setVideoLoading] = useState<Record<string, boolean>>({});
   const [videoUnavailable, setVideoUnavailable] = useState<
     Record<string, boolean>
@@ -440,6 +428,67 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
     }, selectedVideos[0]);
   }, [selectedVideos, videoDurations]);
 
+  const getVideoOffset = useCallback(
+  (videoUrl: string) => videoOffsets[videoUrl] || 0,
+  [videoOffsets]
+);
+
+const getVideoTargetTime = useCallback(
+  (
+    videoUrl: string,
+    sharedTime: number,
+    offsetOverride?: number
+  ) => {
+    const videoDuration = videoDurations[videoUrl] || 0;
+
+    const offset =
+      offsetOverride !== undefined
+        ? offsetOverride
+        : videoOffsets[videoUrl] || 0;
+
+    const targetTime = sharedTime + offset;
+
+    if (videoDuration <= 0) {
+      return Math.max(0, targetTime);
+    }
+
+    return Math.min(Math.max(targetTime, 0), videoDuration);
+  },
+  [videoDurations, videoOffsets]
+);
+
+const seekAllVideosToSharedTime = useCallback(
+  (sharedTime: number) => {
+    selectedVideos.forEach((videoUrl) => {
+      if (videoUnavailable[videoUrl]) return;
+
+      const player = playerRefs.current[videoUrl];
+      if (!player) return;
+
+      player.seekTo(getVideoTargetTime(videoUrl, sharedTime));
+    });
+  },
+  [
+    selectedVideos,
+    videoUnavailable,
+    getVideoTargetTime,
+  ]
+);
+
+const formatOffset = (offset: number) => {
+  const rounded = Math.round(offset * 10) / 10;
+
+  if (rounded > 0) {
+    return `+${rounded.toFixed(1)}s`;
+  }
+
+  if (rounded < 0) {
+    return `${rounded.toFixed(1)}s`;
+  }
+
+  return "0.0s";
+};
+
   const handlePlaybackError = useCallback(
   (videoUrl: string, error?: unknown) => {
     const hlsError = error as PlaybackHlsError | undefined;
@@ -500,32 +549,6 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
   },
   [mainVideoUrl]
 );
-
-
-  const getMainPlayer = () => {
-    if (!mainVideoUrl) return null;
-    return playerRefs.current[mainVideoUrl] || null;
-  };
-
-  const playbackDeviceInfo: DeviceInfo = {
-    deviceName:
-      robotList.find((item) => item.deviceId === values?.device)?.deviceName || "-",
-    companyName:
-      companyList.find((item) => item.companyId === values?.company)?.name ||
-      detailUserLogin?.user?.companyName ||
-      "-",
-    siteName: siteList.find((item) => item.siteId === values?.site)?.name || "-",
-    missionName:
-      missionList.find((item) => item.missionId === values?.mission)?.missionName ||
-      "-",
-    status: selectedVideos.length > 0 ? "active" : "inactive",
-    deviceSn:
-      robotList.find((item) => item.deviceId === values?.device)?.deviceSn || "-",
-    startTime: "-",
-    operatingHour: "_",
-    latitude: "-",
-    longitude: "-",
-  };
 
   const handleBookmarksChange = useCallback(
   (bookmarks: any[], videoUrl: string) => {
@@ -615,6 +638,12 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
     setIsPlaying(false);
     setVideoTimes({});
     setVideoDurations({});
+    setVideoOffsets(
+      limited.reduce<Record<string, number>>((result, videoUrl) => {
+        result[videoUrl] = 0;
+        return result;
+      }, {})
+    );
     setVideoLoading({});
     setVideoUnavailable({});
     playbackErrorCountRef.current = {};
@@ -648,14 +677,24 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
     });
 
     setVideoUnavailable((prev) => {
-  const next = { ...prev };
+      const next = { ...prev };
 
-  if (removedVideo) {
-    delete next[removedVideo];
-  }
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
 
-  return next;
-});
+      return next;
+    });
+
+  setVideoOffsets((prev) => {
+    const next = { ...prev };
+
+    if (removedVideo) {
+      delete next[removedVideo];
+    }
+
+    return next;
+  });
 
 if (removedVideo) {
   delete playbackErrorCountRef.current[removedVideo];
@@ -719,13 +758,12 @@ if (removedVideo) {
     if (shouldPlay) {
       await Promise.all(
         availablePlayers.map(async ({ videoUrl, player }) => {
-          const current = videoTimes[videoUrl] || 0;
-          const videoDuration = videoDurations[videoUrl] || 0;
+          const targetTime = getVideoTargetTime(
+            videoUrl,
+            currentTime
+          );
 
-          if (videoDuration > 0 && current >= videoDuration) {
-            player.seekTo(Math.max(0, videoDuration - 0.1));
-          }
-
+          player.seekTo(targetTime);
           await player.play();
         })
       );
@@ -744,50 +782,24 @@ if (removedVideo) {
 };
 
   const handlePrevious = () => {
-  let hasAvailablePlayer = false;
+  if (selectedVideos.length === 0) return;
 
-  selectedVideos.forEach((videoUrl) => {
-    if (videoUnavailable[videoUrl]) return;
+  const nextSharedTime = Math.max(0, currentTime - 10);
 
-    const player = playerRefs.current[videoUrl];
-    if (!player) return;
-
-    hasAvailablePlayer = true;
-
-    const current = videoTimes[videoUrl] || 0;
-    const next = Math.max(0, current - 10);
-
-    player.seekTo(next);
-  });
-
-  if (!hasAvailablePlayer) return;
-
-  setCurrentTime((prev) => Math.max(0, prev - 10));
+  seekAllVideosToSharedTime(nextSharedTime);
+  setCurrentTime(nextSharedTime);
 };
 
  const handleNext = () => {
-  let hasAvailablePlayer = false;
+  if (selectedVideos.length === 0) return;
 
-  selectedVideos.forEach((videoUrl) => {
-    if (videoUnavailable[videoUrl]) return;
-
-    const player = playerRefs.current[videoUrl];
-    if (!player) return;
-
-    hasAvailablePlayer = true;
-
-    const current = videoTimes[videoUrl] || 0;
-    const videoDuration = videoDurations[videoUrl] || 0;
-    const next = Math.min(videoDuration, current + 10);
-
-    player.seekTo(next);
-  });
-
-  if (!hasAvailablePlayer) return;
-
-  setCurrentTime((prev) =>
-    Math.min(mainDuration, prev + 10)
+  const nextSharedTime = Math.min(
+    mainDuration,
+    currentTime + 10
   );
+
+  seekAllVideosToSharedTime(nextSharedTime);
+  setCurrentTime(nextSharedTime);
 };
 
   const handleSliderChange = (value: number) => {
@@ -795,28 +807,8 @@ if (removedVideo) {
   };
 
   const handleTimeChangeComplete = (value: number) => {
-  let hasAvailablePlayer = false;
-
-  selectedVideos.forEach((videoUrl) => {
-    if (videoUnavailable[videoUrl]) return;
-
-    const player = playerRefs.current[videoUrl];
-    if (!player) return;
-
-    hasAvailablePlayer = true;
-
-    const videoDuration = videoDurations[videoUrl] || 0;
-    const clampedValue = Math.min(
-      value,
-      videoDuration || value
-    );
-
-    player.seekTo(clampedValue);
-  });
-
-  if (hasAvailablePlayer) {
-    setCurrentTime(value);
-  }
+  seekAllVideosToSharedTime(value);
+  setCurrentTime(value);
 };
 
   const toggleModule = (value: number) => {
@@ -1388,6 +1380,17 @@ const playbackMapGpsData = useMemo(() => {
               {selectedVideoItems.map((video) => {
                 const videoTime = videoTimes[video.value] || 0;
                 const videoDuration = videoDurations[video.value] || 0;
+                const videoOffset = videoOffsets[video.value] || 0;
+
+                const minimumOffset = Math.min(
+                  0,
+                  -currentTime
+                );
+
+                const maximumOffset = Math.max(
+                  0,
+                  videoDuration - currentTime
+                );
 
                 return (
                   <div key={video.value} className="flex flex-col gap-2">
@@ -1471,10 +1474,11 @@ const playbackMapGpsData = useMemo(() => {
                               [video.value]: playerDuration,
                             }));
 
-                            if (video.value === selectedVideos[0]) {
-                              const mainPlayer = getMainPlayer();
-                              setDuration(mainPlayer?.getDuration() || 0);
-                            }
+                            if (video.value === mainVideoUrl) {
+                                const mainPlayer = playerRefs.current[mainVideoUrl];
+
+                                setDuration(mainPlayer?.getDuration() || 0);
+                              }
 
                             if (
                               video.value === historyPlaybackState?.playbackUrl &&
@@ -1487,7 +1491,7 @@ const playbackMapGpsData = useMemo(() => {
                                 [video.value]: historySeekTime,
                               }));
 
-                              if (video.value === selectedVideos[0]) {
+                              if (video.value === mainVideoUrl) {
                                 setCurrentTime(historySeekTime);
                               }
                             }
@@ -1507,11 +1511,13 @@ const playbackMapGpsData = useMemo(() => {
                                 player?.getDuration() || 0,
                             }));
 
-                            if (video.value === selectedVideos[0]) {
-                              const mainPlayer = getMainPlayer();
+                            if (video.value === mainVideoUrl) {
+                              const mainPlayer = playerRefs.current[mainVideoUrl];
+                              const mainPlayerTime = mainPlayer?.getCurrentTime() || 0;
+                              const mainOffset = getVideoOffset(mainVideoUrl);
 
                               setCurrentTime(
-                                mainPlayer?.getCurrentTime() || 0
+                                Math.max(0, mainPlayerTime - mainOffset)
                               );
 
                               setDuration(
@@ -1524,7 +1530,7 @@ const playbackMapGpsData = useMemo(() => {
                             }
                           }}
                           onEnded={() => {
-                            if (video.value === selectedVideos[0]) {
+                            if (video.value === mainVideoUrl) {
                               setIsPlaying(false);
                             }
                           }}
@@ -1534,48 +1540,60 @@ const playbackMapGpsData = useMemo(() => {
                     </div>
 
                     <div className="bg-[#F3F4F6] rounded-[10px] px-5 py-4">
-                      <input
-                        type="range"
-                        min={0}
-                        max={videoDuration || 0}
+                      <Slider
+                        min={minimumOffset}
+                        max={maximumOffset}
                         step={0.1}
-                        value={Math.min(videoTime, videoDuration || 0)}
-                        onChange={(e) => {
-                          const nextValue = Number(e.target.value);
+                        value={Math.min(
+                          Math.max(videoOffset, minimumOffset),
+                          maximumOffset
+                        )}
+                        tooltip={{
+                          formatter: (value) =>
+                            formatOffset(Number(value || 0)),
+                        }}
+                        onChange={(nextOffset) => {
+                          const numericOffset = Number(nextOffset);
 
-                          setVideoTimes((prev) => ({
+                          setVideoOffsets((prev) => ({
                             ...prev,
-                            [video.value]: nextValue,
+                            [video.value]: numericOffset,
                           }));
-                        }}
-                        onMouseUp={(e) => {
-                          const nextValue = Number((e.target as HTMLInputElement).value);
-                          const player = playerRefs.current[video.value];
-                          if (player) {
-                            player.seekTo(nextValue);
-                          }
 
-                          if (video.value === mainVideoUrl) {
-                            setCurrentTime(nextValue);
-                          }
+                          playerRefs.current[video.value]?.seekTo(
+                            getVideoTargetTime(
+                              video.value,
+                              currentTime,
+                              numericOffset
+                            )
+                          );
                         }}
-                        onTouchEnd={(e) => {
-                          const target = e.target as HTMLInputElement;
-                          const nextValue = Number(target.value);
-                          const player = playerRefs.current[video.value];
-                          if (player) {
-                            player.seekTo(nextValue);
-                          }
+                        onChangeComplete={(nextOffset) => {
+                          const numericOffset = Number(nextOffset);
 
-                          if (video.value === mainVideoUrl) {
-                            setCurrentTime(nextValue);
-                          }
+                          setVideoOffsets((prev) => ({
+                            ...prev,
+                            [video.value]: numericOffset,
+                          }));
+
+                          playerRefs.current[video.value]?.seekTo(
+                            getVideoTargetTime(
+                              video.value,
+                              currentTime,
+                              numericOffset
+                            )
+                          );
                         }}
-                        className="w-full accent-[#3B82F6]"
                       />
 
-                      <div className="text-sm text-[#6B7280] mt-3">
-                        {formatTime(videoTime)} / {formatTime(videoDuration)}
+                      <div className="flex justify-between items-center text-sm text-[#6B7280] mt-3">
+                        <span>
+                          {formatTime(videoTime)} / {formatTime(videoDuration)}
+                        </span>
+
+                        <span className="font-semibold text-[#374151]">
+                          {formatOffset(videoOffset)}
+                        </span>
                       </div>
                     </div>
                   </div>
