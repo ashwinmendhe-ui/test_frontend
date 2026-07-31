@@ -81,6 +81,22 @@ type PlayerStatus =
     22: "NO-Safety Rope(LLM)",
   };
 
+  const AI_MODULE_CLASS_IDS: Record<string, number> = {
+  construction: 0,
+  hardhat: 1,
+  mask: 2,
+  no_hardhat: 3,
+  no_mask_common: 4,
+  no_mask: 4,
+  no_safety_vest: 5,
+  person: 6,
+  safety_vest: 8,
+  machinery: 9,
+  vehicle: 10,
+  llm_no_hardhat: 20,
+  llm_no_safety_vest: 21,
+};
+
   const resolveMapUrl = (
   playbackUrl?: string | null,
   mapUrl?: string | null
@@ -302,6 +318,17 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   const [selectedModules, setSelectedModules] = useState<string[]>(
     aiModules.map((item) => item.value)
   );
+
+  const selectedClassIds = useMemo(
+  () =>
+    selectedModules
+      .map((moduleValue) => AI_MODULE_CLASS_IDS[moduleValue])
+      .filter(
+        (classId): classId is number =>
+          typeof classId === "number" && Number.isFinite(classId)
+      ),
+  [selectedModules]
+);
 
   const commonModules = aiModules.filter((item) => item.type === "common");
   const dangerModules = aiModules.filter((item) => item.type === "danger");
@@ -1674,9 +1701,10 @@ const SmallStatusBadge = ({
                   autoPlay
                   muted
                   controls={false}
-                  selectedClassIds={[]}
+                  selectedClassIds={selectedClassIds}
                   showCommonDetection={showCommonDetection}
                   showDangerDetection={showDangerDetection}
+                  type="main"
                   onDeviceInfoUpdate={(deviceInfo) => {
                     handleDeviceInfoUpdate(deviceInfo);
                   }}

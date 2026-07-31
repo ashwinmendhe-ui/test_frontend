@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -309,6 +310,14 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
   [metadataBaseUrl]
 );
 
+const normalizedSelectedClassIds = useMemo(
+  () =>
+    selectedClassIds
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id)),
+  [selectedClassIds]
+);
+
   const startFrameSync = useCallback(() => {
   const syncLoop = () => {
     const video = videoRef.current;
@@ -424,7 +433,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       const selectedLlmClassIds =
         type === "llm" && rawClassIds
           ? rawClassIds.filter((id: number) =>
-              selectedClassIds.includes(id)
+              normalizedSelectedClassIds.includes(id)
             )
           : undefined;
 
@@ -436,7 +445,13 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       const classId =
         type === "llm"
           ? classIds?.[0]
-          : Number(det.cid ?? det.class_id ?? det.c);
+          : Number(
+              det.cid ??
+              det.classId ??
+              det.class_id ??
+              det.c ??
+              det.id
+            );
 
       const classNames = classIds?.map((id: number) =>
         getLabelName(id)
@@ -464,12 +479,14 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       };
     };
 
-      if (selectedClassIds.length === 0) {
+      if (normalizedSelectedClassIds.length === 0) {
         lastDetectionsRef.current = [];
         clearCanvas();
         rafIdRef.current = requestAnimationFrame(syncLoop);
         return;
       }
+
+      const shouldApplyIndividualFilter = true;
 
       const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
 
@@ -486,9 +503,9 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
             return false;
           }
 
-          if (!selectedClassIds.includes(classId)) {
-            return false;
-          }
+          if (!normalizedSelectedClassIds.includes(classId)) {
+              return false;
+            }
 
           const isDanger = DANGER_CLASS_IDS.includes(classId);
 
@@ -511,10 +528,17 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
           }
 
           const matchingClassIds = Array.isArray(det.classIds)
-            ? det.classIds.filter((id: number) =>
-                selectedClassIds.includes(Number(id))
-              )
-            : [];
+          ? det.classIds.filter((id: number) => {
+              const numericId = Number(id);
+
+              return (
+                Number.isFinite(numericId) &&
+                (
+                  normalizedSelectedClassIds.includes(numericId)
+                )
+              );
+            })
+          : [];
 
           if (matchingClassIds.length === 0) {
             return false;
@@ -548,7 +572,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
   drawDetections,
   getLabelName,
   loadSegmentMetadata,
-  selectedClassIds,
+  normalizedSelectedClassIds,
   showCommonDetection,
   showDangerDetection,
   onDeviceInfoUpdate,
