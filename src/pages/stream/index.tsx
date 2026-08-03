@@ -779,7 +779,7 @@ const formatDuration = (seconds: number) => {
 
       setHlsRetryCount((prev) => prev + 1);
       setHlsRetryKey((prev) => prev + 1);
-    }, 700);
+    }, 3000);
 
     return;
   }
@@ -1705,9 +1705,7 @@ const SmallStatusBadge = ({
                   showCommonDetection={showCommonDetection}
                   showDangerDetection={showDangerDetection}
                   type="main"
-                  onDeviceInfoUpdate={(deviceInfo) => {
-                    handleDeviceInfoUpdate(deviceInfo);
-                  }}
+                  onDeviceInfoUpdate={handleDeviceInfoUpdate}
                   onReady={() => {
                     setHasConnectedOnce(true);
                     setPlayerStatus("LIVE");

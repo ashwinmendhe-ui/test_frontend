@@ -398,8 +398,7 @@ const normalizedSelectedClassIds = useMemo(
     const infoFrame = nearestYoloFrame ?? nearestLlmFrame;
 
     if (infoFrame?.device_info) {
-
-      onDeviceInfoUpdate?.(
+      onDeviceInfoUpdateRef.current?.(
         infoFrame.device_info,
         src || "",
         currentTime
@@ -575,9 +574,25 @@ const normalizedSelectedClassIds = useMemo(
   normalizedSelectedClassIds,
   showCommonDetection,
   showDangerDetection,
-  onDeviceInfoUpdate,
   src,
 ]);
+
+const onDeviceInfoUpdateRef = useRef(onDeviceInfoUpdate);
+const onReadyRef = useRef(onReady);
+const onTimeUpdateRef = useRef(onTimeUpdate);
+
+useEffect(() => {
+  onDeviceInfoUpdateRef.current = onDeviceInfoUpdate;
+}, [onDeviceInfoUpdate]);
+
+useEffect(() => {
+  onReadyRef.current = onReady;
+}, [onReady]);
+
+useEffect(() => {
+  onTimeUpdateRef.current = onTimeUpdate;
+}, [onTimeUpdate]);
+
 
     useEffect(() => {
   const video = videoRef.current;
@@ -599,31 +614,55 @@ const normalizedSelectedClassIds = useMemo(
     hls.attachMedia(video);
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      onReady?.();
-
       if (autoPlay) {
-        video.play().catch(() => {});
+        video.play().catch((error) => {
+          console.warn("[HLS] Autoplay failed", error);
+        });
       }
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
-  const isLoadError =
-    data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
-    data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT ||
-    data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-    data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
-    data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
-    data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT;
+      if (!data.fatal) {
+        return;
+      }
 
-  if (isLoadError || data.fatal) {
-    onErrorRef.current?.(data);
-  }
+      console.error("[HLS] Fatal error", {
+        type: data.type,
+        details: data.details,
+        fatal: data.fatal,
+      });
 
-  if (data.fatal) {
-    hls.destroy();
-    hlsRef.current = null;
-  }
-});
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        onErrorRef.current?.(data);
+
+        try {
+          hls.startLoad();
+        } catch (error) {
+          console.error("[HLS] Failed to restart network loading", error);
+        }
+
+        return;
+      }
+
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        try {
+          hls.recoverMediaError();
+        } catch (error) {
+          console.error("[HLS] Failed to recover media error", error);
+          onErrorRef.current?.(data);
+        }
+
+        return;
+      }
+
+      onErrorRef.current?.(data);
+
+      hls.destroy();
+
+      if (hlsRef.current === hls) {
+        hlsRef.current = null;
+      }
+    });
 
     hlsRef.current = hls;
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -779,7 +818,7 @@ try {
 }, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded,disableBackgroundTasks,type]);
 
 
-  useEffect(() => {
+ useEffect(() => {
   if (!src || !metadataBaseUrl) return;
 
   startFrameSync();
@@ -876,20 +915,25 @@ useEffect(() => {
 
     return (
   <div className="relative w-full h-full bg-black overflow-hidden">
-    <video
-      ref={videoRef}
-      className={className}
-      muted={muted}
-      controls={controls}
-      playsInline
-      onLoadedMetadata={onLoadedMetadata}
-      onTimeUpdate={() => {
-        const video = videoRef.current;
-        if (!video) return;
-        onTimeUpdate?.(video.currentTime);
-      }}
-      onEnded={onEnded}
-    />
+    
+      <video
+          ref={videoRef}
+          className={className}
+          muted={muted}
+          controls={controls}
+          playsInline
+          onPlaying={() => {
+            onReadyRef.current?.();
+          }}
+          onLoadedMetadata={onLoadedMetadata}
+          onTimeUpdate={() => {
+            const video = videoRef.current;
+            if (!video) return;
+
+            onTimeUpdateRef.current?.(video.currentTime);
+          }}
+          onEnded={onEnded}
+        />
 
     <canvas
       ref={canvasRef}
