@@ -433,10 +433,16 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   }, [selectedRobotDetail?.deviceSn, streamPayload.deviceSn]);
 
   const clearLocalStreamState = useCallback(() => {
+  if (retryTimerRef.current !== null) {
+    window.clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
+  }
+
   playerRef.current?.pause();
 
   localStorage.removeItem(ACTIVE_STREAM_KEY);
-    setLiveDeviceInfo(null);
+  setLiveDeviceInfo(null);
+
   if (localStorage.getItem(STREAM_OWNER_TAB_KEY) === CURRENT_TAB_ID) {
     localStorage.removeItem(STREAM_OWNER_TAB_KEY);
   }
@@ -763,20 +769,20 @@ const formatDuration = (seconds: number) => {
 
  const handleHlsError = useCallback(() => {
   if (!isStreaming || !streamPlaybackUrl) return;
-    if (playerStatus === "CONNECTING") return;
+  if (playerStatus === "CONNECTING") return;
 
-
-  // Only reconnect state after stream was already live once
   if (hasConnectedOnce) {
     setPlayerStatus("RECONNECTING");
 
-    if (retryTimerRef.current) {
+    if (retryTimerRef.current !== null) {
       window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
     }
 
     retryTimerRef.current = window.setTimeout(() => {
-      setPlayerStatus("CONNECTING");
+      retryTimerRef.current = null;
 
+      setPlayerStatus("CONNECTING");
       setHlsRetryCount((prev) => prev + 1);
       setHlsRetryKey((prev) => prev + 1);
     }, 3000);
@@ -784,7 +790,6 @@ const formatDuration = (seconds: number) => {
     return;
   }
 
-  // Initial startup retry
   if (hlsRetryCount >= 30) {
     setPlayerStatus("OFFLINE");
 
@@ -797,11 +802,14 @@ const formatDuration = (seconds: number) => {
     return;
   }
 
-  if (retryTimerRef.current) {
+  if (retryTimerRef.current !== null) {
     window.clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
   }
 
   retryTimerRef.current = window.setTimeout(() => {
+    retryTimerRef.current = null;
+
     setHlsRetryCount((prev) => prev + 1);
     setHlsRetryKey((prev) => prev + 1);
   }, 1200);
@@ -1348,8 +1356,9 @@ applyActiveStream(restoredStream);
 
 useEffect(() => {
   return () => {
-    if (retryTimerRef.current) {
+    if (retryTimerRef.current !== null) {
       window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
     }
   };
 }, []);
@@ -1704,13 +1713,19 @@ const SmallStatusBadge = ({
                   selectedClassIds={selectedClassIds}
                   showCommonDetection={showCommonDetection}
                   showDangerDetection={showDangerDetection}
-                  type="main"
+                  type="live"
                   onDeviceInfoUpdate={handleDeviceInfoUpdate}
                   onReady={() => {
-                    setHasConnectedOnce(true);
-                    setPlayerStatus("LIVE");
-                    setIsPlaying(true);
-                  }}
+                      if (retryTimerRef.current !== null) {
+                        window.clearTimeout(retryTimerRef.current);
+                        retryTimerRef.current = null;
+                      }
+
+                      setHasConnectedOnce(true);
+                      setPlayerStatus("LIVE");
+                      setIsPlaying(true);
+                      setHlsRetryCount(0);
+                    }}
                   onError={handleHlsError}
                   onLoadedMetadata={() => {
                     setCurrentTime(0);

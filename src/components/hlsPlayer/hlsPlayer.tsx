@@ -42,7 +42,7 @@ interface HLSPlayerProps {
   onTimeUpdate?: (time: number) => void;
   onEnded?: () => void;
   disableBackgroundTasks?: boolean;
-    type?: "main" | "vector" | "playback";
+    type?: "live" | "vector" | "playback";
   onBookmarksChange?: (
     bookmarks: Array<{ timeSec: number | null; t?: number; c_ar?: number[] }>,
     videoUrl: string
@@ -83,7 +83,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
       showCommonDetection = true,
       showDangerDetection = true,
       disableBackgroundTasks = false,
-      type = "main",
+      type = "playback",
     },
     ref
   ) => {
@@ -99,7 +99,6 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
     const currentSegmentNameRef = useRef<string | null>(null);
     const currentMetadataRef = useRef<any[]>([]);
     const rafIdRef = useRef<number | null>(null);
-
     const [frameDimensions, setFrameDimensions] = useState<{
       width: number | null;
       height: number | null;
@@ -117,6 +116,9 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
 
 
     const onErrorRef = useRef(onError);
+    const onDeviceInfoUpdateRef = useRef(onDeviceInfoUpdate);
+    const onReadyRef = useRef(onReady);
+    const onTimeUpdateRef = useRef(onTimeUpdate);
 
     const safeJsonFetch = async (url: string) => {
   try {
@@ -485,8 +487,6 @@ const normalizedSelectedClassIds = useMemo(
         return;
       }
 
-      const shouldApplyIndividualFilter = true;
-
       const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
 
       const yoloDetections = yoloSource
@@ -577,9 +577,6 @@ const normalizedSelectedClassIds = useMemo(
   src,
 ]);
 
-const onDeviceInfoUpdateRef = useRef(onDeviceInfoUpdate);
-const onReadyRef = useRef(onReady);
-const onTimeUpdateRef = useRef(onTimeUpdate);
 
 useEffect(() => {
   onDeviceInfoUpdateRef.current = onDeviceInfoUpdate;
@@ -633,12 +630,15 @@ useEffect(() => {
       });
 
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        onErrorRef.current?.(data);
-
         try {
+          console.warn("[HLS] Attempting network recovery", {
+            details: data.details,
+          });
+
           hls.startLoad();
         } catch (error) {
-          console.error("[HLS] Failed to restart network loading", error);
+          console.error("[HLS] Network recovery failed", error);
+          onErrorRef.current?.(data);
         }
 
         return;
@@ -646,9 +646,13 @@ useEffect(() => {
 
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
         try {
+          console.warn("[HLS] Attempting media recovery", {
+            details: data.details,
+          });
+
           hls.recoverMediaError();
         } catch (error) {
-          console.error("[HLS] Failed to recover media error", error);
+          console.error("[HLS] Media recovery failed", error);
           onErrorRef.current?.(data);
         }
 

@@ -1299,6 +1299,7 @@ const playbackMapGpsData = useMemo(() => {
                   autoPlay={false}
                   muted={true}
                   controls={false}
+                  type="playback"
                   onLoadedMetadata={() => {
                     const videoUrl = selectedVideos[0];
 
@@ -1453,6 +1454,7 @@ const playbackMapGpsData = useMemo(() => {
                           autoPlay={false}
                           muted={true}
                           controls={false}
+                          type="playback"
                           onLoadedMetadata={() => {
                             const player = playerRefs.current[video.value];
                             const playerDuration = player?.getDuration() || 0;
