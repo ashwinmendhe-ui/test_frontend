@@ -126,6 +126,9 @@ const timeToSeconds = (time?: string) => {
 
   return 0;
 };
+  const OFFSET_MIN_SECONDS = -30;
+  const OFFSET_MAX_SECONDS = 30;
+  const SYNC_TOLERANCE_SECONDS = 0.25;
 
 export default function Playback() {
   const location = useLocation();
@@ -151,10 +154,15 @@ export default function Playback() {
   const [form] = Form.useForm<PlaybackFormValues>();
 
   const playerRefs = useRef<Record<string, HLSPlayerRef | null>>({});
+  const isSharedSeekingRef = useRef(false);
+  const sharedSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [, setDuration] = useState(0);
   const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
   const handleDeviceInfoUpdate = useCallback(
   (deviceInfo: any, videoUrl: string) => {
@@ -418,15 +426,7 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
     return durations.length > 0 ? Math.max(...durations) : 0;
   }, [selectedVideos, videoDurations]);
 
-  const mainVideoUrl = useMemo(() => {
-    if (selectedVideos.length === 0) return undefined;
-
-    return selectedVideos.reduce((longest, current) => {
-      const longestDuration = videoDurations[longest] || 0;
-      const currentDuration = videoDurations[current] || 0;
-      return currentDuration > longestDuration ? current : longest;
-    }, selectedVideos[0]);
-  }, [selectedVideos, videoDurations]);
+  const masterVideoUrl = selectedVideos[0];
 
   const getVideoOffset = useCallback(
   (videoUrl: string) => videoOffsets[videoUrl] || 0,
@@ -458,19 +458,52 @@ const getVideoTargetTime = useCallback(
 );
 
 const seekAllVideosToSharedTime = useCallback(
-  (sharedTime: number) => {
+  (
+    sharedTime: number,
+    offsetOverrides?: Record<string, number>
+  ) => {
+    isSharedSeekingRef.current = true;
+
+    if (sharedSeekTimerRef.current) {
+      clearTimeout(sharedSeekTimerRef.current);
+    }
+
     selectedVideos.forEach((videoUrl) => {
       if (videoUnavailable[videoUrl]) return;
 
       const player = playerRefs.current[videoUrl];
       if (!player) return;
 
-      player.seekTo(getVideoTargetTime(videoUrl, sharedTime));
+      const offset =
+        offsetOverrides?.[videoUrl] ??
+        videoOffsets[videoUrl] ??
+        0;
+
+      const targetTime = getVideoTargetTime(
+        videoUrl,
+        sharedTime,
+        offset
+      );
+
+      const playerTime = player.getCurrentTime();
+
+      if (
+        Math.abs(playerTime - targetTime) >
+        SYNC_TOLERANCE_SECONDS
+      ) {
+        player.seekTo(targetTime);
+      }
     });
+
+    sharedSeekTimerRef.current = setTimeout(() => {
+      isSharedSeekingRef.current = false;
+      sharedSeekTimerRef.current = null;
+    }, 300);
   },
   [
     selectedVideos,
     videoUnavailable,
+    videoOffsets,
     getVideoTargetTime,
   ]
 );
@@ -541,13 +574,13 @@ const formatOffset = (offset: number) => {
       [videoUrl]: 0,
     }));
 
-    if (videoUrl === mainVideoUrl) {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-    }
+    if (videoUrl === masterVideoUrl) {
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+}
   },
-  [mainVideoUrl]
+  [masterVideoUrl]
 );
 
   const handleBookmarksChange = useCallback(
@@ -756,20 +789,14 @@ if (removedVideo) {
     );
 
     if (shouldPlay) {
-      await Promise.all(
-        availablePlayers.map(async ({ videoUrl, player }) => {
-          const targetTime = getVideoTargetTime(
-            videoUrl,
-            currentTime
-          );
+  seekAllVideosToSharedTime(currentTime);
 
-          player.seekTo(targetTime);
-          await player.play();
-        })
-      );
+  await Promise.all(
+    availablePlayers.map(({ player }) => player.play())
+  );
 
-      setIsPlaying(true);
-    } else {
+  setIsPlaying(true);
+} else {
       availablePlayers.forEach(({ player }) => {
         player.pause();
       });
@@ -849,7 +876,14 @@ if (removedVideo) {
   ).length;
 
   
-
+useEffect(() => {
+  return () => {
+    if (sharedSeekTimerRef.current) {
+      clearTimeout(sharedSeekTimerRef.current);
+      sharedSeekTimerRef.current = null;
+    }
+  };
+}, []);
   
 // Load company list
 useEffect(() => {
@@ -1009,6 +1043,7 @@ const allSelectedVideosUnavailable =
 
     const bookmarks = bookmarksByVideo[videoUrl] || [];
     const labelsMap = labelsByVideo[videoUrl] || {};
+    const videoOffset = videoOffsets[videoUrl] || 0;
 
 
 
@@ -1047,7 +1082,12 @@ const allSelectedVideosUnavailable =
 
         const marker = {
           id: `${videoUrl}-${index}`,
-          timeSec: Number(bookmark.timeSec?.toFixed(1) || 0),
+          timeSec: Number(
+            Math.max(
+              0,
+              Number(bookmark.timeSec || 0) - videoOffset
+            ).toFixed(1)
+          ),
           type: getMarkerTypeFromLabel(primaryLabel),
           label: fallbackLabel,
           confidence: getMarkerConfidence(selectedBookmarkClassIds),
@@ -1081,6 +1121,7 @@ const allSelectedVideosUnavailable =
   labelsByVideo,
   selectedVideos,
   selectedModules,
+  videoOffsets,
   mainDuration,
   t,
 ]);
@@ -1382,17 +1423,6 @@ const playbackMapGpsData = useMemo(() => {
                 const videoTime = videoTimes[video.value] || 0;
                 const videoDuration = videoDurations[video.value] || 0;
                 const videoOffset = videoOffsets[video.value] || 0;
-
-                const minimumOffset = Math.min(
-                  0,
-                  -currentTime
-                );
-
-                const maximumOffset = Math.max(
-                  0,
-                  videoDuration - currentTime
-                );
-
                 return (
                   <div key={video.value} className="flex flex-col gap-2">
                     <div className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
@@ -1476,10 +1506,10 @@ const playbackMapGpsData = useMemo(() => {
                               [video.value]: playerDuration,
                             }));
 
-                            if (video.value === mainVideoUrl) {
-                                const mainPlayer = playerRefs.current[mainVideoUrl];
+                            if (video.value === masterVideoUrl) {
+                                const masterPlayer = playerRefs.current[video.value];
 
-                                setDuration(mainPlayer?.getDuration() || 0);
+                                setDuration(masterPlayer?.getDuration() || 0);
                               }
 
                             if (
@@ -1493,7 +1523,7 @@ const playbackMapGpsData = useMemo(() => {
                                 [video.value]: historySeekTime,
                               }));
 
-                              if (video.value === mainVideoUrl) {
+                              if (video.value === masterVideoUrl) {
                                 setCurrentTime(historySeekTime);
                               }
                             }
@@ -1513,26 +1543,33 @@ const playbackMapGpsData = useMemo(() => {
                                 player?.getDuration() || 0,
                             }));
 
-                            if (video.value === mainVideoUrl) {
-                              const mainPlayer = playerRefs.current[mainVideoUrl];
-                              const mainPlayerTime = mainPlayer?.getCurrentTime() || 0;
-                              const mainOffset = getVideoOffset(mainVideoUrl);
+                            if (
+                              video.value === masterVideoUrl &&
+                              !isSharedSeekingRef.current
+                            ) {
+                              const masterPlayer = playerRefs.current[video.value];
 
-                              setCurrentTime(
-                                Math.max(0, mainPlayerTime - mainOffset)
+                              const masterPlayerTime =
+                                masterPlayer?.getCurrentTime() || 0;
+
+                              const masterOffset =
+                                getVideoOffset(video.value);
+
+                              const nextSharedTime = Math.min(
+                                mainDuration,
+                                Math.max(0, masterPlayerTime - masterOffset)
                               );
 
-                              setDuration(
-                                mainPlayer?.getDuration() || 0
-                              );
+                              setCurrentTime(nextSharedTime);
+                              setDuration(mainDuration);
 
                               setIsPlaying(
-                                !(mainPlayer?.isPaused() ?? true)
+                                !(masterPlayer?.isPaused() ?? true)
                               );
                             }
                           }}
                           onEnded={() => {
-                            if (video.value === mainVideoUrl) {
+                            if (video.value === masterVideoUrl) {
                               setIsPlaying(false);
                             }
                           }}
@@ -1543,49 +1580,34 @@ const playbackMapGpsData = useMemo(() => {
 
                     <div className="bg-[#F3F4F6] rounded-[10px] px-5 py-4">
                       <Slider
-                        min={minimumOffset}
-                        max={maximumOffset}
+                        min={OFFSET_MIN_SECONDS}
+                        max={OFFSET_MAX_SECONDS}
                         step={0.1}
-                        value={Math.min(
-                          Math.max(videoOffset, minimumOffset),
-                          maximumOffset
-                        )}
+                        value={videoOffset}
                         tooltip={{
                           formatter: (value) =>
                             formatOffset(Number(value || 0)),
                         }}
                         onChange={(nextOffset) => {
-                          const numericOffset = Number(nextOffset);
+                        const numericOffset = Number(nextOffset);
 
-                          setVideoOffsets((prev) => ({
-                            ...prev,
-                            [video.value]: numericOffset,
-                          }));
+                        setVideoOffsets((prev) => ({
+                          ...prev,
+                          [video.value]: numericOffset,
+                        }));
+                      }}
+                      onChangeComplete={(nextOffset) => {
+                        const numericOffset = Number(nextOffset);
 
-                          playerRefs.current[video.value]?.seekTo(
-                            getVideoTargetTime(
-                              video.value,
-                              currentTime,
-                              numericOffset
-                            )
-                          );
-                        }}
-                        onChangeComplete={(nextOffset) => {
-                          const numericOffset = Number(nextOffset);
+                        setVideoOffsets((prev) => ({
+                          ...prev,
+                          [video.value]: numericOffset,
+                        }));
 
-                          setVideoOffsets((prev) => ({
-                            ...prev,
-                            [video.value]: numericOffset,
-                          }));
-
-                          playerRefs.current[video.value]?.seekTo(
-                            getVideoTargetTime(
-                              video.value,
-                              currentTime,
-                              numericOffset
-                            )
-                          );
-                        }}
+                        seekAllVideosToSharedTime(currentTime, {
+                          [video.value]: numericOffset,
+                        });
+                      }}
                       />
 
                       <div className="flex justify-between items-center text-sm text-[#6B7280] mt-3">
