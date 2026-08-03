@@ -322,9 +322,14 @@ const normalizedSelectedClassIds = useMemo(
 
   const startFrameSync = useCallback(() => {
   const syncLoop = () => {
-    const video = videoRef.current;
+    const video = videoRef.current; 
 
-    if (!video || playlistSegmentsRef.current.length === 0) {
+  if (
+      !video ||
+      video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+      playlistSegmentsRef.current.length === 0
+    ) {
+      clearCanvas();
       rafIdRef.current = requestAnimationFrame(syncLoop);
       return;
     }
@@ -618,55 +623,81 @@ useEffect(() => {
       }
     });
 
-    hls.on(Hls.Events.ERROR, (_, data) => {
-      if (!data.fatal) {
-        return;
-      }
+   hls.on(Hls.Events.ERROR, (_, data) => {
+  if (!data.fatal) {
+    return;
+  }
 
-      console.error("[HLS] Fatal error", {
-        type: data.type,
+  console.error("[HLS] Fatal error", {
+    type: data.type,
+    details: data.details,
+    fatal: data.fatal,
+  });
+
+  if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+  const isManifestError =
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT;
+
+  const isLevelErrorBeforeVideoReady =
+    (
+      data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+      data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+    ) &&
+    video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
+
+  const isInitialPlaylistError =
+    isManifestError || isLevelErrorBeforeVideoReady;
+
+  if (isInitialPlaylistError) {
+    console.warn(
+      "[HLS] Initial playlist unavailable; requesting retry",
+      {
         details: data.details,
-        fatal: data.fatal,
+      }
+    );
+
+    onErrorRef.current?.(data);
+    return;
+  }
+
+  try {
+    console.warn("[HLS] Attempting fragment/network recovery", {
+      details: data.details,
+    });
+
+    hls.startLoad();
+  } catch (error) {
+    console.error("[HLS] Network recovery failed", error);
+    onErrorRef.current?.(data);
+  }
+
+  return;
+}
+
+  if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+    try {
+      console.warn("[HLS] Attempting media recovery", {
+        details: data.details,
       });
 
-      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        try {
-          console.warn("[HLS] Attempting network recovery", {
-            details: data.details,
-          });
-
-          hls.startLoad();
-        } catch (error) {
-          console.error("[HLS] Network recovery failed", error);
-          onErrorRef.current?.(data);
-        }
-
-        return;
-      }
-
-      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-        try {
-          console.warn("[HLS] Attempting media recovery", {
-            details: data.details,
-          });
-
-          hls.recoverMediaError();
-        } catch (error) {
-          console.error("[HLS] Media recovery failed", error);
-          onErrorRef.current?.(data);
-        }
-
-        return;
-      }
-
+      hls.recoverMediaError();
+    } catch (error) {
+      console.error("[HLS] Media recovery failed", error);
       onErrorRef.current?.(data);
+    }
 
-      hls.destroy();
+    return;
+  }
 
-      if (hlsRef.current === hls) {
-        hlsRef.current = null;
-      }
-    });
+  onErrorRef.current?.(data);
+
+  hls.destroy();
+
+  if (hlsRef.current === hls) {
+    hlsRef.current = null;
+  }
+});
 
     hlsRef.current = hls;
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
