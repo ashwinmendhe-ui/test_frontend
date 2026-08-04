@@ -1276,7 +1276,7 @@ const playbackMapGpsData = useMemo(() => {
             </div>
           ) : selectedVideos.length === 1 ? (
             <div className="p-2 h-full">
-              <div className="relative rounded-[8px] bg-black overflow-hidden">
+              <div className="relative w-full h-[410px] rounded-[8px] bg-black overflow-hidden">
                 <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
                   <span
                     className={`w-2.5 h-2.5 rounded-full ${
@@ -1342,7 +1342,7 @@ const playbackMapGpsData = useMemo(() => {
                   )}
                   onBookmarksChange={handleBookmarksChange}
                   onLabelsLoaded={handleLabelsLoaded}
-                  className="w-full h-[410px] object-contain bg-black"
+                  className="w-full h-full object-contain bg-black"
                   autoPlay={false}
                   muted={true}
                   controls={false}
