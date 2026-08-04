@@ -104,13 +104,6 @@ const getMarkerColor = (type?: string, classIds: number[] = []) => {
   }
 };
 
-const getMarkerHeight = (index: number, type?: string) => {
-  if (type === "alert") return 28;
-  if (index % 4 === 0) return 24;
-  if (index % 3 === 0) return 20;
-  return 20;
-};
-
 export default function ControlBar({
   isLive = false,
   isPlaying,
@@ -261,39 +254,38 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
 
         <div className="flex-1 px-2">
           <div className="relative w-full">
-            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2">
               <Slider
-                value={displayTime}
-                max={timelineDuration > 0 ? timelineDuration : 100}
-                min={0}
-                step={0.1}
-                onChange={handleChange}
-                onChangeComplete={handleAfterChange}
-                disabled={disabled}
-                tooltip={{
-                  formatter: (value) => formatTime(value || 0),
-                }}
-                className="m-0! p-0! h-[30px]!"
-                styles={{
-                  track: {
-                    backgroundColor: "#D1D1D6",
-                    height: "12px",
-                  },
-                  rail: {
-                    backgroundColor: "#E9ECF0",
-                    height: "12px",
-                  },
-                  handle: {
-                    width: "2px",
-                    height: "44px",
-                    backgroundColor: "#9BA2A9",
-                    marginTop: "-16px",
-                    zIndex: 5,
-                    boxShadow: "none",
-                  },
-                }}
-              />
-            </div>
+              value={displayTime}
+              max={timelineDuration > 0 ? timelineDuration : 100}
+              min={0}
+              step={0.1}
+              onChange={handleChange}
+              onChangeComplete={handleAfterChange}
+              disabled={disabled}
+              tooltip={{
+                formatter: (value) => formatTime(value || 0),
+              }}
+              className="m-0! p-0! h-[31px]!"
+              styles={{
+                track: {
+                  backgroundColor: "#D1D1D6",
+                  height: "28px",
+                },
+                rail: {
+                  backgroundColor: "#E9ECF0",
+                  height: "28px",
+                },
+                handle: {
+                  width: "2px",
+                  height: "32px",
+                  backgroundColor: "#9BA2A9",
+                  marginTop: "-5px",
+                  zIndex: 5,
+                  boxShadow: "none",
+                },
+              }}
+            />
+            
 
             {duration > 0 && filteredBookmarks.length > 0 && (
               <div className="pointer-events-none absolute inset-0">
@@ -304,10 +296,6 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                     ? bm.classIds
                     : bm.c_ar ?? [];
 
-                  const markerHeight = getMarkerHeight(
-                    bm.idx,
-                    bm.type
-                  );
 
                   const markerColor = getMarkerColor(
                     bm.type,
@@ -349,44 +337,32 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                       )}
                     </div>
                   );
-
                   return (
                     <Tooltip
-                      key={
-                        bm.id ||
-                        `${bm.timeSec}-${bm.idx}`
+                    key={bm.id || `${bm.timeSec}-${bm.idx}`}
+                    title={tooltipContent}
+                  >
+                    <div
+                      className="cursor-pointer pointer-events-auto absolute"
+                      style={{
+                        left: `${bm.positionPercent}%`,
+                        top: bm.position === "bottom" ? "50%" : "0",
+                        transform: "translateX(-50%)",
+                        zIndex: 4,
+                      }}
+                      onClick={() =>
+                        handleBookmarkTap(bm.timeSec as number)
                       }
-                      title={tooltipContent}
                     >
                       <div
-                        className="cursor-pointer pointer-events-auto absolute"
+                        className="w-1"
                         style={{
-                          left: `${bm.positionPercent}%`,
-                          top:
-                            bm.position === "bottom"
-                              ? "31px"
-                              : "3px",
-                          transform: "translateX(-50%)",
-                          zIndex: 4,
+                          height: "14px",
+                          backgroundColor: markerColor,
                         }}
-                        onClick={() =>
-                          handleBookmarkTap(
-                            bm.timeSec as number
-                          )
-                        }
-                      >
-                        <div
-                          className="w-1 rounded-sm"
-                          style={{
-                            height: `${Math.min(
-                              markerHeight,
-                              20
-                            )}px`,
-                            backgroundColor: markerColor,
-                          }}
-                        />
-                      </div>
-                    </Tooltip>
+                      />
+                    </div>
+                  </Tooltip>
                   );
                 })}
               </div>

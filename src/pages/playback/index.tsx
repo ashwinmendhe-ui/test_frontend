@@ -1435,7 +1435,7 @@ const playbackMapGpsData = useMemo(() => {
                     key={video.value}
                     className="relative w-full min-w-0"
                   >
-                  <div className="relative w-full h-[410px] rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
+                  <div className="relative w-full aspect-video rounded-[8px] bg-black overflow-hidden">
                     <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
                       <span
                         className={`w-2.5 h-2.5 rounded-full ${
@@ -1651,14 +1651,8 @@ const playbackMapGpsData = useMemo(() => {
                       }}
                     />
 
-                    <div className="flex justify-between items-center text-sm text-[#6B7280] mt-3">
-                      <span>
-                        {formatTime(videoTime)} / {formatTime(videoDuration)}
-                      </span>
-
-                      <span className="font-semibold text-[#374151]">
-                        {formatOffset(videoOffset)}
-                      </span>
+                    <div className="text-sm text-[#6B7280] text-left mt-2 mx-1">
+                      {formatTime(videoTime)} / {formatTime(videoDuration)}
                     </div>
                   </div>
                 </div>
