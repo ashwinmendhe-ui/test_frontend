@@ -260,7 +260,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
         </button>
 
         <div className="flex-1 px-2">
-          <div className="relative w-full h-[54px]">
+          <div className="relative w-full">
             <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2">
               <Slider
                 value={displayTime}

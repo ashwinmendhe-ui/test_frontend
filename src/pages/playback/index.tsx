@@ -1262,7 +1262,13 @@ const playbackMapGpsData = useMemo(() => {
 
         </Form>
 
-        <div className="bg-[#364152] rounded-[10px] overflow-hidden min-h-[430px] relative min-w-[660px]">
+        <div
+            className={
+              selectedVideos.length === 0
+                ? "relative min-w-[660px] min-h-[430px] bg-[#364152] rounded-[10px] overflow-hidden"
+                : "relative min-w-[660px] w-full"
+            }
+          >
           {selectedVideos.length === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-[#D5D7D8]">
               <img src={NoVideoIcon} alt="No video available" className="w-24 h-24" />
@@ -1285,24 +1291,24 @@ const playbackMapGpsData = useMemo(() => {
                 </div>
 
                 {videoUnavailable[selectedVideos[0]] ? (
-                <div className="w-full h-[410px] flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
-                  <img
-                    src={NoVideoIcon}
-                    alt={t("playback_recording_unavailable")}
-                    className="w-20 h-20 opacity-80"
-                  />
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-black px-5 text-center">
+                      <img
+                        src={NoVideoIcon}
+                        alt={t("playback_recording_unavailable")}
+                        className="w-20 h-20 opacity-80"
+                      />
 
-                  <div>
-                    <h3 className="text-white text-[18px] font-bold">
-                      {t("playback_recording_unavailable")}
-                    </h3>
+                      <div>
+                        <h3 className="text-white text-[18px] font-bold">
+                          {t("playback_recording_unavailable")}
+                        </h3>
 
-                    <p className="mt-2 text-[#D1D5DB] text-[14px]">
-                      {t("playback_recording_unavailable_description")}
-                    </p>
-                  </div>
-                </div>
-              ) : (
+                        <p className="mt-2 text-[#D1D5DB] text-[14px]">
+                          {t("playback_recording_unavailable_description")}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
                 <HLSPlayer
                   ref={(instance) => {
                     if (selectedVideos[0]) {
@@ -1418,7 +1424,7 @@ const playbackMapGpsData = useMemo(() => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 p-2 h-full">
+            <div className="grid grid-cols-2 gap-2 w-full">
             {selectedVideoItems.map((video) => {
               const videoTime = videoTimes[video.value] || 0;
               const videoDuration = videoDurations[video.value] || 0;
@@ -1426,10 +1432,10 @@ const playbackMapGpsData = useMemo(() => {
 
               return (
                 <div
-                  key={video.value}
-                  className="min-w-0 flex flex-col gap-3"
-                >
-                  <div className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
+                    key={video.value}
+                    className="relative w-full min-w-0"
+                  >
+                  <div className="relative w-full h-[410px] rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
                     <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
                       <span
                         className={`w-2.5 h-2.5 rounded-full ${
@@ -1441,7 +1447,7 @@ const playbackMapGpsData = useMemo(() => {
 
                     <div className="w-full h-full">
                       {videoUnavailable[video.value] ? (
-                        <div className="w-full h-[410px] flex flex-col items-center justify-center gap-4 bg-black px-5 text-center">
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-black px-5 text-center">
                           <img
                             src={NoVideoIcon}
                             alt={t("playback_recording_unavailable")}
@@ -1486,7 +1492,7 @@ const playbackMapGpsData = useMemo(() => {
                           )}
                           onBookmarksChange={handleBookmarksChange}
                           onLabelsLoaded={handleLabelsLoaded}
-                          className="w-full h-[410px] object-contain bg-black"
+                          className="w-full h-full object-contain bg-black"
                           autoPlay={false}
                           muted={true}
                           controls={false}
@@ -1585,7 +1591,7 @@ const playbackMapGpsData = useMemo(() => {
                     </div>
                   </div>
 
-                  <div className="w-full bg-white border border-[#E5E7EB] rounded-[10px] px-5 py-4">
+                  <div className="mt-2 w-full bg-white rounded-[8px] px-4 py-3">
                     <Slider
                       className="w-full"
                       min={OFFSET_MIN_SECONDS}
