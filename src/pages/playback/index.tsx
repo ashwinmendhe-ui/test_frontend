@@ -1430,7 +1430,159 @@ const playbackMapGpsData = useMemo(() => {
                   className="min-w-0 flex flex-col gap-3"
                 >
                   <div className="relative rounded-[8px] bg-black overflow-hidden flex items-center justify-center">
-                    {/* Existing video/HLSPlayer code remains unchanged */}
+                    <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-[#374151]/90 rounded-full px-3 py-1.5 text-xs font-semibold text-white">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          getVideoStatus(video.value).dotClass
+                        }`}
+                      />
+                      <span>{getVideoStatus(video.value).label}</span>
+                    </div>
+
+                    <div className="w-full h-full">
+                      {videoUnavailable[video.value] ? (
+                        <div className="w-full h-[410px] flex flex-col items-center justify-center gap-4 bg-black px-5 text-center">
+                          <img
+                            src={NoVideoIcon}
+                            alt={t("playback_recording_unavailable")}
+                            className="w-16 h-16 opacity-80"
+                          />
+
+                          <div>
+                            <h3 className="text-white text-[16px] font-bold">
+                              {t("playback_recording_unavailable")}
+                            </h3>
+
+                            <p className="mt-2 text-[#D1D5DB] text-[13px]">
+                              {t("playback_recording_unavailable_description")}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <HLSPlayer
+                          ref={(instance) => {
+                            playerRefs.current[video.value] = instance;
+                          }}
+                          src={video.value}
+                          onError={(error) => {
+                            handlePlaybackError(video.value, error);
+                          }}
+                          onDeviceInfoUpdate={handleDeviceInfoUpdate}
+                          metadataBaseUrl={metadataBaseByVideo[video.value]}
+                          selectedClassIds={selectedModules}
+                          showCommonDetection={selectedModules.some((value) =>
+                            aiModules.some(
+                              (item) =>
+                                item.value === value &&
+                                item.type === "common"
+                            )
+                          )}
+                          showDangerDetection={selectedModules.some((value) =>
+                            aiModules.some(
+                              (item) =>
+                                item.value === value &&
+                                item.type === "danger"
+                            )
+                          )}
+                          onBookmarksChange={handleBookmarksChange}
+                          onLabelsLoaded={handleLabelsLoaded}
+                          className="w-full h-[410px] object-contain bg-black"
+                          autoPlay={false}
+                          muted={true}
+                          controls={false}
+                          type="playback"
+                          onLoadedMetadata={() => {
+                            const player = playerRefs.current[video.value];
+                            const playerDuration =
+                              player?.getDuration() || 0;
+
+                            playbackErrorCountRef.current[video.value] = 0;
+
+                            setVideoLoading((prev) => ({
+                              ...prev,
+                              [video.value]: false,
+                            }));
+
+                            setVideoUnavailable((prev) => ({
+                              ...prev,
+                              [video.value]: false,
+                            }));
+
+                            setVideoDurations((prev) => ({
+                              ...prev,
+                              [video.value]: playerDuration,
+                            }));
+
+                            if (video.value === masterVideoUrl) {
+                              setDuration(playerDuration);
+                            }
+
+                            if (
+                              video.value === historyPlaybackState?.playbackUrl &&
+                              historySeekTime > 0
+                            ) {
+                              player?.seekTo(historySeekTime);
+
+                              setVideoTimes((prev) => ({
+                                ...prev,
+                                [video.value]: historySeekTime,
+                              }));
+
+                              if (video.value === masterVideoUrl) {
+                                setCurrentTime(historySeekTime);
+                              }
+                            }
+                          }}
+                          onTimeUpdate={() => {
+                            const player =
+                              playerRefs.current[video.value];
+
+                            const playerTime =
+                              player?.getCurrentTime() || 0;
+
+                            const playerDuration =
+                              player?.getDuration() || 0;
+
+                            setVideoTimes((prev) => ({
+                              ...prev,
+                              [video.value]: playerTime,
+                            }));
+
+                            setVideoDurations((prev) => ({
+                              ...prev,
+                              [video.value]: playerDuration,
+                            }));
+
+                            if (
+                              video.value === masterVideoUrl &&
+                              !isSharedSeekingRef.current
+                            ) {
+                              const masterOffset =
+                                getVideoOffset(video.value);
+
+                              const nextSharedTime = Math.min(
+                                mainDuration,
+                                Math.max(
+                                  0,
+                                  playerTime - masterOffset
+                                )
+                              );
+
+                              setCurrentTime(nextSharedTime);
+                              setDuration(mainDuration);
+                              setIsPlaying(
+                                !(player?.isPaused() ?? true)
+                              );
+                            }
+                          }}
+                          onEnded={() => {
+                            if (video.value === masterVideoUrl) {
+                              setIsPlaying(false);
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="w-full bg-white border border-[#E5E7EB] rounded-[10px] px-5 py-4">
@@ -1451,6 +1603,25 @@ const playbackMapGpsData = useMemo(() => {
                           ...prev,
                           [video.value]: numericOffset,
                         }));
+
+                        const player = playerRefs.current[video.value];
+
+                        if (!player) return;
+
+                        const targetTime = getVideoTargetTime(
+                          video.value,
+                          currentTime,
+                          numericOffset
+                        );
+
+                        const playerTime = player.getCurrentTime();
+
+                        if (
+                          Math.abs(playerTime - targetTime) >
+                          SYNC_TOLERANCE_SECONDS
+                        ) {
+                          player.seekTo(targetTime);
+                        }
                       }}
                       onChangeComplete={(nextOffset) => {
                         const numericOffset = Number(nextOffset);
@@ -1460,9 +1631,17 @@ const playbackMapGpsData = useMemo(() => {
                           [video.value]: numericOffset,
                         }));
 
-                        seekAllVideosToSharedTime(currentTime, {
-                          [video.value]: numericOffset,
-                        });
+                        const player = playerRefs.current[video.value];
+
+                        if (!player) return;
+
+                        player.seekTo(
+                          getVideoTargetTime(
+                            video.value,
+                            currentTime,
+                            numericOffset
+                          )
+                        );
                       }}
                     />
 
