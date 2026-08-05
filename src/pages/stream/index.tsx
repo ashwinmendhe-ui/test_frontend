@@ -4,7 +4,7 @@ import { Button, Form, Select, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
-import { useNavigate , useLocation, useParams} from "react-router-dom";
+import { useLocation, useParams} from "react-router-dom";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useSiteStore } from "@/stores/siteStore";
 import { useMissionStore } from "@/stores/missionStore";
@@ -117,6 +117,25 @@ type PlayerStatus =
     /index\.m3u8(?:\?.*)?$/,
     "map.m3u8"
   );
+};
+
+const parseCoordinate = (...values: unknown[]): number | undefined => {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
+
+    const parsed =
+      typeof value === "number"
+        ? value
+        : Number(String(value).trim());
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
 };
 
 export default function StreamIndex() {
@@ -848,6 +867,15 @@ const handleNext = () => {
   setCurrentTime(nextTime);
 };
 const handleDeviceInfoUpdate = useCallback((deviceInfo: any) => {
+  console.log("[MapCoordinates][Stream] Device info", {
+    latitude: deviceInfo?.latitude,
+    longitude: deviceInfo?.longitude,
+    lat: deviceInfo?.lat,
+    lng: deviceInfo?.lng,
+    lon: deviceInfo?.lon,
+    location: deviceInfo?.location,
+    raw: deviceInfo,
+  });
 
   setLiveDeviceInfo((previous: any) => {
     const isSame =
@@ -858,7 +886,19 @@ const handleDeviceInfoUpdate = useCallback((deviceInfo: any) => {
       previous?.altitude === deviceInfo?.altitude &&
       previous?.speed === deviceInfo?.speed &&
       previous?.latitude === deviceInfo?.latitude &&
-      previous?.longitude === deviceInfo?.longitude;
+      previous?.longitude === deviceInfo?.longitude &&
+      previous?.lat === deviceInfo?.lat &&
+      previous?.lng === deviceInfo?.lng &&
+      previous?.lon === deviceInfo?.lon &&
+      previous?.gpsLatitude === deviceInfo?.gpsLatitude &&
+      previous?.gpsLongitude === deviceInfo?.gpsLongitude &&
+      previous?.gps_latitude === deviceInfo?.gps_latitude &&
+      previous?.gps_longitude === deviceInfo?.gps_longitude &&
+      previous?.location?.latitude === deviceInfo?.location?.latitude &&
+      previous?.location?.longitude === deviceInfo?.location?.longitude &&
+      previous?.location?.lat === deviceInfo?.location?.lat &&
+      previous?.location?.lng === deviceInfo?.location?.lng &&
+      previous?.location?.lon === deviceInfo?.location?.lon;
 
     return isSame ? previous : deviceInfo;
   });
@@ -1544,23 +1584,58 @@ const showDangerDetection =
     dangerModules.some((d) => d.value === m)
   );
 
+  const liveLatitude = parseCoordinate(
+  liveDeviceInfo?.latitude,
+  liveDeviceInfo?.lat,
+  liveDeviceInfo?.gpsLatitude,
+  liveDeviceInfo?.gps_latitude,
+  liveDeviceInfo?.location?.latitude,
+  liveDeviceInfo?.location?.lat
+);
+
+const liveLongitude = parseCoordinate(
+  liveDeviceInfo?.longitude,
+  liveDeviceInfo?.lng,
+  liveDeviceInfo?.lon,
+  liveDeviceInfo?.gpsLongitude,
+  liveDeviceInfo?.gps_longitude,
+  liveDeviceInfo?.location?.longitude,
+  liveDeviceInfo?.location?.lng,
+  liveDeviceInfo?.location?.lon
+);
+
+const hasValidLiveCoordinates =
+  liveLatitude !== undefined &&
+  liveLongitude !== undefined &&
+  liveLatitude >= -90 &&
+  liveLatitude <= 90 &&
+  liveLongitude >= -180 &&
+  liveLongitude <= 180;
+
+console.log("[MapCoordinates][Stream] Parsed", {
+  liveLatitude,
+  liveLongitude,
+  hasValidLiveCoordinates,
+});
+
 const liveMapGpsData = useMemo(() => {
-  if (
-    typeof liveDeviceInfo?.latitude === "number" &&
-    typeof liveDeviceInfo?.longitude === "number"
-  ) {
-    return [
-      {
-        lat: liveDeviceInfo.latitude,
-        lng: liveDeviceInfo.longitude,
-        time: currentTime,
-      },
-    ];
+  if (!hasValidLiveCoordinates) {
+    return [];
   }
 
-  return [];
-}, [liveDeviceInfo?.latitude, liveDeviceInfo?.longitude, currentTime]);
-
+  return [
+    {
+      lat: liveLatitude as number,
+      lng: liveLongitude as number,
+      time: currentTime,
+    },
+  ];
+}, [
+  hasValidLiveCoordinates,
+  liveLatitude,
+  liveLongitude,
+  currentTime,
+]);
 
 const SmallStatusBadge = ({
   label,
@@ -1814,20 +1889,17 @@ const SmallStatusBadge = ({
                 status={
                   !isStreaming
                     ? "idle"
-                    : liveDeviceInfo?.latitude !== undefined &&
-                      liveDeviceInfo?.longitude !== undefined
+                    : hasValidLiveCoordinates
                     ? "live"
                     : "loading"
                 }
               />
 
-              {isStreaming &&
-              liveDeviceInfo?.latitude !== undefined &&
-              liveDeviceInfo?.longitude !== undefined ? (
+              {isStreaming && hasValidLiveCoordinates ? (
                 <LiveMap
                   currentTime={currentTime}
-                  latitude={liveDeviceInfo.latitude}
-                  longitude={liveDeviceInfo.longitude}
+                  latitude={liveLatitude}
+                  longitude={liveLongitude}
                   videoUrl={streamPlaybackUrl}
                   gpsData={liveMapGpsData}
                   streamStatus={{

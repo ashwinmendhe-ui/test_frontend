@@ -375,9 +375,11 @@ const normalizedSelectedClassIds = useMemo(
   
     let nearestYoloFrame: any | null = null;
     let nearestLlmFrame: any | null = null;
+    let nearestDeviceInfoFrame: any | null = null;
 
     let latestYoloTime = 0;
     let latestLlmTime = 0;
+    let latestDeviceInfoTime = 0;
 
     for (const frame of metadata) {
       const frameTime = Number(frame.m ?? frame.ts_ms ?? 0);
@@ -391,6 +393,10 @@ const normalizedSelectedClassIds = useMemo(
         (Array.isArray(frame?.ld) && frame.ld.length > 0) ||
         (Array.isArray(frame?.llm) && frame.llm.length > 0);
 
+      const hasDeviceInfo =
+        frame?.device_info &&
+        typeof frame.device_info === "object";
+
       if (hasYolo && frameTime > latestYoloTime) {
         nearestYoloFrame = frame;
         latestYoloTime = frameTime;
@@ -400,13 +406,18 @@ const normalizedSelectedClassIds = useMemo(
         nearestLlmFrame = frame;
         latestLlmTime = frameTime;
       }
-    }
+      if (
+        hasDeviceInfo &&
+        frameTime > latestDeviceInfoTime
+      ) {
+        nearestDeviceInfoFrame = frame;
+        latestDeviceInfoTime = frameTime;
+      }
+        }
 
-    const infoFrame = nearestYoloFrame ?? nearestLlmFrame;
-
-    if (infoFrame?.device_info) {
+    if (nearestDeviceInfoFrame?.device_info) {
       onDeviceInfoUpdateRef.current?.(
-        infoFrame.device_info,
+        nearestDeviceInfoFrame.device_info,
         src || "",
         currentTime
       );

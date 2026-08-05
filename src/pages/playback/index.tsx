@@ -126,10 +126,28 @@ const timeToSeconds = (time?: string) => {
 
   return 0;
 };
-  const OFFSET_MIN_SECONDS = -30;
-  const OFFSET_MAX_SECONDS = 30;
-  const SYNC_TOLERANCE_SECONDS = 0.25;
+  const parseCoordinate = (...values: unknown[]): number | undefined => {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
 
+    const parsed =
+      typeof value === "number"
+        ? value
+        : Number(String(value).trim());
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+};
+
+const OFFSET_MIN_SECONDS = -30;
+const OFFSET_MAX_SECONDS = 30;
+const SYNC_TOLERANCE_SECONDS = 0.25;
 export default function Playback() {
   const location = useLocation();
   const historyPlaybackState = location.state as
@@ -1129,28 +1147,52 @@ const selectedVideoInfo = selectedVideos[0]
   ? deviceInfoByVideo[selectedVideos[0]]
   : undefined;
 
-const playbackLatitude = Number(selectedVideoInfo?.latitude);
-const playbackLongitude = Number(selectedVideoInfo?.longitude);
+const playbackLatitude = parseCoordinate(
+  selectedVideoInfo?.latitude,
+  selectedVideoInfo?.lat,
+  selectedVideoInfo?.gpsLatitude,
+  selectedVideoInfo?.gps_latitude,
+  selectedVideoInfo?.location?.latitude,
+  selectedVideoInfo?.location?.lat
+);
+
+const playbackLongitude = parseCoordinate(
+  selectedVideoInfo?.longitude,
+  selectedVideoInfo?.lng,
+  selectedVideoInfo?.lon,
+  selectedVideoInfo?.gpsLongitude,
+  selectedVideoInfo?.gps_longitude,
+  selectedVideoInfo?.location?.longitude,
+  selectedVideoInfo?.location?.lng,
+  selectedVideoInfo?.location?.lon
+);
+
+const hasValidPlaybackCoordinates =
+  playbackLatitude !== undefined &&
+  playbackLongitude !== undefined &&
+  playbackLatitude >= -90 &&
+  playbackLatitude <= 90 &&
+  playbackLongitude >= -180 &&
+  playbackLongitude <= 180;
 
 const playbackMapGpsData = useMemo(() => {
-  if (
-    Number.isFinite(playbackLatitude) &&
-    Number.isFinite(playbackLongitude) &&
-    playbackLatitude !== 0 &&
-    playbackLongitude !== 0
-  ) {
-    return [
-      {
-        lat: playbackLatitude,
-        lng: playbackLongitude,
-        time: currentTime,
-      },
-    ];
+  if (!hasValidPlaybackCoordinates) {
+    return [];
   }
 
-  return [];
-}, [playbackLatitude, playbackLongitude, currentTime]);
-
+  return [
+    {
+      lat: playbackLatitude as number,
+      lng: playbackLongitude as number,
+      time: currentTime,
+    },
+  ];
+}, [
+  hasValidPlaybackCoordinates,
+  playbackLatitude,
+  playbackLongitude,
+  currentTime,
+]);
   return (
 <div className="w-full h-full overflow-auto text-[#111827] bg-[#F6F7F9]">
       <div className="w-full min-w-[1120px] min-h-full grid grid-cols-[minmax(700px,1fr)_390px] gap-[11px]">
@@ -1962,27 +2004,30 @@ const playbackMapGpsData = useMemo(() => {
             {t("playback_route_map")}
           </h2>
           <div className="h-[260px] bg-[#F6F7F9] rounded-[8px] overflow-hidden">
-            {selectedVideos.length > 0 ? (
-              <LiveMap
-                currentTime={currentTime}
-                latitude={playbackLatitude}
-                longitude={playbackLongitude}
-                videoUrl={selectedVideos?.[0] || ""}
-                gpsData={playbackMapGpsData}
-                streamStatus={{
-                  error: null,
-                  isLoading: false,
-                  videoConnected: true,
-                  isPaused: !isPlaying,
-                  isReconnecting: false,
-                }}
-                mode="playback"
-              />
-            ) : (
-              <div className="h-full w-full bg-[#737D89] rounded-[8px] flex items-center justify-center text-white text-[15px]">
-                {t("playback_map_idle_message")}
-              </div>
-            )}
+            {selectedVideos.length > 0 && hasValidPlaybackCoordinates ? (
+            <LiveMap
+              currentTime={currentTime}
+              latitude={playbackLatitude}
+              longitude={playbackLongitude}
+              videoUrl={selectedVideos[0] || ""}
+              gpsData={playbackMapGpsData}
+              streamStatus={{
+                error: null,
+                isLoading: false,
+                videoConnected: true,
+                isPaused: !isPlaying,
+                isReconnecting: false,
+              }}
+              mode="playback"
+            />
+          ) : (
+            <div className="h-full w-full bg-[#737D89] rounded-[8px] flex items-center justify-center text-white text-[15px]">
+              {selectedVideos.length > 0
+                ? "GPS coordinates are not available"
+                : t("playback_map_idle_message")}
+            </div>
+          )}
+           
           </div>
         </div>
       </div>
