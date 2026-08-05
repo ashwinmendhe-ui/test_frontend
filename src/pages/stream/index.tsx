@@ -552,12 +552,6 @@ if (!playbackUrl) {
   );
 }
 
-console.log("[StreamStart] Stream URLs", {
-  playbackUrl,
-  backendMapUrl,
-  resolvedMapUrl,
-  streamInfo,
-});
 
 setStreamPlaybackUrl(playbackUrl);
 setStreamMapUrl(resolvedMapUrl);
@@ -867,15 +861,6 @@ const handleNext = () => {
   setCurrentTime(nextTime);
 };
 const handleDeviceInfoUpdate = useCallback((deviceInfo: any) => {
-  console.log("[MapCoordinates][Stream] Device info", {
-    latitude: deviceInfo?.latitude,
-    longitude: deviceInfo?.longitude,
-    lat: deviceInfo?.lat,
-    lng: deviceInfo?.lng,
-    lon: deviceInfo?.lon,
-    location: deviceInfo?.location,
-    raw: deviceInfo,
-  });
 
   setLiveDeviceInfo((previous: any) => {
     const isSame =
@@ -1511,13 +1496,6 @@ const resolvedMapUrl = resolveMapUrl(
   backendMapUrl
 );
 
-console.log("[DashboardStream] Stream URLs", {
-  playbackUrl,
-  backendMapUrl,
-  resolvedMapUrl,
-  streamInfo,
-});
-
 setStreamPlaybackUrl(playbackUrl);
 setStreamMapUrl(resolvedMapUrl);
       setMapReady(false);
@@ -1607,16 +1585,13 @@ const liveLongitude = parseCoordinate(
 const hasValidLiveCoordinates =
   liveLatitude !== undefined &&
   liveLongitude !== undefined &&
+  Number.isFinite(liveLatitude) &&
+  Number.isFinite(liveLongitude) &&
   liveLatitude >= -90 &&
   liveLatitude <= 90 &&
   liveLongitude >= -180 &&
-  liveLongitude <= 180;
-
-console.log("[MapCoordinates][Stream] Parsed", {
-  liveLatitude,
-  liveLongitude,
-  hasValidLiveCoordinates,
-});
+  liveLongitude <= 180 &&
+  !(liveLatitude === 0 && liveLongitude === 0);
 
 const liveMapGpsData = useMemo(() => {
   if (!hasValidLiveCoordinates) {

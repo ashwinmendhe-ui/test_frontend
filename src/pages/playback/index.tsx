@@ -1170,10 +1170,13 @@ const playbackLongitude = parseCoordinate(
 const hasValidPlaybackCoordinates =
   playbackLatitude !== undefined &&
   playbackLongitude !== undefined &&
+  Number.isFinite(playbackLatitude) &&
+  Number.isFinite(playbackLongitude) &&
   playbackLatitude >= -90 &&
   playbackLatitude <= 90 &&
   playbackLongitude >= -180 &&
-  playbackLongitude <= 180;
+  playbackLongitude <= 180 &&
+  !(playbackLatitude === 0 && playbackLongitude === 0);
 
 const playbackMapGpsData = useMemo(() => {
   if (!hasValidPlaybackCoordinates) {

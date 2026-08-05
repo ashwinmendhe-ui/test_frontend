@@ -382,6 +382,10 @@ const normalizedSelectedClassIds = useMemo(
     let latestDeviceInfoTime = 0;
 
     for (const frame of metadata) {
+
+      if (frame.device_info) {
+          console.log("[HLS] frame.device_info found", frame);
+        }
       const frameTime = Number(frame.m ?? frame.ts_ms ?? 0);
 
       if (!frameTime || frameTime > targetFrameTime) continue;
@@ -416,11 +420,22 @@ const normalizedSelectedClassIds = useMemo(
         }
 
     if (nearestDeviceInfoFrame?.device_info) {
+      console.log(
+        "[HLS] Device info frame",
+        nearestDeviceInfoFrame.device_info
+      );
+
       onDeviceInfoUpdateRef.current?.(
         nearestDeviceInfoFrame.device_info,
         src || "",
         currentTime
       );
+    } else {
+      console.log("[HLS] No device_info frame", {
+        nearestDeviceInfoFrame,
+        currentSegment: currentSegmentNameRef.current,
+        metadataCount: metadata.length,
+      });
     }
 
     const yoloSource = Array.isArray(nearestYoloFrame?.d)
