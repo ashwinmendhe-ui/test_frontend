@@ -917,12 +917,8 @@ useEffect(() => {
   const deviceSn = selectedDevice?.deviceSn;
 
   if (!deviceSn) {
-    console.warn("[LiveTelemetry] Device SN not found", {
-      selectedDevice,
-      selectedDeviceId: values?.device,
-    });
-    return;
-  }
+  return;
+}
 
   let cancelled = false;
 

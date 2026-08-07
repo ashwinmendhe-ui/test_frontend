@@ -17,6 +17,10 @@ import { Form, Select, Slider, Switch } from "antd";
 import { formatTime } from "@/utils/date";
 import { useLocation } from "react-router-dom";
 import { LiveMap } from "@/components/map/liveMap";
+import {
+  playbackApi,
+  type PlaybackTelemetryItem,
+} from "@/api/playbackApi";
 
 type PlaybackFormValues = {
   company?: string;
@@ -182,6 +186,9 @@ export default function Playback() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [, setDuration] = useState(0);
   const [deviceInfoByVideo, setDeviceInfoByVideo] = useState<Record<string, any>>({});
+  const [telemetryByVideo, setTelemetryByVideo] = useState<
+  Record<string, PlaybackTelemetryItem[]>
+>({});
   const handleDeviceInfoUpdate = useCallback(
   (deviceInfo: any, videoUrl: string) => {
     setDeviceInfoByVideo((prev) => {
@@ -214,6 +221,7 @@ export default function Playback() {
   const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
   const [videoOffsets, setVideoOffsets] = useState<Record<string, number>>({});
   const [videoLoading, setVideoLoading] = useState<Record<string, boolean>>({});
+  const telemetryLoadedRef = useRef<Set<string>>(new Set());
   const [videoUnavailable, setVideoUnavailable] = useState<
     Record<string, boolean>
   >({});
@@ -297,6 +305,7 @@ export default function Playback() {
         .map((item) => ({
           value: item.url,
           label: item.segment,
+          sessionId: item.sessionId,
         })),
     [playbackList]
   );
@@ -893,7 +902,128 @@ if (removedVideo) {
     (value) => aiModules.find((item) => item.value === value)?.type === "danger"
   ).length;
 
-  
+
+useEffect(() => {
+  if (selectedVideos.length === 0) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadTelemetry = async () => {
+    for (const videoUrl of selectedVideos) {
+      const playbackItem = playbackList.find(
+        (item) => item.url === videoUrl
+      );
+
+      const sessionId = playbackItem?.sessionId;
+
+      if (!sessionId) {
+        continue;
+      }
+
+      if (telemetryLoadedRef.current.has(sessionId)) {
+        continue;
+      }
+
+      // Prevent duplicate request while React rerenders.
+      telemetryLoadedRef.current.add(sessionId);
+
+      try {
+        const telemetry =
+          await playbackApi.getTelemetry(sessionId);
+
+        if (cancelled) {
+          return;
+        }
+
+        console.log("[PlaybackTelemetry] Loaded", {
+          videoUrl,
+          sessionId,
+          count: telemetry.length,
+        });
+
+        setTelemetryByVideo((previous) => ({
+          ...previous,
+          [videoUrl]: telemetry,
+        }));
+      } catch (error) {
+        telemetryLoadedRef.current.delete(sessionId);
+
+        if (!cancelled) {
+          console.error(
+            "[PlaybackTelemetry] Failed to load",
+            {
+              videoUrl,
+              sessionId,
+              error,
+            }
+          );
+        }
+      }
+    }
+  };
+
+  loadTelemetry();
+
+  return () => {
+    cancelled = true;
+  };
+}, [selectedVideos, playbackList]);
+
+useEffect(() => {
+  selectedVideos.forEach((videoUrl) => {
+    const telemetry = telemetryByVideo[videoUrl];
+
+    if (!telemetry || telemetry.length === 0) {
+      return;
+    }
+
+    const videoTimeSeconds =
+      videoTimes[videoUrl] ?? 0;
+
+    const targetOffsetMs =
+      videoTimeSeconds * 1000;
+
+    let nearestTelemetry:
+      | PlaybackTelemetryItem
+      | undefined;
+
+    for (const item of telemetry) {
+      if (item.offsetMs <= targetOffsetMs) {
+        nearestTelemetry = item;
+      } else {
+        break;
+      }
+    }
+
+    if (!nearestTelemetry) {
+  setDeviceInfoByVideo((previous) => {
+    if (!previous[videoUrl]) {
+      return previous;
+    }
+
+    const next = { ...previous };
+    delete next[videoUrl];
+
+    return next;
+  });
+
+  return;
+}
+
+    handleDeviceInfoUpdate(
+      nearestTelemetry,
+      videoUrl
+    );
+  });
+}, [
+  selectedVideos,
+  videoTimes,
+  telemetryByVideo,
+  handleDeviceInfoUpdate,
+]);
+
 useEffect(() => {
   return () => {
     if (sharedSeekTimerRef.current) {
@@ -1742,7 +1872,10 @@ const playbackMapGpsData = useMemo(() => {
     selectedVideoItems.length > 1 ? "grid-cols-2" : "grid-cols-1"
   }`}
 >
-  {selectedVideoItems.map((video) => (
+  {selectedVideoItems.map((video) => {
+  const videoDeviceInfo = deviceInfoByVideo[video.value];
+
+  return (
     <div key={video.value} className="space-y-3">
       <h3 className="text-[18px] font-bold text-[#111827]">
         {video.label}
@@ -1759,28 +1892,28 @@ const playbackMapGpsData = useMemo(() => {
   <div className="flex justify-between">
     <span>{t("stream_info_status")}</span>
     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-  {selectedVideoInfo?.status ?? "-"}
+  {videoDeviceInfo?.status ?? "-"}
 </span>
   </div>
 
   <div className="flex justify-between">
     <span>{t("stream_info_battery")}</span>
     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-  {selectedVideoInfo?.battery != null ? `${selectedVideoInfo.battery}%` : "-"}
+  {videoDeviceInfo?.battery != null ? `${videoDeviceInfo.battery}%` : "-"}
 </span>
   </div>
 
   <div className="flex justify-between">
     <span>{t("stream_info_network")}</span>
     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-  {selectedVideoInfo?.network ?? "-"}
+  {videoDeviceInfo?.network ?? "-"}
 </span>
   </div>
 
   <div className="flex justify-between">
     <span>{t("stream_info_gps")}</span>
     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-  {selectedVideoInfo?.gps ?? "-"}
+  {videoDeviceInfo?.gps ?? "-"}
 </span>
   </div>
 </div>
@@ -1796,8 +1929,8 @@ const playbackMapGpsData = useMemo(() => {
       <div className="flex justify-between">
       <span>{t("stream_info_altitude")}</span>
       <span className="font-bold text-[#6B7280]">
-  {selectedVideoInfo?.altitude != null
-    ? `${Number(selectedVideoInfo.altitude).toFixed(2)} m`
+  {videoDeviceInfo?.altitude != null
+    ? `${Number(videoDeviceInfo.altitude).toFixed(2)} m`
     : "-"}
 </span>
     </div>
@@ -1805,8 +1938,8 @@ const playbackMapGpsData = useMemo(() => {
     <div className="flex justify-between">
       <span>{t("stream_info_speed")}</span>
       <span className="font-bold text-[#6B7280]">
-  {selectedVideoInfo?.speed != null
-    ? `${selectedVideoInfo.speed} m/s`
+  {videoDeviceInfo?.speed != null
+    ? `${videoDeviceInfo.speed} m/s`
     : "-"}
 </span>
     </div>
@@ -1822,16 +1955,18 @@ const playbackMapGpsData = useMemo(() => {
 </div>
 
     <div className="flex justify-between">
-      <span>{t("stream_info_start_time")}</span>
-      <span className="font-bold text-[#6B7280]">
-  {selectedVideoItems?.[0]?.label ?? "-"}
-</span>
-    </div>
+  <span>{t("stream_info_start_time")}</span>
+
+  <span className="font-bold text-[#6B7280]">
+    {video.label ?? "-"}
+  </span>
+</div>
   </div>
 </div>
       </div>
     </div>
-  ))}
+  );
+})}
 </div>
       </div>
 

@@ -4,6 +4,7 @@ import { create } from "zustand";
 export interface PlaybackItem {
   segment: string;
   url: string;
+  sessionId?: string | null;
 }
 
 export interface PlaybackQueryParams {
@@ -36,6 +37,7 @@ export const usePlaybackStore = create<Store>((set) => ({
       });
     } catch (error) {
       console.error("Failed to fetch playback list:", error);
+
       set({
         loading: false,
         list: [],
