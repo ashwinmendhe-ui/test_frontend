@@ -10,7 +10,7 @@ import { useSiteStore } from "@/stores/siteStore";
 import { useMissionStore } from "@/stores/missionStore";
 import { useRobotStore } from "@/stores/robotStore";
 import { useStreamStore } from "@/stores/streamStore";
-import { streamApi } from "@/api";
+import { robotApi,streamApi } from "@/api";
 import { showNotification } from "@/utils/notification";
 import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
 import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
@@ -903,6 +903,86 @@ const inactivePollCountRef = useRef(0);
 const STREAM_STATUS_POLL_INTERVAL_MS = 3000;
 const STREAM_INACTIVE_CONFIRMATION_POLLS = 10;
 
+
+
+useEffect(() => {
+  if (!isStreaming) {
+    return;
+  }
+
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values?.device
+  );
+
+  const deviceSn = selectedDevice?.deviceSn;
+
+  if (!deviceSn) {
+    console.warn("[LiveTelemetry] Device SN not found", {
+      selectedDevice,
+      selectedDeviceId: values?.device,
+    });
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadTelemetry = async () => {
+    try {
+      const response = await robotApi.getTelemetry(deviceSn);
+
+      if (cancelled) return;
+
+      const telemetry = response?.data;
+
+      if (!telemetry) {
+        console.warn("[LiveTelemetry] No telemetry data", {
+          deviceSn,
+          response,
+        });
+        return;
+      }
+
+      const normalizedTelemetry = {
+        ...telemetry,
+
+        // Go2 currently returns gpsFix.
+        // Keep gps field consistent with Stream UI.
+        gps: telemetry.gps ?? telemetry.gpsFix ?? null,
+      };
+
+      console.log("[LiveTelemetry] Updated", {
+        deviceSn,
+        telemetry: normalizedTelemetry,
+      });
+
+      handleDeviceInfoUpdate(normalizedTelemetry);
+    } catch (error) {
+      if (!cancelled) {
+        console.error(
+          "[LiveTelemetry] Failed to load telemetry",
+          deviceSn,
+          error
+        );
+      }
+    }
+  };
+
+  // Load immediately instead of waiting for first interval.
+  loadTelemetry();
+
+  const intervalId = window.setInterval(loadTelemetry, 2000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+  };
+}, [
+  isStreaming,
+  values?.device,
+  robotList,
+  handleDeviceInfoUpdate,
+]);
+
 useEffect(() => {
   if (
     !selectedRobotDetail?.deviceSn ||
@@ -1062,6 +1142,13 @@ useEffect(() => {
   siteOptions,
   missionOptions,
 ]);
+
+
+useEffect(() => {
+  if (!isStreaming) {
+    setLiveDeviceInfo(null);
+  }
+}, [isStreaming]);
 
 useEffect(() => {
   if (!isStreaming || !streamMapUrl || mapReady) return;

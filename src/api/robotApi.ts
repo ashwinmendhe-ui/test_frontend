@@ -52,6 +52,10 @@ getListBySite: async (siteId?: string, scope?: string) => {
     const res = await axiosClient.get(`/v1/devices/${id}`);
     return res.data;
   },
+  getTelemetry: async (deviceSn: string) => {
+  const res = await axiosClient.get(`/v1/devices/${deviceSn}/telemetry`);
+  return res.data;
+},
 
   createRobot: async (data: DetailDevice) => {
     const payload = {
