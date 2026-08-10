@@ -155,6 +155,7 @@ export const useMissionStore = create<Store>((set, get) => ({
 
   createMission: async (param) => {
   set({ loading: true });
+
   try {
     const payload = {
       companyId: param.companyId || "",
@@ -171,15 +172,18 @@ export const useMissionStore = create<Store>((set, get) => ({
     const data = res?.data ?? res;
 
     await get().getList();
+
     return data;
   } catch (error) {
-    set({ loading: false });
     throw error;
+  } finally {
+    set({ loading: false });
   }
 },
 
   updateMission: async (id, param) => {
   set({ loading: true });
+
   try {
     const payload = {
       companyId: param.companyId || "",
@@ -196,10 +200,12 @@ export const useMissionStore = create<Store>((set, get) => ({
     const data = res?.data ?? res;
 
     await get().getList();
+
     return data;
   } catch (error) {
-    set({ loading: false });
     throw error;
+  } finally {
+    set({ loading: false });
   }
 },
 

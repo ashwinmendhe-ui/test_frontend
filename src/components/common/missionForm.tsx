@@ -3,7 +3,7 @@ import { useSiteStore } from "@/stores/siteStore";
 import { useUserStore } from "@/stores/userStore";
 import type { MissionFormValue } from "@/stores/missionStore";
 import { Button, Form, Input, Select, message } from "antd";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import FileUpload, { type FileUploadRef } from "./fileUpload";
@@ -30,6 +30,8 @@ export default function MissionForm({
   const [form] = Form.useForm<MissionFormValue>();
   const [messageApi, contextHolder] = message.useMessage();
   const fileUploadRef = useRef<FileUploadRef>(null);
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const watchedFile = Form.useWatch("file", form);
   const watchedDownloadUrl = Form.useWatch("downloadUrl", form);
   const deviceTypeOptions = [
@@ -101,57 +103,66 @@ useEffect(() => {
   };
 
   const handleSubmit = async (values: MissionFormValue) => {
-    try {
-      const newValues = {
-        ...values,
-        companyId:
-          userRole !== 1
-            ? detailUserLogin?.user?.companyId || ""
-            : values.companyId,
-        companyName:
-          userRole !== 1
-            ? detailUserLogin?.user?.companyName || ""
-            : values.companyName,
-      };
+  if (submittingRef.current) {
+    return;
+  }
 
-      const res = await onSubmit(newValues);
+  submittingRef.current = true;
+  setSubmitting(true);
 
-      if (res?.code === 1) {
-        messageApi.error(
-          mode === "add"
-            ? t("mission_create_failed")
-            : t("mission_update_failed")
-        );
+  try {
+    const newValues = {
+      ...values,
+      companyId:
+        userRole !== 1
+          ? detailUserLogin?.user?.companyId || ""
+          : values.companyId,
+      companyName:
+        userRole !== 1
+          ? detailUserLogin?.user?.companyName || ""
+          : values.companyName,
+    };
+
+    const res = await onSubmit(newValues);
+
+    if (res?.code === 1) {
+      messageApi.error(
+        mode === "add"
+          ? t("mission_create_failed")
+          : t("mission_update_failed")
+      );
+      return;
+    }
+
+    if (res?.uploadUrl && fileUploadRef.current?.hasNewFile()) {
+      try {
+        await fileUploadRef.current.uploadToS3(res.uploadUrl);
+      } catch (error) {
+        messageApi.error(t("upload_failed_title"));
         return;
       }
-
-      if (res?.uploadUrl && fileUploadRef.current?.hasNewFile()) {
-        try {
-          await fileUploadRef.current.uploadToS3(res.uploadUrl);
-        } catch (error) {
-          messageApi.error(t("upload_failed_title"));
-          return;
-        }
-      }
-
-      await messageApi.success(
-        mode === "add"
-          ? t("mission_create_success")
-          : t("mission_update_success"),2
-      );
-
-      
-        navigate("/settings/mission");
-      
-    } catch (error: any) {
-      messageApi.error(
-        error?.response?.data?.message ||
-          (mode === "add"
-            ? t("mission_create_failed")
-            : t("mission_update_failed"))
-      );
     }
-  };
+
+    await messageApi.success(
+      mode === "add"
+        ? t("mission_create_success")
+        : t("mission_update_success"),
+      2
+    );
+
+    navigate("/settings/mission");
+  } catch (error: any) {
+    messageApi.error(
+      error?.response?.data?.message ||
+        (mode === "add"
+          ? t("mission_create_failed")
+          : t("mission_update_failed"))
+    );
+  } finally {
+    submittingRef.current = false;
+    setSubmitting(false);
+  }
+};
 
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
@@ -321,16 +332,18 @@ useEffect(() => {
           {onCancel && (
             <Button
               onClick={onCancel}
+               disabled={loading || submitting}
               className="h-[41px] w-[140px] rounded-[7px] bg-white! border! border-[#757575]! text-[#757575]!"
             >
               {t("button_cancel")}
             </Button>
           )}
 
-          <Button
+         <Button
             type="primary"
             htmlType="submit"
-            loading={loading}
+            loading={loading || submitting}
+            disabled={loading || submitting}
             className="h-[41px] w-[140px] rounded-[7px] bg-primary! hover:bg-primaryDark! border-none text-white!"
           >
             {mode === "add" ? t("button_save") : t("button_update")}
