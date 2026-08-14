@@ -194,10 +194,7 @@ window.liveStatusCallback = (arg: any) => {
 
     void startConnection();
 
-    return () => {
-      delete window.reg_callback;
-      delete window.liveStatusCallback;
-    };
+    return () => {};
   }, [navigate]);
 
   const handleLogout = () => {
