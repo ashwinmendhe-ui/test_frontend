@@ -9,8 +9,6 @@ import { useTranslation } from "react-i18next";
 import { useUserStore } from "@/stores/userStore";
 import { useCompanyStore } from "@/stores/companyStore";
 import { useSiteStore } from "@/stores/siteStore";
-import { useRobotStore } from "@/stores/robotStore";
-import { useMissionStore } from "@/stores/missionStore";
 import { usePlaybackStore } from "@/stores/playbackStore";
 import ControlBar from "@/components/common/controlBar";
 import { Form, Select, Slider, Switch } from "antd";
@@ -20,7 +18,9 @@ import { LiveMap } from "@/components/map/liveMap";
 import {
   playbackApi,
   type PlaybackTelemetryItem,
+  type PlaybackOptionItem,
 } from "@/api/playbackApi";
+
 
 type PlaybackFormValues = {
   company?: string;
@@ -70,6 +70,7 @@ const getMetadataBaseUrl = (videoUrl: string) => {
     .replace(/\/index\.m3u8(\?.*)?$/i, "")
     .replace(/\/playlist\.m3u8(\?.*)?$/i, "");
 };
+
 
 const normalizeText = (value?: string) => (value || "").trim().toLowerCase();
 
@@ -174,6 +175,9 @@ export default function Playback() {
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
   const [form] = Form.useForm<PlaybackFormValues>();
+  const [playbackOptions, setPlaybackOptions] = useState<
+  PlaybackOptionItem[]
+>([]);
 
   const playerRefs = useRef<Record<string, HLSPlayerRef | null>>({});
   const isSharedSeekingRef = useRef(false);
@@ -235,9 +239,7 @@ export default function Playback() {
   const [labelsByVideo, setLabelsByVideo] = useState<Record<string, LabelsMap>>({});
   const { list: companyList, getList: getCompanyList } = useCompanyStore();
   const { list: siteList, getListByCompany } = useSiteStore();
-  const { list: robotList, getListBySite: getRobotListBySite } = useRobotStore();
-  const { listBySite: missionList, getListBySite: getMissionListBySite } =
-    useMissionStore();
+  
   const { list: playbackList, getPlayback, resetPlayback } = usePlaybackStore();
 
   const userRole = detailUserLogin?.roles?.[0];
@@ -270,33 +272,56 @@ export default function Playback() {
     [siteList]
   );
 
-  const deviceOptions = useMemo(
-    () =>
-      robotList.map((item) => ({
-        value: item.deviceId,
-        label: item.deviceName,
-      })),
-    [robotList]
-  );
+  const deviceOptions = useMemo(() => {
+  const unique = new Map<string, string>();
 
-  const selectedDevice = useMemo(
-    () => robotList.find((item) => item.deviceId === values?.device),
-    [robotList, values?.device]
+  playbackOptions.forEach((item) => {
+    if (!item.deviceSn) return;
+
+    if (!unique.has(item.deviceSn)) {
+      unique.set(
+        item.deviceSn,
+        item.deviceName || item.deviceSn
+      );
+    }
+  });
+
+  return Array.from(unique.entries()).map(
+    ([deviceSn, deviceName]) => ({
+      value: deviceSn,
+      label: deviceName,
+    })
   );
+}, [playbackOptions]);
+ 
 
   const missionOptions = useMemo(() => {
-    return missionList
-      .filter((item) =>
-        selectedDevice?.deviceType
-          ? item.deviceType === selectedDevice.deviceType
-          : true
-      )
-      .map((item) => ({
-        value: item.missionId,
-        label: item.missionName,
-      }));
-  }, [missionList, selectedDevice]);
+  if (!values?.device) {
+    return [];
+  }
 
+  const unique = new Map<string, string>();
+
+  playbackOptions
+    .filter((item) => item.deviceSn === values.device)
+    .forEach((item) => {
+      if (!item.missionId) return;
+
+      if (!unique.has(item.missionId)) {
+        unique.set(
+          item.missionId,
+          item.missionName || item.missionId
+        );
+      }
+    });
+
+  return Array.from(unique.entries()).map(
+    ([missionId, missionName]) => ({
+      value: missionId,
+      label: missionName,
+    })
+  );
+}, [playbackOptions, values?.device]);
   const videoOptions = useMemo(
     () =>
       playbackList
@@ -1072,34 +1097,57 @@ useEffect(() => {
   form.setFieldValue("site", historyPlaybackState.siteId);
 }, [historyPlaybackState?.siteId, form]);
 
-// Load robots + missions
+// Load historical playback device + mission options
 useEffect(() => {
-  if (values?.site) {
-
-    getRobotListBySite(values.site, "site");
-    getMissionListBySite(values.site);
+  if (!values?.company || !values?.site) {
+    setPlaybackOptions([]);
+    return;
   }
-}, [values?.site, getRobotListBySite, getMissionListBySite]);
 
-// Map deviceSn → deviceId
+  let cancelled = false;
+
+  playbackApi
+    .getOptions(values.company, values.site)
+    .then((data) => {
+      if (!cancelled) {
+        setPlaybackOptions(
+          Array.isArray(data) ? data : []
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(
+        "Failed to fetch playback options:",
+        error
+      );
+
+      if (!cancelled) {
+        setPlaybackOptions([]);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [values?.company, values?.site]);
+// Restore historical device directly by deviceSn
 useEffect(() => {
-  if (!historyPlaybackState?.deviceSn || robotList.length === 0) return;
+  if (!historyPlaybackState?.deviceSn) return;
 
-  const matched = robotList.find(
-    (item) => item.deviceSn === historyPlaybackState.deviceSn
+  form.setFieldValue(
+    "device",
+    historyPlaybackState.deviceSn
   );
+}, [historyPlaybackState?.deviceSn, form]);
 
-  if (matched) {
-    form.setFieldValue("device", matched.deviceId);
-  }
-}, [historyPlaybackState?.deviceSn, robotList, form]);
-
-// Set mission
 useEffect(() => {
-  if (!historyPlaybackState?.missionId || missionList.length === 0) return;
-  form.setFieldValue("mission", historyPlaybackState.missionId);
-}, [historyPlaybackState?.missionId, missionList, form]);
+  if (!historyPlaybackState?.missionId) return;
 
+  form.setFieldValue(
+    "mission",
+    historyPlaybackState.missionId
+  );
+}, [historyPlaybackState?.missionId, form]);
 // Load playback list
 useEffect(() => {
   if (!values?.company) {
@@ -1110,14 +1158,14 @@ useEffect(() => {
   getPlayback({
     companyId: values.company,
     siteId: values.site || "",
-    deviceSn: selectedDevice?.deviceSn || "",
+    deviceSn: values.device || "",
     missionId: values.mission || "",
   });
 }, [
   values?.company,
   values?.site,
+  values?.device,
   values?.mission,
-  selectedDevice?.deviceSn,
   getPlayback,
   resetPlayback,
 ]);

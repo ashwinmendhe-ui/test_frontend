@@ -6,6 +6,13 @@ export interface PlaybackListItem {
   sessionId?: string | null;
 }
 
+export interface PlaybackOptionItem {
+  deviceSn: string;
+  deviceName: string;
+  missionId?: string | null;
+  missionName?: string;
+}
+
 export interface PlaybackTelemetryItem {
   recordedAt: string;
   offsetMs: number;
@@ -38,6 +45,20 @@ export const playbackApi = {
         siteId: params.siteId || "",
         deviceSn: params.deviceSn || "",
         missionId: params.missionId || "",
+      },
+    });
+
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
+  getOptions: async (
+    companyId?: string,
+    siteId?: string
+  ): Promise<PlaybackOptionItem[]> => {
+    const res = await axiosClient.get("/v1/playback/options", {
+      params: {
+        companyId: companyId || "",
+        siteId: siteId || "",
       },
     });
 
