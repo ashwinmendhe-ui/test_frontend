@@ -262,19 +262,13 @@ const restoreMissionSelection = useCallback(
 
     pendingMissionRestoreRef.current = missionId;
 
-    const missionExists = missionOptions.some(
-      (mission) => mission.value === missionId
-    );
-
-    if (!missionExists) {
-      return;
-    }
-
     form.setFieldValue("mission", missionId);
-    pendingMissionRestoreRef.current = null;
 
-    console.info("[MissionRestore] Mission restored", {
+    console.info("[MissionRestore] Mission value restored", {
       missionId,
+      available: missionOptions.some(
+        (mission) => mission.value === missionId
+      ),
     });
   },
   [form, missionOptions]
@@ -1533,14 +1527,18 @@ useEffect(() => {
 
     await getRobotDetail(deviceId);
 
-    const matchedMission = missionList.find(
-      (item: any) =>
-        item.missionId === dashboardPrefill.missionId ||
-        item.missionName === dashboardPrefill.missionName
-    );
+    const dashboardMissionId = dashboardPrefill?.missionId ?? null;
 
-    if (matchedMission?.missionId) {
-      form.setFieldValue("mission", matchedMission.missionId);
+    if (dashboardMissionId) {
+      pendingMissionRestoreRef.current = dashboardMissionId;
+
+      form.setFieldValue("mission", dashboardMissionId);
+
+      console.info("[DashboardPrefill] Mission prefilled", {
+        deviceSn,
+        missionId: dashboardMissionId,
+        missionName: dashboardPrefill?.missionName,
+      });
     }
 
     if (dashboardPrefill.openLiveStream && deviceSn) {
@@ -1619,16 +1617,20 @@ useEffect(() => {
   );
 
   if (!missionExists) {
-    console.warn("[MissionRestore] Mission not found in current options", {
-      missionId,
-      missionOptions,
-    });
+  console.warn("[MissionRestore] Mission not found in current options", {
+    missionId,
+    missionOptions,
+  });
 
-    return;
-  }
+  return;
+}
 
-  form.setFieldValue("mission", missionId);
-  pendingMissionRestoreRef.current = null;
+form.setFieldValue("mission", missionId);
+pendingMissionRestoreRef.current = null;
+
+console.info("[MissionRestore] Mission option loaded", {
+  missionId,
+});
 
   console.info("[MissionRestore] Mission restored", {
     missionId,
