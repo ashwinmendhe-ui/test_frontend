@@ -130,6 +130,26 @@ window.liveStatusCallback = (arg: any) => {
       }
 
       try {
+      const apiHost = import.meta.env.VITE_API_URL;
+
+      if (!apiHost) {
+        throw new Error(
+          "ROBOPILOT API host is not configured."
+        );
+      }
+
+      const apiConfig = JSON.stringify({
+        host: apiHost,
+        token,
+      });
+
+      apiPilot.loadComponent(
+        ComponentName.Api,
+        apiConfig
+      );
+
+      apiPilot.setToken(token);
+
   apiPilot.setWorkspaceId(workspaceId);
 
   const thingConfig = JSON.stringify({
