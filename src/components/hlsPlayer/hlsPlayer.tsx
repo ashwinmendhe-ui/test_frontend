@@ -89,6 +89,7 @@ const HLSPlayer = forwardRef<HLSPlayerRef, HLSPlayerProps>(
   ) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hlsRef = useRef<Hls | null>(null);
+    const wasPlayingBeforeHiddenRef = useRef(false);
     const lastDetectionsRef = useRef<any[]>([]);
     const sessionStartTimeRef = useRef<number | null>(null);
     const playlistSegmentsRef = useRef<SegmentInfo[]>([]);
@@ -897,6 +898,55 @@ try {
   };
 }, [src, metadataBaseUrl, startFrameSync, clearCanvas]);
 
+    const syncToLiveEdge = useCallback(() => {
+      if (type !== "live") return;
+
+      const video = videoRef.current;
+
+      if (!video) return;
+
+      let liveEdge: number | null = null;
+
+      const hlsLiveSyncPosition = hlsRef.current?.liveSyncPosition;
+
+      if (
+        typeof hlsLiveSyncPosition === "number" &&
+        Number.isFinite(hlsLiveSyncPosition)
+      ) {
+        liveEdge = hlsLiveSyncPosition;
+      } else if (video.seekable.length > 0) {
+        liveEdge = video.seekable.end(video.seekable.length - 1);
+      }
+
+      if (liveEdge == null || !Number.isFinite(liveEdge)) {
+        return;
+      }
+
+      const drift = liveEdge - video.currentTime;
+
+      // Ignore very small normal live-stream latency.
+      if (drift <= 1) {
+        return;
+      }
+
+      const targetTime = Math.max(0, liveEdge - 0.1);
+
+
+     console.log("[HLS] Resyncing live stream", {
+        currentTime: video.currentTime,
+        liveEdge,
+        targetTime,
+        drift,
+      });
+
+      video.currentTime = targetTime;
+
+
+      // Update ControlBar immediately instead of waiting
+      // for the browser's next timeupdate event.
+      onTimeUpdateRef.current?.(liveEdge);
+    }, [type]);
+
     useImperativeHandle(ref, () => ({
       play: async () => {
         const video = videoRef.current;
@@ -940,6 +990,46 @@ try {
         return videoRef.current?.paused ?? true;
       },
     }));
+
+
+    useEffect(() => {
+  if (type !== "live") return;
+
+  const handleVisibilityChange = () => {
+    const video = videoRef.current;
+
+    if (!video) return;
+
+    if (document.hidden) {
+      wasPlayingBeforeHiddenRef.current = !video.paused;
+      return;
+    }
+
+    // Do not automatically resume a stream that the user
+    // intentionally paused before changing tabs.
+    if (!wasPlayingBeforeHiddenRef.current) {
+      return;
+    }
+
+    syncToLiveEdge();
+
+    video.play().catch((error) => {
+      console.warn("[HLS] Resume after tab restore failed", error);
+    });
+  };
+
+  document.addEventListener(
+    "visibilitychange",
+    handleVisibilityChange
+  );
+
+  return () => {
+    document.removeEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+  };
+}, [type, syncToLiveEdge]);
 
 
     useEffect(() => {
