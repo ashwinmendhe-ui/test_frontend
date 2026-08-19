@@ -153,11 +153,7 @@ export default function DroneLoginPage() {
     const initializeDjiPilot = () => {
       try {
         apiPilot.init();
-        apiPilot.setPlatformMessage(
-          "Cloud Api Platform",
-          "",
-          ""
-        );
+        
 
         if (!window.djiBridge) {
           setBridgeError(
@@ -195,6 +191,11 @@ export default function DroneLoginPage() {
           );
           return;
         }
+        apiPilot.setPlatformMessage(
+          "Cloud Api Platform",
+          "",
+          ""
+        );
 
         const remoteControllerSn =
           apiPilot.getRemoteControllerSN();
