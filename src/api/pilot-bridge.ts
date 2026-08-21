@@ -331,4 +331,28 @@ export const apiPilot = {
       bridge.liveshareGetConfig()
     );
   },
+
+  registerBackClick(
+    callback: () => boolean
+  ): void {
+    const bridge = getBridge();
+
+    if (!bridge) {
+      return;
+    }
+
+    bridge.onBackClick = callback;
+  },
+
+  registerStopPlatform(
+    callback: () => void
+  ): void {
+    const bridge = getBridge();
+
+    if (!bridge) {
+      return;
+    }
+
+    bridge.onStopPlatform = callback;
+  },
 };

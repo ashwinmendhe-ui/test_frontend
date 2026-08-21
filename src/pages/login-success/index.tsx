@@ -60,9 +60,22 @@ export default function LoginSuccessPage() {
 
     const components = apiPilot.init();
 
+    apiPilot.registerBackClick(() => {
+      console.info(
+        "DJI Pilot Back pressed on ROBOPILOT login-success."
+      );
+
+      return false;
+    });
+
+    apiPilot.registerStopPlatform(() => {
+      console.warn(
+        "DJI Pilot onStopPlatform triggered."
+      );
+    });
+
     const deviceSn =
       localStorage.getItem(STORAGE_KEYS.deviceSn) ?? "";
-
     const token =
       localStorage.getItem(STORAGE_KEYS.token) ?? "";
 
@@ -91,14 +104,6 @@ window.liveStatusCallback = (arg: any) => {
     arg
   );
 };
-
-    window.liveStatusCallback = (arg: any) => {
-      console.info(
-        "DJI LiveShare status callback:",
-        arg
-      );
-    };
-
     const startConnection = async () => {
       if (!token || !workspaceId || !username || !deviceSn) {
         clearDjiStorage();

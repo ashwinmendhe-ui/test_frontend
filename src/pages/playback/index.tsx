@@ -1947,7 +1947,9 @@ const playbackMapGpsData = useMemo(() => {
   <div className="flex justify-between">
     <span>{t("stream_info_battery")}</span>
     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-  {videoDeviceInfo?.battery != null ? `${videoDeviceInfo.battery}%` : "-"}
+      {videoDeviceInfo?.battery != null
+      ? `${Math.round(Number(videoDeviceInfo.battery))}%`
+      : "-"}
 </span>
   </div>
 

@@ -2006,9 +2006,9 @@ const SmallStatusBadge = ({
                   <div className="flex justify-between">
                     <span>{t("stream_battery")}</span>
                     <span className="px-3 py-1 rounded-full bg-green-200 text-green-700 font-bold">
-                      {isStreaming && liveDeviceInfo?.battery != null
-                        ? `${liveDeviceInfo.battery}%`
-                        : "-"}
+                     {isStreaming && liveDeviceInfo?.battery != null
+                      ? `${Math.round(Number(liveDeviceInfo.battery))}%`
+                      : "-"}
                     </span>
                   </div>
 
