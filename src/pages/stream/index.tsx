@@ -171,9 +171,18 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
     getListBySite: getRobotListBySite,
     getDetail: getRobotDetail,
   } = useRobotStore();
-  const { startStream, heartBeat } = useStreamStore();
+  const {
+      startStream,
+      heartBeat,
+      checkStatus,
+    } = useStreamStore();
 
   const pendingMissionRestoreRef = useRef<string | null>(null);
+  const autoJoinTriggeredRef = useRef(false);
+  const pendingAutoJoinMissionRef = useRef<string | null>(null);
+
+  const [canStopStream, setCanStopStream] = useState(true);
+  const [shouldSendHeartbeat, setShouldSendHeartbeat] = useState(true);
 
   const [form] = Form.useForm<StreamFormValues>();
   const values = Form.useWatch([], form);
@@ -359,7 +368,11 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     value: string
   ) => {
     form.setFieldValue(fieldName, value);
+    autoJoinTriggeredRef.current = false;
+pendingAutoJoinMissionRef.current = null;
 
+setCanStopStream(true);
+setShouldSendHeartbeat(true);
     if (fieldName === "company") {
       form.setFieldsValue({
         site: undefined,
@@ -473,6 +486,10 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   setElapsedSeconds(0);
   setWorkStartTime(null);
   setWorkStartAtMs(null);
+  setCanStopStream(true);
+  setShouldSendHeartbeat(true);
+  autoJoinTriggeredRef.current = false;
+  pendingAutoJoinMissionRef.current = null;
 }, []);
 
   const broadcastStreamMessage = useCallback(
@@ -516,15 +533,53 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   return;
 }
 
+const canStop =
+  res?.data?.canStop !== false;
+
+const sendHeartbeat =
+  res?.data?.isSendHeartBeat !== false;
+
+const joinedExisting =
+  res?.data?.joinedExisting === true;
+
+setCanStopStream(canStop);
+setShouldSendHeartbeat(sendHeartbeat);
+
+console.info("[StreamJoin] Start response", {
+  canStop,
+  sendHeartbeat,
+  joinedExisting,
+  sessionId: res?.data?.sessionId,
+  streamId: res?.data?.streamId,
+});
+
     if (res?.data?.streamId) {
       const streamInfo = await startStream(res.data.streamId);
-      const now = new Date();
-      const startAtMs = now.getTime();
+     const startedAtRaw =
+  res?.data?.startTime ??
+  streamInfo?.startedAt ??
+  streamInfo?.startTime ??
+  streamInfo?.started_at;
 
-      setWorkStartTime(now);
-      setWorkStartAtMs(startAtMs);
-      setElapsedSeconds(0);
+const parsedStartAtMs = startedAtRaw
+  ? new Date(startedAtRaw).getTime()
+  : Date.now();
 
+const startAtMs = Number.isFinite(parsedStartAtMs)
+  ? parsedStartAtMs
+  : Date.now();
+
+const now = new Date(startAtMs);
+
+setWorkStartTime(now);
+setWorkStartAtMs(startAtMs);
+
+setElapsedSeconds(
+  Math.max(
+    0,
+    Math.floor((Date.now() - startAtMs) / 1000)
+  )
+);
       const playbackUrl =
   streamInfo?.playback_url ??
   streamInfo?.playbackUrl ??
@@ -577,23 +632,32 @@ setStreamMapUrl(resolvedMapUrl);
   values?.mission ??
   null;
 
-broadcastStreamMessage({
-  type: "STREAM_STARTED",
-  deviceSn: getCurrentDeviceSn(),
-  sessionId: res?.data?.sessionId || null,
-  playbackUrl,
-  mapUrl: resolvedMapUrl,
-  missionId: activeMissionId,
-  startTime: now.toISOString(),
-  startAtMs,
-});
+if (!joinedExisting) {
+  broadcastStreamMessage({
+    type: "STREAM_STARTED",
+    deviceSn: getCurrentDeviceSn(),
+    sessionId: res?.data?.sessionId || null,
+    playbackUrl,
+    mapUrl: resolvedMapUrl,
+    missionId: activeMissionId,
+    startTime: now.toISOString(),
+    startAtMs,
+  });
+}
     }
 
-    if (res?.data?.sessionId) {
-      setSessionId(res.data.sessionId);
-      localStorage.setItem(STREAM_OWNER_TAB_KEY, CURRENT_TAB_ID);      
-      await heartBeat(res.data.sessionId);
-    }
+   if (res?.data?.sessionId) {
+  setSessionId(res.data.sessionId);
+
+  if (sendHeartbeat) {
+    localStorage.setItem(
+      STREAM_OWNER_TAB_KEY,
+      CURRENT_TAB_ID
+    );
+
+    await heartBeat(res.data.sessionId);
+  }
+}
 
     showNotification(
       "success",
@@ -620,6 +684,12 @@ broadcastStreamMessage({
 };
 
 const handleStopWork = async () => {
+  if (!canStopStream) {
+  console.warn(
+    "[StreamJoin] Observer cannot stop another user's stream"
+  );
+  return;
+}
   try {
     setIsLoading(true);
 
@@ -768,10 +838,12 @@ const formatDuration = (seconds: number) => {
   )}:${String(s).padStart(2, "0")}`;
 };
 
+const handleReportCancel = () => {
+  setIsReportOpen(false);
 
-  const handleReportCancel = () => {
-    setIsReportOpen(false);
-  };
+  autoJoinTriggeredRef.current = false;
+  pendingAutoJoinMissionRef.current = null;
+};
 
 
  const handleHlsError = useCallback(() => {
@@ -1279,7 +1351,13 @@ useEffect(() => {
   }, [detailUserLogin, form, getSiteListByCompany, userRole]);
 
  useEffect(() => {
-  if (!sessionId || !isStreaming) return;
+  if (
+  !sessionId ||
+  !isStreaming ||
+  !shouldSendHeartbeat
+) {
+  return;
+}
 
   const claimOwnershipIfNeeded = () => {
     const currentOwner =
@@ -1328,7 +1406,7 @@ useEffect(() => {
       localStorage.removeItem(STREAM_OWNER_TAB_KEY);
     }
   };
-}, [heartBeat, isStreaming, sessionId]);
+}, [heartBeat, isStreaming, sessionId, shouldSendHeartbeat]);
 
 
 useEffect(() => {
@@ -1483,6 +1561,141 @@ useEffect(() => {
 
   return () => window.clearInterval(timer);
 }, [isStreaming, workStartAtMs]);
+
+
+useEffect(() => {
+  const deviceSn = selectedRobotDetail?.deviceSn;
+
+  if (
+    !deviceSn ||
+    isStreaming ||
+    isLoading ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const checkRunningStream = async () => {
+    try {
+      const status = await checkStatus(deviceSn);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!status?.streaming) {
+        autoJoinTriggeredRef.current = false;
+        return;
+      }
+
+      const runningMissionId =
+        status?.missionId ??
+        status?.mission_id ??
+        null;
+
+      if (!runningMissionId) {
+        return;
+      }
+
+      /*
+       * Same behavior as the final FPT implementation:
+       * restore the mission currently running on this device.
+       */
+      if (autoJoinTriggeredRef.current) {
+  return;
+}
+
+pendingAutoJoinMissionRef.current = runningMissionId;
+
+restoreMissionSelection(runningMissionId);
+
+    } catch (error) {
+      console.warn(
+        "[StreamJoin] Failed to check active stream",
+        {
+          deviceSn,
+          error,
+        }
+      );
+
+      autoJoinTriggeredRef.current = false;
+    }
+  };
+
+  /*
+   * Case 1:
+   * Observer opens Work after mission already started.
+   */
+  void checkRunningStream();
+
+  /*
+   * Case 2:
+   * Observer is already waiting when another user starts.
+   *
+   * This ONLY checks status.
+   * It does not reset or touch HLS.
+   */
+  const timer = window.setInterval(
+    checkRunningStream,
+    3000
+  );
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(timer);
+  };
+}, [
+  selectedRobotDetail?.deviceSn,
+  isStreaming,
+  isLoading,
+  isReportOpen,
+  checkStatus,
+  restoreMissionSelection,
+]);
+
+
+useEffect(() => {
+  const pendingMissionId =
+    pendingAutoJoinMissionRef.current;
+
+  if (
+    !pendingMissionId ||
+    isStreaming ||
+    isLoading ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  /*
+   * Wait until Form.useWatch has actually received the
+   * mission restored by the active-stream status check.
+   *
+   * At this point streamPayload has also been rebuilt using
+   * the correct missionId.
+   */
+  if (values?.mission !== pendingMissionId) {
+    return;
+  }
+
+  autoJoinTriggeredRef.current = true;
+  pendingAutoJoinMissionRef.current = null;
+
+  console.info("[StreamJoin] Joining active mission", {
+    deviceSn: selectedRobotDetail?.deviceSn,
+    missionId: pendingMissionId,
+  });
+
+  void handleStartWork();
+}, [
+  values?.mission,
+  selectedRobotDetail?.deviceSn,
+  isStreaming,
+  isLoading,
+  isReportOpen,
+]);
 
 
 useEffect(() => {
@@ -1814,6 +2027,7 @@ const SmallStatusBadge = ({
                 ) : (
                   <Button
                     loading={isLoading}
+                    disabled={!canStopStream}
                     onClick={handleStopWork}
                     className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
                   >
@@ -2212,6 +2426,7 @@ const SmallStatusBadge = ({
               <Button
                 onClick={handleStopWork}
                 loading={isLoading}
+                disabled={!canStopStream}
                 className="w-full h-[52px]! rounded-[6px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
               >
                 {t("stream_emergency_stop")}

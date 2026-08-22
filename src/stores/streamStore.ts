@@ -38,8 +38,19 @@ export interface CreateReport {
 interface Store {
   loading: boolean;
   list: any[];
+
+  currentStatus: {
+    streaming?: boolean;
+    active?: boolean;
+    missionId?: string;
+    sessionStatus?: string;
+    status?: string;
+  };
+
   report: ReportData;
+
   startStream: (id: string) => Promise<any>;
+  checkStatus: (deviceSn: string) => Promise<any>;
   heartBeat: (sessionId: string) => Promise<any>;
 }
 
@@ -64,6 +75,7 @@ const delay = (ms: number) =>
 export const useStreamStore = create<Store>((set) => ({
   loading: false,
   list: [],
+  currentStatus: {},
   report: defaultReport,
 
   startStream: async (id: string) => {
@@ -147,6 +159,43 @@ export const useStreamStore = create<Store>((set) => ({
       set({ loading: false });
     }
   },
+
+  checkStatus: async (deviceSn: string) => {
+  if (!deviceSn) {
+    console.warn("[streamStore] checkStatus called without deviceSn");
+    return null;
+  }
+
+  try {
+    const res = await streamApi.status(deviceSn);
+
+    const normalizedStatus = {
+      ...res,
+      streaming:
+        res?.streaming === true ||
+        res?.active === true ||
+        res?.sessionStatus === "ACTIVE" ||
+        res?.session_status === "ACTIVE" ||
+        res?.status === "ACTIVE" ||
+        res?.status === "RUNNING" ||
+        res?.status === "LIVE" ||
+        res?.status === "WORKING",
+    };
+
+    set({
+      currentStatus: normalizedStatus,
+    });
+
+    return normalizedStatus;
+  } catch (error) {
+    console.error("[streamStore] checkStatus failed", {
+      deviceSn,
+      error,
+    });
+
+    throw error;
+  }
+},
 
   heartBeat: async (sessionId: string) => {
     if (!sessionId) {
