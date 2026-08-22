@@ -119,6 +119,7 @@ type PlayerStatus =
   );
 };
 
+
 const parseCoordinate = (...values: unknown[]): number | undefined => {
   for (const value of values) {
     if (value === null || value === undefined || value === "") {
@@ -139,6 +140,8 @@ const parseCoordinate = (...values: unknown[]): number | undefined => {
 };
 
 export default function StreamIndex() {
+  const elapsedSecondsRef = useRef(0);
+const bookmarksRef = useRef<any[]>([]);
   const [reportDetail, setReportDetail] = useState<any>(null);
 const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [workStartTime, setWorkStartTime] = useState<Date | null>(null);
@@ -158,6 +161,8 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const dashboardPrefill = location.state as any;
   const lockSelection = Boolean(dashboardPrefill?.fromDashboard);
   const didDashboardPrefill = useRef(false);
+  const [isDashboardPrefilling, setIsDashboardPrefilling] =
+  useState(Boolean(dashboardPrefill?.fromDashboard));
   const { detailUserLogin } = useUserStore();
   const { id: routeDeviceId } = useParams();
   const { list: companyList, getList: getCompanyList } = useCompanyStore();
@@ -179,8 +184,11 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
 
   const pendingMissionRestoreRef = useRef<string | null>(null);
   const autoJoinTriggeredRef = useRef(false);
-  const pendingAutoJoinMissionRef = useRef<string | null>(null);
 
+  const [
+    pendingAutoJoinMissionId,
+    setPendingAutoJoinMissionId,
+  ] = useState<string | null>(null);
   const [canStopStream, setCanStopStream] = useState(true);
   const [shouldSendHeartbeat, setShouldSendHeartbeat] = useState(true);
 
@@ -192,6 +200,7 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [remoteStopSignal, setRemoteStopSignal] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [streamPlaybackUrl, setStreamPlaybackUrl] = useState("");
   const [streamMapUrl, setStreamMapUrl] = useState("");
@@ -368,8 +377,8 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     value: string
   ) => {
     form.setFieldValue(fieldName, value);
-    autoJoinTriggeredRef.current = false;
-pendingAutoJoinMissionRef.current = null;
+   autoJoinTriggeredRef.current = false;
+setPendingAutoJoinMissionId(null);
 
 setCanStopStream(true);
 setShouldSendHeartbeat(true);
@@ -435,28 +444,50 @@ setShouldSendHeartbeat(true);
   };
 
   const streamPayload = useMemo(() => {
-    return {
-      deviceSn: selectedRobotDetail?.deviceSn || "",
-      urlType: 1,
-      videoId: {
-        droneSn: selectedRobotDetail?.droneSn || selectedRobotDetail?.deviceSn || "",
-        payloadIndex: {
-          type: selectedRobotDetail?.subDeviceInfo?.type || 99,
-          subType: selectedRobotDetail?.subDeviceInfo?.subType || 0,
-          position: 0,
-        },
-        videoType: "normal",
-      },
-      videoQuality: 0,
-      videoType: "zoom",
-      missionId: values?.mission || "",
-    };
-  }, [selectedRobotDetail, values?.mission]);
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values?.device
+  );
 
+  const deviceSn =
+  selectedDevice?.deviceSn ||
+  selectedRobotDetail?.deviceSn ||
+  "";
+
+  return {
+    deviceSn,
+    urlType: 1,
+    videoId: {
+      droneSn:
+        selectedRobotDetail?.droneSn ||
+        deviceSn,
+
+      payloadIndex: {
+        type:
+          selectedRobotDetail?.subDeviceInfo?.type ||
+          99,
+        subType:
+          selectedRobotDetail?.subDeviceInfo?.subType ||
+          0,
+        position: 0,
+      },
+
+      videoType: "normal",
+    },
+
+    videoQuality: 0,
+    videoType: "zoom",
+    missionId: values?.mission || "",
+  };
+}, [
+  selectedRobotDetail,
+  robotList,
+  values?.device,
+  values?.mission,
+]);
 
   const getCurrentDeviceSn = useCallback(() => {
-    return selectedRobotDetail?.deviceSn || streamPayload.deviceSn || "";
-  }, [selectedRobotDetail?.deviceSn, streamPayload.deviceSn]);
+  return streamPayload.deviceSn || selectedRobotDetail?.deviceSn || "";
+}, [streamPayload.deviceSn, selectedRobotDetail?.deviceSn]);
 
   const clearLocalStreamState = useCallback(() => {
   if (retryTimerRef.current !== null) {
@@ -488,8 +519,9 @@ setShouldSendHeartbeat(true);
   setWorkStartAtMs(null);
   setCanStopStream(true);
   setShouldSendHeartbeat(true);
+  setRemoteStopSignal(null);
   autoJoinTriggeredRef.current = false;
-  pendingAutoJoinMissionRef.current = null;
+setPendingAutoJoinMissionId(null);
 }, []);
 
   const broadcastStreamMessage = useCallback(
@@ -842,7 +874,7 @@ const handleReportCancel = () => {
   setIsReportOpen(false);
 
   autoJoinTriggeredRef.current = false;
-  pendingAutoJoinMissionRef.current = null;
+  setPendingAutoJoinMissionId(null);
 };
 
 
@@ -966,10 +998,17 @@ const [mapReady, setMapReady] = useState(false);
 
 const remoteSeenActiveRef = useRef(false);
 const inactivePollCountRef = useRef(0);
-const STREAM_STATUS_POLL_INTERVAL_MS = 3000;
-const STREAM_INACTIVE_CONFIRMATION_POLLS = 10;
+const STREAM_STATUS_POLL_INTERVAL_MS = 2000;
+const STREAM_INACTIVE_CONFIRMATION_POLLS = 2;
 
 
+useEffect(() => {
+  elapsedSecondsRef.current = elapsedSeconds;
+}, [elapsedSeconds]);
+
+useEffect(() => {
+  bookmarksRef.current = bookmarks;
+}, [bookmarks]);
 
 useEffect(() => {
   if (!isStreaming) {
@@ -1046,15 +1085,28 @@ useEffect(() => {
 ]);
 
 useEffect(() => {
+
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values?.device
+  );
+
+  const deviceSn =
+    selectedDevice?.deviceSn ||
+    selectedRobotDetail?.deviceSn;
+
+  const deviceName =
+  selectedRobotDetail?.deviceName ||
+  selectedDevice?.deviceName ||
+  deviceSn ||
+  "-";
+
   if (
-    !selectedRobotDetail?.deviceSn ||
+    !deviceSn ||
     !streamPlaybackUrl ||
     isReportOpen
   ) {
     return;
   }
-
-  const deviceSn = selectedRobotDetail.deviceSn;
 
   const timer = window.setInterval(async () => {
     try {
@@ -1144,19 +1196,13 @@ useEffect(() => {
           ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
           : "-",
         endTime: endTimeText,
-        totalTime: formatDuration(elapsedSeconds),
+        totalTime: formatDuration(elapsedSecondsRef.current),
         distance: "-",
         siteName:
           siteOptions.find((site) => site.value === values?.site)?.label ||
           "-",
-        deviceName:
-          selectedRobotDetail.deviceName ||
-          selectedRobotDetail.deviceSn ||
-          "-",
-        robotName:
-          selectedRobotDetail.deviceName ||
-          selectedRobotDetail.deviceSn ||
-          "-",
+        deviceName,
+        robotName: deviceName,
         missionName:
           missionOptions.find(
             (mission) => mission.value === values?.mission
@@ -1164,7 +1210,7 @@ useEffect(() => {
         userName: "sysadmin",
         workerName: "sysadmin",
         deviceSn,
-        totalRecognition: bookmarks.length,
+        totalRecognition: bookmarksRef.current.length,
         bookmarks: [],
         labelCounts: {},
       });
@@ -1191,6 +1237,8 @@ useEffect(() => {
 
   return () => window.clearInterval(timer);
 }, [
+  values?.device,
+  robotList,
   selectedRobotDetail?.deviceSn,
   selectedRobotDetail?.deviceName,
   streamPlaybackUrl,
@@ -1199,8 +1247,6 @@ useEffect(() => {
   values?.site,
   values?.mission,
   workStartTime,
-  elapsedSeconds,
-  bookmarks.length,
   siteOptions,
   missionOptions,
 ]);
@@ -1442,6 +1488,10 @@ setStreamMapUrl(resolvedMapUrl);
       Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
     );
     setIsStreaming(true);
+    remoteSeenActiveRef.current = true;
+    inactivePollCountRef.current = 0;
+
+
     setIsPlaying(false);
     setPlayerStatus("LOADING");
     setHlsRetryCount(0);
@@ -1518,13 +1568,24 @@ applyActiveStream(restoredStream);
       applyActiveStream(message);
     }
 
-    if (message.type === "STREAM_STOPPED") {
-      const currentDeviceSn = getCurrentDeviceSn();
+   if (message.type === "STREAM_STOPPED") {
+  const currentDeviceSn = getCurrentDeviceSn();
 
-      if (currentDeviceSn && currentDeviceSn === message.deviceSn) {
-        clearLocalStreamState();
-      }
-    }
+  if (
+    currentDeviceSn &&
+    currentDeviceSn === message.deviceSn
+  ) {
+    console.info("[StreamSync] Remote stop received", {
+      deviceSn: message.deviceSn,
+    });
+
+    /*
+     * Same-user tabs receive this immediately.
+     * Generate/open the report without waiting for status polling.
+     */
+    setRemoteStopSignal(Date.now());
+  }
+}
   };
 
   return () => {
@@ -1562,9 +1623,175 @@ useEffect(() => {
   return () => window.clearInterval(timer);
 }, [isStreaming, workStartAtMs]);
 
-
 useEffect(() => {
-  const deviceSn = selectedRobotDetail?.deviceSn;
+  if (
+    remoteStopSignal === null ||
+    !streamPlaybackUrl ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  const endTime = new Date();
+
+  const startTimeText = workStartTime
+    ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
+    : "-";
+
+  const endTimeText = endTime
+    .toLocaleString("sv-SE")
+    .replace("T", " ");
+
+  const siteName =
+    siteOptions.find(
+      (site) => site.value === values?.site
+    )?.label || "-";
+
+  const robotName =
+    selectedRobotDetail?.deviceName ||
+    selectedRobotDetail?.deviceSn ||
+    "-";
+
+  const missionName =
+    missionOptions.find(
+      (mission) => mission.value === values?.mission
+    )?.label || "-";
+
+  const fallbackBookmarks = bookmarks.map(
+    (bookmark: any, index: number) => {
+      const label =
+        bookmark.labels?.[0] ||
+        bookmark.label ||
+        bookmark.type ||
+        "Unknown";
+
+      return {
+        label,
+        mdisplay: bookmark.timeSec
+          ? new Date(bookmark.timeSec * 1000)
+              .toISOString()
+              .substring(11, 19)
+          : "00:00:00",
+        m: bookmark.timeSec || 0,
+        s: bookmark.s || "",
+        o: 0,
+        duration: bookmark.timeSec
+          ? new Date(bookmark.timeSec * 1000)
+              .toISOString()
+              .substring(11, 19)
+          : "00:00:00",
+        id: bookmark.id || `${label}-${index}`,
+      };
+    }
+  );
+
+  const fallbackLabelCounts =
+    fallbackBookmarks.reduce(
+      (
+        acc: Record<string, number>,
+        bookmark: any
+      ) => {
+        acc[bookmark.label] =
+          (acc[bookmark.label] || 0) + 1;
+
+        return acc;
+      },
+      {}
+    );
+
+  /*
+   * Stop video locally only after preserving all report information.
+   */
+  playerRef.current?.pause();
+
+  setReportDetail({
+    reportCreatedAt: endTimeText,
+    playbackUrl: streamPlaybackUrl,
+    mapUrl: streamMapUrl,
+    companyId: values?.company,
+    siteId: values?.site,
+    missionId: values?.mission,
+
+    startTime: startTimeText,
+    endTime: endTimeText,
+    totalTime: formatDuration(elapsedSecondsRef.current),
+
+    distance: "-",
+    siteName,
+    deviceName: robotName,
+    robotName,
+    missionName,
+
+    userName: "sysadmin",
+    workerName: "sysadmin",
+
+    deviceSn:
+      selectedRobotDetail?.deviceSn || "",
+
+    totalRecognition:
+      fallbackBookmarks.length,
+
+    labelCounts:
+      fallbackLabelCounts,
+
+    bookmarks:
+      fallbackBookmarks,
+  });
+
+  /*
+   * Now move this tab out of active monitoring.
+   */
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+  setSessionId(null);
+
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+
+  setMapReady(false);
+  setMapRetryKey(0);
+
+  remoteSeenActiveRef.current = false;
+  inactivePollCountRef.current = 0;
+
+  setRemoteStopSignal(null);
+
+  /*
+   * Open report last.
+   */
+  setIsReportOpen(true);
+}, [
+  remoteStopSignal,
+  isReportOpen,
+  streamPlaybackUrl,
+  streamMapUrl,
+  workStartTime,
+  elapsedSeconds,
+  bookmarks,
+  values?.company,
+  values?.site,
+  values?.mission,
+  siteOptions,
+  missionOptions,
+  selectedRobotDetail?.deviceName,
+  selectedRobotDetail?.deviceSn,
+]);
+useEffect(() => {
+  if (isDashboardPrefilling) {
+  return;
+}
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values?.device
+  );
+
+  const deviceSn =
+    selectedDevice?.deviceSn ||
+    selectedRobotDetail?.deviceSn;
 
   if (
     !deviceSn ||
@@ -1607,10 +1834,14 @@ useEffect(() => {
   return;
 }
 
-pendingAutoJoinMissionRef.current = runningMissionId;
+console.info("[StreamJoin] Active mission detected", {
+  deviceSn,
+  missionId: runningMissionId,
+});
+
+setPendingAutoJoinMissionId(runningMissionId);
 
 restoreMissionSelection(runningMissionId);
-
     } catch (error) {
       console.warn(
         "[StreamJoin] Failed to check active stream",
@@ -1647,6 +1878,9 @@ restoreMissionSelection(runningMissionId);
     window.clearInterval(timer);
   };
 }, [
+  isDashboardPrefilling,
+  values?.device,
+  robotList,
   selectedRobotDetail?.deviceSn,
   isStreaming,
   isLoading,
@@ -1657,40 +1891,56 @@ restoreMissionSelection(runningMissionId);
 
 
 useEffect(() => {
-  const pendingMissionId =
-    pendingAutoJoinMissionRef.current;
-
   if (
-    !pendingMissionId ||
-    isStreaming ||
-    isLoading ||
-    isReportOpen
-  ) {
+  isDashboardPrefilling ||
+  !pendingAutoJoinMissionId ||
+  isStreaming ||
+  isLoading ||
+  isReportOpen
+) {
+  return;
+}
+
+  /*
+   * Wait until the Form mission matches the currently
+   * running mission before joining.
+   */
+  if (values?.mission !== pendingAutoJoinMissionId) {
     return;
   }
 
-  /*
-   * Wait until Form.useWatch has actually received the
-   * mission restored by the active-stream status check.
-   *
-   * At this point streamPayload has also been rebuilt using
-   * the correct missionId.
-   */
-  if (values?.mission !== pendingMissionId) {
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values?.device
+  );
+
+  const deviceSn =
+    selectedRobotDetail?.deviceSn ||
+    selectedDevice?.deviceSn ||
+    "";
+
+  if (!deviceSn) {
     return;
   }
 
   autoJoinTriggeredRef.current = true;
-  pendingAutoJoinMissionRef.current = null;
+
+  const joiningMissionId =
+    pendingAutoJoinMissionId;
+
+  setPendingAutoJoinMissionId(null);
 
   console.info("[StreamJoin] Joining active mission", {
-    deviceSn: selectedRobotDetail?.deviceSn,
-    missionId: pendingMissionId,
+    deviceSn,
+    missionId: joiningMissionId,
   });
 
   void handleStartWork();
 }, [
+  pendingAutoJoinMissionId,
+  isDashboardPrefilling,
   values?.mission,
+  values?.device,
+  robotList,
   selectedRobotDetail?.deviceSn,
   isStreaming,
   isLoading,
@@ -1708,11 +1958,15 @@ useEffect(() => {
   const deviceId = dashboardPrefill.deviceId || routeDeviceId;
   const deviceSn = dashboardPrefill.deviceSn;
 
-  if (!companyId || !siteId || !deviceId) return;
+  if (!companyId || !siteId || !deviceId) {
+  setIsDashboardPrefilling(false);
+  return;
+}
 
   didDashboardPrefill.current = true;
 
-  const applyDashboardPrefill = async () => {
+const applyDashboardPrefill = async () => {
+  try {
     form.setFieldsValue({
       company: companyId,
       site: undefined,
@@ -1740,58 +1994,78 @@ useEffect(() => {
 
     await getRobotDetail(deviceId);
 
-    const dashboardMissionId = dashboardPrefill?.missionId ?? null;
+    const dashboardMissionId =
+      dashboardPrefill?.missionId ?? null;
 
     if (dashboardMissionId) {
-      pendingMissionRestoreRef.current = dashboardMissionId;
+      pendingMissionRestoreRef.current =
+        dashboardMissionId;
 
-      form.setFieldValue("mission", dashboardMissionId);
+      form.setFieldValue(
+        "mission",
+        dashboardMissionId
+      );
 
-      console.info("[DashboardPrefill] Mission prefilled", {
-        deviceSn,
-        missionId: dashboardMissionId,
-        missionName: dashboardPrefill?.missionName,
-      });
+      console.info(
+        "[DashboardPrefill] Mission prefilled",
+        {
+          deviceSn,
+          missionId: dashboardMissionId,
+          missionName:
+            dashboardPrefill?.missionName,
+        }
+      );
     }
 
-    if (dashboardPrefill.openLiveStream && deviceSn) {
-      const statusRes = await streamApi.status(deviceSn);
+    if (
+      dashboardPrefill.openLiveStream &&
+      deviceSn
+    ) {
+      const statusRes =
+        await streamApi.status(deviceSn);
 
-      if (!statusRes?.streaming) return;
+      if (!statusRes?.streaming) {
+        return;
+      }
 
       const activeMissionId =
-  statusRes?.missionId ??
-  statusRes?.mission_id ??
-  dashboardPrefill?.missionId ??
-  null;
+        statusRes?.missionId ??
+        statusRes?.mission_id ??
+        dashboardPrefill?.missionId ??
+        null;
 
-restoreMissionSelection(activeMissionId);
+      restoreMissionSelection(
+        activeMissionId
+      );
 
-      const streamInfo = await startStream(deviceSn);
+      const streamInfo =
+        await startStream(deviceSn);
 
       setSessionId(
-      statusRes?.sessionId ??
-      statusRes?.session_id ??
-      null
-    );
+        statusRes?.sessionId ??
+          statusRes?.session_id ??
+          null
+      );
 
       const playbackUrl =
-  streamInfo?.playback_url ??
-  streamInfo?.playbackUrl ??
-  "";
+        streamInfo?.playback_url ??
+        streamInfo?.playbackUrl ??
+        "";
 
-const backendMapUrl =
-  streamInfo?.map_url ??
-  streamInfo?.mapUrl ??
-  "";
+      const backendMapUrl =
+        streamInfo?.map_url ??
+        streamInfo?.mapUrl ??
+        "";
 
-const resolvedMapUrl = resolveMapUrl(
-  playbackUrl,
-  backendMapUrl
-);
+      const resolvedMapUrl =
+        resolveMapUrl(
+          playbackUrl,
+          backendMapUrl
+        );
 
-setStreamPlaybackUrl(playbackUrl);
-setStreamMapUrl(resolvedMapUrl);
+      setStreamPlaybackUrl(playbackUrl);
+      setStreamMapUrl(resolvedMapUrl);
+
       setMapReady(false);
       setMapRetryKey(0);
 
@@ -1801,7 +2075,19 @@ setStreamMapUrl(resolvedMapUrl);
 
       setIsStreaming(true);
     }
-  };
+  } catch (error) {
+    console.error(
+      "[DashboardPrefill] Failed",
+      error
+    );
+  } finally {
+    /*
+     * Dashboard initialization is complete.
+     * Re-enable normal observer monitoring.
+     */
+    setIsDashboardPrefilling(false);
+  }
+};
 
   applyDashboardPrefill();
 }, [
