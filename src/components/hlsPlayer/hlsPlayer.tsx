@@ -661,32 +661,41 @@ useEffect(() => {
     fatal: data.fatal,
   });
 
-if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-  /*
-   * Live HLS files can temporarily be unavailable while the
-   * playlist/segments are still being generated.
-   *
-   * Do NOT ask the parent to remount the React HLSPlayer here.
-   * Recover using the existing HLS/video instance instead.
-   */
-  console.warn("[HLS] Recovering network error in place", {
-    details: data.details,
-    type,
-    src,
-  });
+  if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+  const isManifestError =
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+    data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT;
+
+  const isLevelErrorBeforeVideoReady =
+    (
+      data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+      data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+    ) &&
+    video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
+
+  const isInitialPlaylistError =
+    isManifestError || isLevelErrorBeforeVideoReady;
+
+  if (isInitialPlaylistError) {
+    console.warn(
+      "[HLS] Initial playlist unavailable; requesting retry",
+      {
+        details: data.details,
+      }
+    );
+
+    onErrorRef.current?.(data);
+    return;
+  }
 
   try {
-    hls.startLoad();
-  } catch (error) {
-    console.error("[HLS] Network recovery failed", {
-      error,
+    console.warn("[HLS] Attempting fragment/network recovery", {
       details: data.details,
-      src,
     });
 
-    /*
-     * Escalate only if HLS.js itself cannot recover.
-     */
+    hls.startLoad();
+  } catch (error) {
+    console.error("[HLS] Network recovery failed", error);
     onErrorRef.current?.(data);
   }
 
