@@ -160,6 +160,7 @@ export default function StreamIndex() {
   const [workStartAtMs, setWorkStartAtMs] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const bookmarksRef = useRef<any[]>([]);
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("OFFLINE");
   const [hlsRetryKey, setHlsRetryKey] = useState(0);
@@ -638,7 +639,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
       setHasConnectedOnce(false);
 
       setHlsRetryCount(0);
-      setHlsRetryKey((prev) => prev + 1);
+      setHlsRetryKey(0);
 
       setMapReady(false);
       setMapRetryKey(0);
@@ -817,6 +818,144 @@ broadcastStreamMessage({
   setIsLoading(false);
 }
 };
+
+
+const openStoppedStreamReport = useCallback(() => {
+  const endTime = new Date();
+
+  const endTimeText = endTime
+    .toLocaleString("sv-SE")
+    .replace("T", " ");
+
+  const startTimeText = workStartTime
+    ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
+    : "-";
+
+ const totalSeconds = workStartAtMs
+  ? Math.max(
+      0,
+      Math.floor((Date.now() - workStartAtMs) / 1000)
+    )
+  : 0;
+
+  const siteName =
+    siteOptions.find(
+      (site) => site.value === values?.site
+    )?.label || "-";
+
+  const robotName =
+    selectedRobotDetail?.deviceName ||
+    selectedRobotDetail?.deviceSn ||
+    "-";
+
+  const missionName =
+    missionOptions.find(
+      (mission) => mission.value === values?.mission
+    )?.label || "-";
+
+  const fallbackBookmarks = bookmarksRef.current.map(
+    (bookmark: any, index: number) => {
+      const label =
+        bookmark.labels?.[0] ||
+        bookmark.label ||
+        bookmark.type ||
+        "Unknown";
+
+      return {
+        label,
+        mdisplay: bookmark.timeSec
+          ? new Date(bookmark.timeSec * 1000)
+              .toISOString()
+              .substring(11, 19)
+          : "00:00:00",
+        m: bookmark.timeSec || 0,
+        s: bookmark.s || "",
+        o: 0,
+        duration: bookmark.timeSec
+          ? new Date(bookmark.timeSec * 1000)
+              .toISOString()
+              .substring(11, 19)
+          : "00:00:00",
+        id: bookmark.id || `${label}-${index}`,
+      };
+    }
+  );
+
+  const fallbackLabelCounts = fallbackBookmarks.reduce(
+    (
+      acc: Record<string, number>,
+      bookmark: any
+    ) => {
+      acc[bookmark.label] =
+        (acc[bookmark.label] || 0) + 1;
+
+      return acc;
+    },
+    {}
+  );
+
+  setReportDetail({
+    reportCreatedAt: endTimeText,
+    playbackUrl: streamPlaybackUrl,
+    mapUrl: streamMapUrl,
+
+    companyId: values?.company,
+    siteId: values?.site,
+    missionId: values?.mission,
+
+    startTime: startTimeText,
+    endTime: endTimeText,
+    totalTime: formatDuration(totalSeconds),
+
+    distance: "-",
+    siteName,
+
+    deviceName: robotName,
+    robotName,
+
+    missionName,
+
+    userName: "sysadmin",
+    workerName: "sysadmin",
+
+    deviceSn:
+      selectedRobotDetail?.deviceSn || "",
+
+    totalRecognition: fallbackBookmarks.length,
+    labelCounts: fallbackLabelCounts,
+    bookmarks: fallbackBookmarks,
+  });
+
+  playerRef.current?.pause();
+
+  setIsReportOpen(true);
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+  setSessionId(null);
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+  setMapReady(false);
+  setMapRetryKey(0);
+
+  remoteSeenActiveRef.current = false;
+  inactivePollCountRef.current = 0;
+}, [
+  missionOptions,
+  selectedRobotDetail?.deviceName,
+  selectedRobotDetail?.deviceSn,
+  siteOptions,
+  streamMapUrl,
+  streamPlaybackUrl,
+  values?.company,
+  values?.mission,
+  values?.site,
+  workStartAtMs,
+  workStartTime,
+]);
 
 const handleStopWork = async () => {
   if (isObserverMonitoring) {
@@ -1170,7 +1309,6 @@ useWebSocket(
   Boolean(selectedRobotDetail?.deviceSn)
 );
 
-
 useEffect(() => {
   const deviceSn = selectedRobotDetail?.deviceSn;
 
@@ -1219,6 +1357,9 @@ useEffect(() => {
   syncActiveStreamFromServer,
 ]);
 
+useEffect(() => {
+  bookmarksRef.current = bookmarks;
+}, [bookmarks]);
 useEffect(() => {
   if (!isStreaming) {
     return;
@@ -1380,6 +1521,13 @@ useEffect(() => {
         .toLocaleString("sv-SE")
         .replace("T", " ");
 
+      const stoppedTotalSeconds = workStartAtMs
+        ? Math.max(
+            0,
+            Math.floor((Date.now() - workStartAtMs) / 1000)
+          )
+        : 0;
+
       playerRef.current?.pause();
 
       setReportDetail({
@@ -1392,7 +1540,7 @@ useEffect(() => {
           ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
           : "-",
         endTime: endTimeText,
-        totalTime: formatDuration(elapsedSeconds),
+        totalTime: formatDuration(stoppedTotalSeconds),
         distance: "-",
         siteName:
           siteOptions.find((site) => site.value === values?.site)?.label ||
@@ -1412,7 +1560,7 @@ useEffect(() => {
         userName: "sysadmin",
         workerName: "sysadmin",
         deviceSn,
-        totalRecognition: bookmarks.length,
+        totalRecognition: bookmarksRef.current.length,
         bookmarks: [],
         labelCounts: {},
       });
@@ -1447,8 +1595,7 @@ useEffect(() => {
   values?.site,
   values?.mission,
   workStartTime,
-  elapsedSeconds,
-  bookmarks.length,
+  workStartAtMs,
   siteOptions,
   missionOptions,
 ]);
@@ -1760,31 +1907,30 @@ applyActiveStream(restoredStream);
       applyActiveStream(message);
     }
 
-    if (message.type === "STREAM_STOPPED") {
-      const currentDeviceSn = getCurrentDeviceSn();
+   if (message.type === "STREAM_STOPPED") {
+  const currentDeviceSn = getCurrentDeviceSn();
 
-      if (currentDeviceSn && currentDeviceSn === message.deviceSn) {
-        console.info(
-          "[StreamSync] Stop received from another tab; waiting for server confirmation",
-          {
-            deviceSn: message.deviceSn,
-          }
-        );
-
-        /*
-        * Do not clear immediately.
-        * Existing stream-status polling will confirm the remote stop
-        * and open the Mission Report.
-        */
+  if (
+    currentDeviceSn &&
+    currentDeviceSn === message.deviceSn
+  ) {
+    console.info(
+      "[StreamSync] Confirmed stop received from another tab",
+      {
+        deviceSn: message.deviceSn,
       }
-    }
+    );
+
+    openStoppedStreamReport();
+  }
+}
   };
 
   return () => {
     channel.close();
     streamSyncChannelRef.current = null;
   };
-}, [clearLocalStreamState, getCurrentDeviceSn, restoreMissionSelection]);
+}, [clearLocalStreamState, getCurrentDeviceSn, restoreMissionSelection, openStoppedStreamReport]);
 
 
 useEffect(() => {
@@ -1888,7 +2034,6 @@ useEffect(() => {
   getRobotDetail,
   routeDeviceId,
   missionList,
-  startStream,
   restoreMissionSelection,
   syncActiveStreamFromServer,
 ]);
@@ -2124,7 +2269,7 @@ const SmallStatusBadge = ({
                 </div>
               </div>
 
-              {isStreaming && streamPlaybackUrl ? (
+             {isStreaming && streamPlaybackUrl ? (
                 <HLSPlayer
                   key={`${streamPlaybackUrl}-${hlsRetryKey}`}
                   ref={playerRef}
