@@ -18,6 +18,7 @@ import ControlBar from "@/components/common/controlBar";
 import WorkReportModal from "@/components/common/workReportModal";
 import { LiveMap } from "@/components/map/liveMap";
 import { useDashboardStore } from "@/stores/dashboardStore";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 
 
@@ -63,6 +64,14 @@ type PlayerStatus =
     startTime?: string;
     startAtMs?: number;
   };
+
+  type DashboardDeviceEvent = {
+  eventType?: string;
+  deviceSn?: string;
+  status?: string;
+  source?: string;
+  timestamp?: string;
+};
 
   const CLASS_LABELS: Record<number, string> = {
     0: "Construction",
@@ -138,9 +147,15 @@ const parseCoordinate = (...values: unknown[]): number | undefined => {
   return undefined;
 };
 
+
+
 export default function StreamIndex() {
+
+  const [isObserverMonitoring, setIsObserverMonitoring] = useState(false);
+
+  const observerSyncInFlightRef = useRef(false);
   const [reportDetail, setReportDetail] = useState<any>(null);
-const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
+  const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [workStartTime, setWorkStartTime] = useState<Date | null>(null);
   const [workStartAtMs, setWorkStartAtMs] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -460,6 +475,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     localStorage.removeItem(STREAM_OWNER_TAB_KEY);
   }
   setIsStreaming(false);
+  setIsObserverMonitoring(false);
   setIsPlaying(false);
   setCurrentTime(0);
   setDuration(0);
@@ -474,6 +490,188 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   setWorkStartTime(null);
   setWorkStartAtMs(null);
 }, []);
+
+
+  const syncActiveStreamFromServer = useCallback(
+  async (deviceSn: string) => {
+    if (!deviceSn || observerSyncInFlightRef.current) {
+      return false;
+    }
+
+    observerSyncInFlightRef.current = true;
+
+    try {
+      const statusRes = await streamApi.status(deviceSn);
+
+      const remoteStatus =
+        statusRes?.sessionStatus ??
+        statusRes?.session_status ??
+        statusRes?.status;
+
+      const active =
+        statusRes?.active === true ||
+        statusRes?.streaming === true ||
+        remoteStatus === "ACTIVE" ||
+        remoteStatus === "RUNNING" ||
+        remoteStatus === "LIVE" ||
+        remoteStatus === "WORKING";
+
+      if (!active) {
+        return false;
+      }
+
+      /*
+       * Current backend intentionally supports deviceSn here:
+       * GET /v1/live/stream-info/{deviceSn}
+       * resolves the latest ACTIVE session.
+       */
+      const streamInfo = await startStream(deviceSn);
+
+      const playbackUrl =
+        streamInfo?.playback_url ??
+        streamInfo?.playbackUrl ??
+        "";
+
+      if (!playbackUrl) {
+        console.warn("[ObserverSync] Active stream has no playback URL", {
+          deviceSn,
+          statusRes,
+          streamInfo,
+        });
+
+        return false;
+      }
+
+      const activeMissionId =
+        streamInfo?.missionId ??
+        streamInfo?.mission_id ??
+        statusRes?.missionId ??
+        statusRes?.mission_id ??
+        null;
+
+      restoreMissionSelection(activeMissionId);
+
+      const backendMapUrl =
+        streamInfo?.map_url ??
+        streamInfo?.mapUrl ??
+        "";
+
+      const resolvedMapUrl = resolveMapUrl(
+        playbackUrl,
+        backendMapUrl
+      );
+
+      const startedAtRaw =
+        streamInfo?.startedAt ??
+        streamInfo?.startTime ??
+        streamInfo?.started_at;
+
+      const parsedStartAtMs = startedAtRaw
+        ? new Date(startedAtRaw).getTime()
+        : Date.now();
+
+      const startAtMs = Number.isFinite(parsedStartAtMs)
+        ? parsedStartAtMs
+        : Date.now();
+
+      const streamOwnerUserId = streamInfo?.userId
+        ? String(streamInfo.userId)
+        : "";
+
+      const currentUserId = detailUserLogin?.user?.id
+        ? String(detailUserLogin.user.id)
+        : "";
+
+      if (!streamOwnerUserId || !currentUserId) {
+        console.warn("[ObserverSync] User identity is not ready", {
+          deviceSn,
+          streamOwnerUserId,
+          currentUserId,
+        });
+
+        return false;
+      }
+
+      const observer = streamOwnerUserId !== currentUserId;
+      console.info("[ObserverSync] Active stream restored", {
+        deviceSn,
+        activeMissionId,
+        streamOwnerUserId,
+        currentUserId,
+        observer,
+      });
+
+      setIsObserverMonitoring(observer);
+
+      /*
+       * An observer must not heartbeat another user's session.
+       *
+       * If this is the original owner reopening their stream,
+       * restoring the session ID preserves current heartbeat behavior.
+       */
+      setSessionId(
+        observer
+          ? null
+          : streamInfo?.id
+            ? String(streamInfo.id)
+            : null
+      );
+
+      setStreamPlaybackUrl(playbackUrl);
+      setStreamMapUrl(resolvedMapUrl);
+
+      const startedAt = new Date(startAtMs);
+
+      setWorkStartTime(startedAt);
+      setWorkStartAtMs(startAtMs);
+      setElapsedSeconds(
+        Math.max(
+          0,
+          Math.floor((Date.now() - startAtMs) / 1000)
+        )
+      );
+
+      setIsStreaming(true);
+      setIsPlaying(false);
+
+      setPlayerStatus("LOADING");
+      setHasConnectedOnce(false);
+
+      setHlsRetryCount(0);
+      setHlsRetryKey((prev) => prev + 1);
+
+      setMapReady(false);
+      setMapRetryKey(0);
+
+      /*
+       * Existing stop-detection polling should now treat this
+       * as a stream that was observed ACTIVE.
+       */
+      remoteSeenActiveRef.current = true;
+      inactivePollCountRef.current = 0;
+
+      return true;
+    } catch (error) {
+      console.warn(
+        "[ObserverSync] Failed to synchronize active stream",
+        {
+          deviceSn,
+          error,
+        }
+      );
+
+      return false;
+    } finally {
+      observerSyncInFlightRef.current = false;
+    }
+  },
+  [
+    detailUserLogin?.user?.id,
+    restoreMissionSelection,
+    startStream,
+  ]
+);
+
 
   const broadcastStreamMessage = useCallback(
   (message: StreamSyncMessage) => {
@@ -496,6 +694,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
   const handleStartWork = async () => {
   try {
     await form.validateFields();
+    setIsObserverMonitoring(false);
     setIsLoading(true);
     setPlayerStatus("LOADING");
 
@@ -620,6 +819,13 @@ broadcastStreamMessage({
 };
 
 const handleStopWork = async () => {
+  if (isObserverMonitoring) {
+    console.warn(
+      "[ObserverSync] Observer attempted to stop another user's stream"
+    );
+    return;
+  }
+
   try {
     setIsLoading(true);
 
@@ -770,8 +976,20 @@ const formatDuration = (seconds: number) => {
 
 
   const handleReportCancel = () => {
-    setIsReportOpen(false);
-  };
+  setIsReportOpen(false);
+
+  const deviceSn = getCurrentDeviceSn();
+
+  if (!deviceSn) {
+    return;
+  }
+
+  /*
+   * The report may have hidden a new mission that was started
+   * while the modal was open.
+   */
+  void syncActiveStreamFromServer(deviceSn);
+};
 
 
  const handleHlsError = useCallback(() => {
@@ -895,9 +1113,111 @@ const [mapReady, setMapReady] = useState(false);
 const remoteSeenActiveRef = useRef(false);
 const inactivePollCountRef = useRef(0);
 const STREAM_STATUS_POLL_INTERVAL_MS = 3000;
-const STREAM_INACTIVE_CONFIRMATION_POLLS = 10;
+const STREAM_INACTIVE_CONFIRMATION_POLLS = 3;
 
 
+const handleRemoteDeviceEvent = useCallback(
+  (event: DashboardDeviceEvent) => {
+    const currentDeviceSn = getCurrentDeviceSn();
+
+    if (
+      !event?.deviceSn ||
+      !currentDeviceSn ||
+      event.deviceSn !== currentDeviceSn
+    ) {
+      return;
+    }
+
+    /*
+     * Do not interfere with:
+     * - local Start
+     * - an already displayed stream
+     * - Mission Report flow
+     */
+    if (
+      isStreaming ||
+      isLoading ||
+      isReportOpen
+    ) {
+      return;
+    }
+
+    if (
+      event.eventType === "DEVICE_STATUS_CHANGED" ||
+      event.eventType === "DEVICE_REFRESH"
+    ) {
+      console.info(
+        "[ObserverSync] Device WebSocket event received",
+        event
+      );
+
+      void syncActiveStreamFromServer(currentDeviceSn);
+    }
+  },
+  [
+    getCurrentDeviceSn,
+    isStreaming,
+    isLoading,
+    isReportOpen,
+    syncActiveStreamFromServer,
+  ]
+);
+
+useWebSocket(
+  import.meta.env.VITE_DEVICE_ENDPOINT_URL,
+  "/topic/dashboard/devices",
+  handleRemoteDeviceEvent,
+  Boolean(selectedRobotDetail?.deviceSn)
+);
+
+
+useEffect(() => {
+  const deviceSn = selectedRobotDetail?.deviceSn;
+
+  if (
+    !deviceSn ||
+    isStreaming ||
+    isLoading ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  const timer = window.setInterval(() => {
+    void syncActiveStreamFromServer(deviceSn);
+  }, 3000);
+
+  return () => {
+    window.clearInterval(timer);
+  };
+}, [
+  selectedRobotDetail?.deviceSn,
+  isStreaming,
+  isLoading,
+  isReportOpen,
+  syncActiveStreamFromServer,
+]);
+
+useEffect(() => {
+  const deviceSn = selectedRobotDetail?.deviceSn;
+
+  if (
+    !deviceSn ||
+    isStreaming ||
+    isLoading ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  void syncActiveStreamFromServer(deviceSn);
+}, [
+  selectedRobotDetail?.deviceSn,
+  isStreaming,
+  isLoading,
+  isReportOpen,
+  syncActiveStreamFromServer,
+]);
 
 useEffect(() => {
   if (!isStreaming) {
@@ -1444,7 +1764,18 @@ applyActiveStream(restoredStream);
       const currentDeviceSn = getCurrentDeviceSn();
 
       if (currentDeviceSn && currentDeviceSn === message.deviceSn) {
-        clearLocalStreamState();
+        console.info(
+          "[StreamSync] Stop received from another tab; waiting for server confirmation",
+          {
+            deviceSn: message.deviceSn,
+          }
+        );
+
+        /*
+        * Do not clear immediately.
+        * Existing stream-status polling will confirm the remote stop
+        * and open the Mission Report.
+        */
       }
     }
   };
@@ -1542,51 +1873,7 @@ useEffect(() => {
     }
 
     if (dashboardPrefill.openLiveStream && deviceSn) {
-      const statusRes = await streamApi.status(deviceSn);
-
-      if (!statusRes?.streaming) return;
-
-      const activeMissionId =
-  statusRes?.missionId ??
-  statusRes?.mission_id ??
-  dashboardPrefill?.missionId ??
-  null;
-
-restoreMissionSelection(activeMissionId);
-
-      const streamInfo = await startStream(deviceSn);
-
-      setSessionId(
-      statusRes?.sessionId ??
-      statusRes?.session_id ??
-      null
-    );
-
-      const playbackUrl =
-  streamInfo?.playback_url ??
-  streamInfo?.playbackUrl ??
-  "";
-
-const backendMapUrl =
-  streamInfo?.map_url ??
-  streamInfo?.mapUrl ??
-  "";
-
-const resolvedMapUrl = resolveMapUrl(
-  playbackUrl,
-  backendMapUrl
-);
-
-setStreamPlaybackUrl(playbackUrl);
-setStreamMapUrl(resolvedMapUrl);
-      setMapReady(false);
-      setMapRetryKey(0);
-
-      setPlayerStatus("LOADING");
-      setHlsRetryCount(0);
-      setHlsRetryKey(0);
-
-      setIsStreaming(true);
+      await syncActiveStreamFromServer(deviceSn);
     }
   };
 
@@ -1603,6 +1890,7 @@ setStreamMapUrl(resolvedMapUrl);
   missionList,
   startStream,
   restoreMissionSelection,
+  syncActiveStreamFromServer,
 ]);
 
 useEffect(() => {
@@ -1814,6 +2102,7 @@ const SmallStatusBadge = ({
                 ) : (
                   <Button
                     loading={isLoading}
+                    disabled={isObserverMonitoring}
                     onClick={handleStopWork}
                     className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
                   >
@@ -2212,6 +2501,7 @@ const SmallStatusBadge = ({
               <Button
                 onClick={handleStopWork}
                 loading={isLoading}
+                disabled={isObserverMonitoring}
                 className="w-full h-[52px]! rounded-[6px]! bg-[#FF3B3B]! border-[#FF3B3B]! text-white! font-bold! text-[18px]!"
               >
                 {t("stream_emergency_stop")}
