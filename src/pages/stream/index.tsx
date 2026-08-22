@@ -485,10 +485,17 @@ setShouldSendHeartbeat(true);
   values?.mission,
 ]);
 
-  const getCurrentDeviceSn = useCallback(() => {
-  return streamPayload.deviceSn || selectedRobotDetail?.deviceSn || "";
-}, [streamPayload.deviceSn, selectedRobotDetail?.deviceSn]);
+ const getCurrentDeviceSn = useCallback(() => {
+  if (!values?.device) {
+    return "";
+  }
 
+  const selectedDevice = robotList.find(
+    (item) => item.deviceId === values.device
+  );
+
+  return selectedDevice?.deviceSn || "";
+}, [robotList, values?.device]);
   const clearLocalStreamState = useCallback(() => {
   if (retryTimerRef.current !== null) {
     window.clearTimeout(retryTimerRef.current);
@@ -1783,15 +1790,18 @@ useEffect(() => {
 ]);
 useEffect(() => {
   if (isDashboardPrefilling) {
-  return;
-}
+    return;
+  }
+
+  if (!values?.company || !values?.site || !values?.device) {
+    return;
+  }
+
   const selectedDevice = robotList.find(
-    (item) => item.deviceId === values?.device
+    (item) => item.deviceId === values.device
   );
 
-  const deviceSn =
-    selectedDevice?.deviceSn ||
-    selectedRobotDetail?.deviceSn;
+  const deviceSn = selectedDevice?.deviceSn;
 
   if (
     !deviceSn ||
@@ -1881,7 +1891,8 @@ restoreMissionSelection(runningMissionId);
   isDashboardPrefilling,
   values?.device,
   robotList,
-  selectedRobotDetail?.deviceSn,
+  values?.company,
+  values?.site,
   isStreaming,
   isLoading,
   isReportOpen,
@@ -1892,14 +1903,22 @@ restoreMissionSelection(runningMissionId);
 
 useEffect(() => {
   if (
-  isDashboardPrefilling ||
-  !pendingAutoJoinMissionId ||
-  isStreaming ||
-  isLoading ||
-  isReportOpen
-) {
-  return;
-}
+    isDashboardPrefilling ||
+    !pendingAutoJoinMissionId ||
+    isStreaming ||
+    isLoading ||
+    isReportOpen
+  ) {
+    return;
+  }
+
+  /*
+   * Auto-join is allowed only when the complete
+   * Company -> Site -> Robot selection exists.
+   */
+  if (!values?.company || !values?.site || !values?.device) {
+    return;
+  }
 
   /*
    * Wait until the Form mission matches the currently
@@ -1910,13 +1929,10 @@ useEffect(() => {
   }
 
   const selectedDevice = robotList.find(
-    (item) => item.deviceId === values?.device
+    (item) => item.deviceId === values.device
   );
 
-  const deviceSn =
-    selectedRobotDetail?.deviceSn ||
-    selectedDevice?.deviceSn ||
-    "";
+  const deviceSn = selectedDevice?.deviceSn || "";
 
   if (!deviceSn) {
     return;
@@ -1938,15 +1954,15 @@ useEffect(() => {
 }, [
   pendingAutoJoinMissionId,
   isDashboardPrefilling,
+  values?.company,
+  values?.site,
   values?.mission,
   values?.device,
   robotList,
-  selectedRobotDetail?.deviceSn,
   isStreaming,
   isLoading,
   isReportOpen,
 ]);
-
 
 useEffect(() => {
   if (!dashboardPrefill?.fromDashboard) return;
