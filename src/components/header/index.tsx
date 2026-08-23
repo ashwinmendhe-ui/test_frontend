@@ -39,8 +39,17 @@ export default function Header() {
           const url = normalizePath(rawUrl);
 
           return {
-            title: <Link to={rawUrl}>{t(breadcrumbNameMap[url] || breadcrumbNameMap["/dashboard"])}</Link>,
-          };
+  title:
+    rawUrl === "/settings" ? (
+      <span>
+        {t(breadcrumbNameMap[url] || breadcrumbNameMap["/dashboard"])}
+      </span>
+    ) : (
+      <Link to={rawUrl}>
+        {t(breadcrumbNameMap[url] || breadcrumbNameMap["/dashboard"])}
+      </Link>
+    ),
+};
         });
 
   const rawCurrentPath =
