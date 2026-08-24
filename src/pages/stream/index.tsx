@@ -2491,7 +2491,9 @@ const SmallStatusBadge = ({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
-                  {t("stream_active_after_start")}
+                  {isStreaming
+                    ? "Waiting for GPS data..."
+                    : t("stream_active_after_start")}
                 </div>
               )}
             </div>

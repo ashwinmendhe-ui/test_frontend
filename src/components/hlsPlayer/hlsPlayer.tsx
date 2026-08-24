@@ -880,8 +880,15 @@ try {
 }, [metadataBaseUrl, src, onBookmarksChange, onLabelsLoaded,disableBackgroundTasks,type]);
 
 
- useEffect(() => {
-  if (!src || !metadataBaseUrl) return;
+useEffect(() => {
+  if (
+    !src ||
+    !metadataBaseUrl ||
+    disableBackgroundTasks ||
+    type === "vector"
+  ) {
+    return;
+  }
 
   startFrameSync();
 
@@ -896,8 +903,14 @@ try {
     currentMetadataRef.current = [];
     lastDetectionsRef.current = [];
   };
-}, [src, metadataBaseUrl, startFrameSync, clearCanvas]);
-
+}, [
+  src,
+  metadataBaseUrl,
+  startFrameSync,
+  clearCanvas,
+  disableBackgroundTasks,
+  type,
+]);
     const syncToLiveEdge = useCallback(() => {
       if (type !== "live") return;
 
@@ -1032,8 +1045,15 @@ try {
 }, [type, syncToLiveEdge]);
 
 
-    useEffect(() => {
-  if (!src || !metadataBaseUrl) return;
+   useEffect(() => {
+  if (
+    !src ||
+    !metadataBaseUrl ||
+    disableBackgroundTasks ||
+    type === "vector"
+  ) {
+    return;
+  }
 
   let stopped = false;
 
@@ -1044,8 +1064,8 @@ try {
       if (!stopped && segments.length > 0) {
         playlistSegmentsRef.current = segments;
       }
-    } catch (error) {
-      // console.error("[PLAYLIST REFRESH ERROR]", error);
+    } catch {
+      // Ignore playlist refresh errors.
     }
   };
 
@@ -1057,9 +1077,12 @@ try {
     stopped = true;
     window.clearInterval(interval);
   };
-}, [src, metadataBaseUrl]);
-
-
+}, [
+  src,
+  metadataBaseUrl,
+  disableBackgroundTasks,
+  type,
+]);
 useEffect(() => {
   onErrorRef.current = onError;
 }, [onError]);
