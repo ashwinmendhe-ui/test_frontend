@@ -1,4 +1,10 @@
-import { Menu, Avatar, Button, Popover } from "antd";
+import {
+  Menu,
+  Avatar,
+  Button,
+  Popover,
+  ConfigProvider,
+} from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   UserOutlined,
@@ -215,7 +221,16 @@ export default function Sidebar({
         z-20
       "
     >
-      <div className="h-full flex flex-col px-2 py-3">
+      <div
+          className={`
+            h-full
+            flex
+            flex-col
+            py-3
+
+            ${collapsed ? "px-1" : "px-2"}
+          `}
+        >
         {/* Profile + collapse button */}
         <div
           className={`
@@ -314,80 +329,68 @@ export default function Sidebar({
         </div>
 
         {/* Navigation */}
-        <Menu
-          mode="inline"
-          inlineCollapsed={collapsed}
-          selectedKeys={[location.pathname]}
-          onClick={(e) => navigate(e.key)}
-          items={translatedMenuItems}
-          className={`
-            mt-3
-            flex-1
+        <ConfigProvider
+  theme={{
+    components: {
+      Menu: {
+        collapsedWidth: 56,
+        collapsedIconSize: 16,
+        itemHeight: 44,
+        itemMarginInline: collapsed ? 6 : 4,
+      },
+    },
+  }}
+>
+  <Menu
+    mode="inline"
+    inlineCollapsed={collapsed}
+    selectedKeys={[location.pathname]}
+    onClick={(e) => navigate(e.key)}
+    items={translatedMenuItems}
+    className={`
+      mt-3
+      flex-1
+      w-full
+      min-w-0
 
-            [&_.ant-menu-item]:h-[46px]
-            [&_.ant-menu-item]:flex
-            [&_.ant-menu-item]:items-center
-            [&_.ant-menu-item]:gap-2
-            [&_.ant-menu-item]:px-3
-            [&_.ant-menu-item]:rounded-[8px]
-            [&_.ant-menu-item]:text-[#4B5563]
-            [&_.ant-menu-item]:font-medium
-            [&_.ant-menu-item]:transition-all
-            [&_.ant-menu-item]:duration-200
+      [&_.ant-menu-item]:h-[44px]
+      [&_.ant-menu-item]:flex
+      [&_.ant-menu-item]:items-center
+      [&_.ant-menu-item]:rounded-[8px]
+      [&_.ant-menu-item]:text-[#4B5563]
+      [&_.ant-menu-item]:font-medium
+      [&_.ant-menu-item]:transition-all
+      [&_.ant-menu-item]:duration-200
 
-            [&_.ant-menu-submenu-title]:h-[46px]
-            [&_.ant-menu-submenu-title]:flex
-            [&_.ant-menu-submenu-title]:items-center
-            [&_.ant-menu-submenu-title]:px-3
-            [&_.ant-menu-submenu-title]:rounded-[8px]
-            [&_.ant-menu-submenu-title]:text-[#4B5563]
-            [&_.ant-menu-submenu-title]:font-medium
-            [&_.ant-menu-submenu-title]:transition-all
-            [&_.ant-menu-submenu-title]:duration-200
+      [&_.ant-menu-submenu-title]:h-[44px]
+      [&_.ant-menu-submenu-title]:flex
+      [&_.ant-menu-submenu-title]:items-center
+      [&_.ant-menu-submenu-title]:rounded-[8px]
+      [&_.ant-menu-submenu-title]:text-[#4B5563]
+      [&_.ant-menu-submenu-title]:font-medium
+      [&_.ant-menu-submenu-title]:transition-all
+      [&_.ant-menu-submenu-title]:duration-200
 
-            [&_.ant-menu-title-content]:truncate
+      [&_.ant-menu-item:hover]:bg-[#F3F7FF]
+      [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
 
-            [&_.ant-menu-item-icon]:min-w-[24px]
-            [&_.ant-menu-item-icon]:flex
-            [&_.ant-menu-item-icon]:items-center
-            [&_.ant-menu-item-icon]:justify-center
+      [&_.ant-menu-item-selected]:bg-[#EAF3FF]
+      [&_.ant-menu-item-selected]:text-[#1677FF]
+      [&_.ant-menu-item-selected]:font-semibold
 
-            [&_.ant-menu-item:hover]:bg-[#F3F7FF]
-            [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
+      [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
+      [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
+      [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
 
-            [&_.ant-menu-item-selected]:bg-[#EAF3FF]
-            [&_.ant-menu-item-selected]:text-[#1677FF]
-            [&_.ant-menu-item-selected]:font-semibold
-
-            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
-            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
-            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
-
-            ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
-
-            ${
-              collapsed
-                ? `
-                    [&_.ant-menu-item]:justify-center
-                    [&_.ant-menu-submenu-title]:justify-center
-
-                    [&_.ant-menu-item]:px-0
-                    [&_.ant-menu-submenu-title]:px-0
-
-                    [&_.ant-menu-item]:mx-auto
-                    [&_.ant-menu-submenu-title]:mx-auto
-
-                    [&_.ant-menu-item]:w-[44px]
-                    [&_.ant-menu-submenu-title]:w-[44px]
-                  `
-                : ""
-            }
-          `}
-          style={{
-            borderInlineEnd: 0,
-            backgroundColor: "transparent",
-          }}
-        />
+      ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
+    `}
+    style={{
+      borderInlineEnd: 0,
+      backgroundColor: "transparent",
+      width: "100%",
+    }}
+  />
+</ConfigProvider>
 
         {/* Resize handle - expanded only */}
         {!collapsed && (
