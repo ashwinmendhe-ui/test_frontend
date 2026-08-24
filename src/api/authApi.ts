@@ -40,23 +40,51 @@ export interface DeviceLoginRequest {
 export interface DeviceLoginResponse {
   token?: string;
   accessToken?: string;
+  refreshToken?: string;
+
+  expiresIn?: number;
+  tokenType?: string;
+
+  mqttHost?: string;
+  mqttPort?: number;
+  mqttUseSsl?: boolean;
+  mqttUsername?: string;
+
   workspaceId?: string;
   workspace_id?: string;
+
   username?: string;
+
   userId?: string;
   user_id?: string;
+
   deviceSn?: string;
   device_sn?: string;
+
   code?: string | number;
   message?: string;
+
   data?: {
     token?: string;
     accessToken?: string;
+    refreshToken?: string;
+
+    expiresIn?: number;
+    tokenType?: string;
+
+    mqttHost?: string;
+    mqttPort?: number;
+    mqttUseSsl?: boolean;
+    mqttUsername?: string;
+
     workspaceId?: string;
     workspace_id?: string;
+
     username?: string;
+
     userId?: string;
     user_id?: string;
+
     deviceSn?: string;
     device_sn?: string;
   };

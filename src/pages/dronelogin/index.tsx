@@ -31,6 +31,11 @@ interface NormalizedDeviceLoginResponse {
   username: string;
   userId: string;
   deviceSn: string;
+
+  mqttHost: string;
+  mqttPort: number;
+  mqttUseSsl: boolean;
+  mqttUsername: string;
 }
 
 const DJI_APP_ID =
@@ -48,6 +53,11 @@ const STORAGE_KEYS = {
   username: "username",
   userId: "userId",
   deviceSn: "deviceSn",
+
+  mqttHost: "mqttHost",
+  mqttPort: "mqttPort",
+  mqttUseSsl: "mqttUseSsl",
+  mqttUsername: "mqttUsername",
 } as const;
 
 function normalizeDeviceLoginResponse(
@@ -90,17 +100,49 @@ function normalizeDeviceLoginResponse(
     responseData?.device_sn ||
     fallbackDeviceSn;
 
-  if (!token || !workspaceId || !userId || !deviceSn) {
-    return null;
-  }
+    const mqttHost =
+  response.mqttHost ||
+  responseData?.mqttHost ||
+  "";
+
+const mqttPort =
+  response.mqttPort ??
+  responseData?.mqttPort ??
+  0;
+
+const mqttUseSsl =
+  response.mqttUseSsl ??
+  responseData?.mqttUseSsl ??
+  false;
+
+const mqttUsername =
+  response.mqttUsername ||
+  responseData?.mqttUsername ||
+  "";
+
+  if (
+  !token ||
+  !workspaceId ||
+  !userId ||
+  !deviceSn ||
+  !mqttHost ||
+  !mqttPort ||
+  !mqttUsername
+) {
+  return null;
+}
 
   return {
-    token,
-    workspaceId,
-    username,
-    userId,
-    deviceSn,
-  };
+  token,
+  workspaceId,
+  username,
+  userId,
+  deviceSn,
+  mqttHost,
+  mqttPort,
+  mqttUseSsl,
+  mqttUsername,
+};
 }
 
 function storeDeviceLoginData(
@@ -120,6 +162,26 @@ function storeDeviceLoginData(
     STORAGE_KEYS.deviceSn,
     loginData.deviceSn
   );
+
+  localStorage.setItem(
+  STORAGE_KEYS.mqttHost,
+  loginData.mqttHost
+);
+
+localStorage.setItem(
+  STORAGE_KEYS.mqttPort,
+  String(loginData.mqttPort)
+);
+
+localStorage.setItem(
+  STORAGE_KEYS.mqttUseSsl,
+  String(loginData.mqttUseSsl)
+);
+
+localStorage.setItem(
+  STORAGE_KEYS.mqttUsername,
+  loginData.mqttUsername
+);
 }
 
 function clearDeviceLoginData() {
@@ -128,6 +190,10 @@ function clearDeviceLoginData() {
   localStorage.removeItem(STORAGE_KEYS.username);
   localStorage.removeItem(STORAGE_KEYS.userId);
   localStorage.removeItem(STORAGE_KEYS.deviceSn);
+  localStorage.removeItem(STORAGE_KEYS.mqttHost);
+  localStorage.removeItem(STORAGE_KEYS.mqttPort);
+  localStorage.removeItem(STORAGE_KEYS.mqttUseSsl);
+  localStorage.removeItem(STORAGE_KEYS.mqttUsername);
 }
 
 export default function DroneLoginPage() {
@@ -191,11 +257,6 @@ export default function DroneLoginPage() {
           );
           return;
         }
-        apiPilot.setPlatformMessage(
-          "Cloud Api Platform",
-          "",
-          ""
-        );
 
         const remoteControllerSn =
           apiPilot.getRemoteControllerSN();

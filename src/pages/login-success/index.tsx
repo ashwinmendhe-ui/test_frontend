@@ -24,15 +24,14 @@ const STORAGE_KEYS = {
   username: "username",
   userId: "userId",
   deviceSn: "deviceSn",
+
+  mqttHost: "mqttHost",
+  mqttPort: "mqttPort",
+  mqttUseSsl: "mqttUseSsl",
+  mqttUsername: "mqttUsername",
 } as const;
 
-const COMPONENT_LOAD_DELAY_MS = 1000;
 
-function delay(milliseconds: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
-}
 
 function clearDjiStorage() {
   localStorage.removeItem(STORAGE_KEYS.token);
@@ -40,12 +39,17 @@ function clearDjiStorage() {
   localStorage.removeItem(STORAGE_KEYS.username);
   localStorage.removeItem(STORAGE_KEYS.userId);
   localStorage.removeItem(STORAGE_KEYS.deviceSn);
+  localStorage.removeItem(STORAGE_KEYS.mqttHost);
+  localStorage.removeItem(STORAGE_KEYS.mqttPort);
+  localStorage.removeItem(STORAGE_KEYS.mqttUseSsl);
+  localStorage.removeItem(STORAGE_KEYS.mqttUsername);
 }
 
 export default function LoginSuccessPage() {
   const navigate = useNavigate();
 
   const initializedRef = useRef(false);
+  const connectedInitRef = useRef(false);
 
   const [initializing, setInitializing] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -58,8 +62,7 @@ export default function LoginSuccessPage() {
 
     initializedRef.current = true;
 
-    const components = apiPilot.init();
-
+    apiPilot.init();
     apiPilot.registerBackClick(() => {
       console.info(
         "DJI Pilot Back pressed on ROBOPILOT login-success."
@@ -84,20 +87,90 @@ export default function LoginSuccessPage() {
 
     const workspaceId =
       localStorage.getItem(STORAGE_KEYS.workspaceId) ?? "";
+      const mqttHost =
+  localStorage.getItem(STORAGE_KEYS.mqttHost) ?? "";
 
-    window.reg_callback = (...args: any[]) => {
+const mqttPort = Number(
+  localStorage.getItem(STORAGE_KEYS.mqttPort) ?? "0"
+);
+
+const mqttUseSsl =
+  localStorage.getItem(STORAGE_KEYS.mqttUseSsl) === "true";
+
+const mqttUsername =
+  localStorage.getItem(STORAGE_KEYS.mqttUsername) ?? "";
+
+const initializeConnectedSession = () => {
+  if (connectedInitRef.current) {
+    return;
+  }
+
+  connectedInitRef.current = true;
+
   console.info(
-    "DJI Thing registration callback:",
+    "[DJI] Initializing connected native session."
+  );
+
+  apiPilot.setWorkspaceId(workspaceId);
+
+  apiPilot.setPlatformMessage(
+    "ROBOPILOT",
+    "ROBOPILOT",
+    ""
+  );
+
+  const liveshareConfig = JSON.stringify({
+    videoPublishType:
+      "video-demand-aux-manual",
+    statusCallback:
+      "liveStatusCallback",
+  });
+
+  const liveShareLoaded =
+    apiPilot.isComponentLoaded(
+      ComponentName.LiveShare
+    );
+
+  console.info(
+    "[DJI] LiveShare already loaded:",
+    liveShareLoaded
+  );
+
+  if (!liveShareLoaded) {
+    apiPilot.loadComponent(
+      ComponentName.LiveShare,
+      liveshareConfig
+    );
+  }
+
+  setConnected(true);
+  setInitializing(false);
+};
+
+
+
+   window.reg_callback = (...args: any[]) => {
+  console.info(
+    "[DJI][THING_CALLBACK]",
     ...args
   );
 
-  setConnected(true);
+  const thingConnected =
+    apiPilot.thingGetConnectState();
 
-  message.success(
-    "DJI Pilot connected successfully."
+  console.info(
+    "[DJI] Thing connected after callback:",
+    thingConnected
   );
-};
 
+  if (thingConnected) {
+    initializeConnectedSession();
+
+    message.success(
+      "DJI Pilot connected successfully."
+    );
+  }
+};
 window.liveStatusCallback = (arg: any) => {
   console.info(
     "DJI LiveShare status callback:",
@@ -105,7 +178,15 @@ window.liveStatusCallback = (arg: any) => {
   );
 };
     const startConnection = async () => {
-      if (!token || !workspaceId || !username || !deviceSn) {
+      if (
+        !token ||
+        !workspaceId ||
+        !username ||
+        !deviceSn ||
+        !mqttHost ||
+        !mqttPort ||
+        !mqttUsername
+      ) {
         clearDjiStorage();
 
         navigate("/dronelogin", {
@@ -123,16 +204,7 @@ window.liveStatusCallback = (arg: any) => {
         return;
       }
 
-      const droneConnectHost =
-        import.meta.env.VITE_DRONE_CONNECT_IP;
-
-      if (!droneConnectHost) {
-        setError(
-          "DJI connection host is not configured."
-        );
-        setInitializing(false);
-        return;
-      }
+      
 
       try {
       const rawApiHost = import.meta.env.VITE_API_URL;
@@ -159,48 +231,54 @@ window.liveStatusCallback = (arg: any) => {
 
       apiPilot.setToken(token);
 
-  apiPilot.setWorkspaceId(workspaceId);
 
-  const thingConfig = JSON.stringify({
-    host: droneConnectHost,
-    connectCallback: "reg_callback",
-    username: deviceSn,
-    password: token,
-  });
+  const mqttProtocol = mqttUseSsl
+  ? "ssl"
+  : "tcp";
 
-  apiPilot.loadComponent(
-    ComponentName.Thing,
-    thingConfig
+const mqttAddress =
+  mqttHost.includes("://")
+    ? mqttHost
+    : `${mqttProtocol}://${mqttHost}:${mqttPort}`;
+
+const thingConfig = JSON.stringify({
+  host: mqttAddress,
+  connectCallback: "reg_callback",
+  username: mqttUsername,
+  password: token,
+});
+
+ const thingLoaded =
+  apiPilot.isComponentLoaded(
+    ComponentName.Thing
   );
 
-  await delay(COMPONENT_LOAD_DELAY_MS);
+const thingConnected =
+  thingLoaded &&
+  apiPilot.thingGetConnectState();
 
-  apiPilot.thingConnect(
-    deviceSn,
-    token,
-    "reg_callback"
+console.info(
+  "[DJI] Thing state before init:",
+  {
+    loaded: thingLoaded,
+    connected: thingConnected,
+  }
+);
+
+if (thingConnected) {
+  console.info(
+    "[DJI] Reusing existing native Thing connection."
   );
 
-  await delay(COMPONENT_LOAD_DELAY_MS);
+  initializeConnectedSession();
+  return;
+}
 
-  const liveshareConfig = JSON.stringify({
-    videoPublishType:
-      "video-demand-aux-manual",
-    statusCallback:
-      "liveStatusCallback",
-  });
+apiPilot.loadComponent(
+  ComponentName.Thing,
+  thingConfig
+);
 
-  components.set(
-    ComponentName.LiveShare,
-    liveshareConfig
-  );
-
-  await delay(COMPONENT_LOAD_DELAY_MS);
-
-  apiPilot.loadComponent(
-    ComponentName.LiveShare,
-    components.get(ComponentName.LiveShare) ?? ""
-  );
 } catch (connectionError: any) {
   console.error(
     "DJI Pilot connection failed:",
