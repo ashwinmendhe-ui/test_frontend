@@ -258,6 +258,65 @@ export default function DroneLoginPage() {
           return;
         }
 
+          const rawApiHost =
+            import.meta.env.VITE_API_URL;
+
+          if (!rawApiHost) {
+            setBridgeError(
+              "ROBOPILOT API host is not configured."
+            );
+            return;
+          }
+
+          const apiHost = rawApiHost.endsWith("/")
+            ? rawApiHost
+            : `${rawApiHost}/`;
+
+          const apiConfig = JSON.stringify({
+            host: apiHost,
+            token: "",
+          });
+
+          apiPilot.loadComponent(
+            "api",
+            apiConfig
+          );
+
+          const storedPilotToken =
+            apiPilot.getToken();
+
+          if (storedPilotToken) {
+            console.info(
+              "[DJI] Existing Pilot token detected."
+            );
+
+            const storedWorkspaceId =
+              localStorage.getItem(
+                STORAGE_KEYS.workspaceId
+              );
+
+            const storedDeviceSn =
+              localStorage.getItem(
+                STORAGE_KEYS.deviceSn
+              );
+
+            if (
+              storedWorkspaceId &&
+              storedDeviceSn
+            ) {
+              localStorage.setItem(
+                STORAGE_KEYS.token,
+                storedPilotToken
+              );
+
+              navigate("/login-success", {
+                replace: true,
+              });
+
+              return;
+            }
+          }
+
         const remoteControllerSn =
           apiPilot.getRemoteControllerSN();
 
@@ -344,6 +403,10 @@ export default function DroneLoginPage() {
         );
         return;
       }
+
+      localStorage.removeItem(
+          "djiStopPlatformTriggered"
+        );
 
       storeDeviceLoginData(loginData);
 

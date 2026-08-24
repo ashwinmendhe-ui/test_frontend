@@ -75,6 +75,11 @@ export default function LoginSuccessPage() {
       console.warn(
         "DJI Pilot onStopPlatform triggered."
       );
+
+      localStorage.setItem(
+        "djiStopPlatformTriggered",
+        new Date().toISOString()
+      );
     });
 
     const deviceSn =
@@ -230,6 +235,21 @@ window.liveStatusCallback = (arg: any) => {
       );
 
       apiPilot.setToken(token);
+
+      const pilotStoredToken =
+  apiPilot.getToken();
+
+console.info(
+  "[DJI] Token stored in Pilot:",
+  Boolean(pilotStoredToken)
+);
+
+console.info(
+  "[DJI] onStopPlatform marker:",
+  localStorage.getItem(
+    "djiStopPlatformTriggered"
+  )
+);
 
 
   const mqttProtocol = mqttUseSsl

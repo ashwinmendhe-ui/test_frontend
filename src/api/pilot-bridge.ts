@@ -225,6 +225,24 @@ export const apiPilot = {
     );
   },
 
+  getToken(): string {
+  const bridge = getBridge();
+
+  if (
+    !bridge ||
+    typeof bridge.apiGetToken !== "function"
+  ) {
+    console.warn(
+      "DJI apiGetToken is unavailable."
+    );
+    return "";
+  }
+
+  return returnString(
+    bridge.apiGetToken()
+  );
+},
+
   thingConnect(
     username: string,
     password: string,
