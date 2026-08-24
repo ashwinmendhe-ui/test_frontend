@@ -1,6 +1,11 @@
-import { Menu, Avatar, Button } from "antd";
+import { Menu, Avatar, Button, Popover } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
-import { UserOutlined } from "@ant-design/icons";
+import {
+  UserOutlined,
+  LeftOutlined,
+  RightOutlined,
+  DownOutlined,
+} from "@ant-design/icons";
 import { menuItems } from "../../constants/menu";
 import LogoutIcon from "../../assets/logout-icon.svg";
 import { useAuthStore } from "../../stores/authStore";
@@ -16,15 +21,19 @@ type MenuItem = {
   children?: MenuItem[];
 };
 
-export default function Sidebar({
-  collapsed,
-  width,
-  setWidth,
-}: {
+type SidebarProps = {
   collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
   width: number;
   setWidth: (w: number) => void;
-}) {
+};
+
+export default function Sidebar({
+  collapsed,
+  setCollapsed,
+  width,
+  setWidth,
+}: SidebarProps) {
   const { t } = useTranslation();
   const { detailUserLogin, getDetailUserLogin } = useUserStore();
   const logout = useAuthStore((state) => state.logout);
@@ -47,12 +56,14 @@ export default function Sidebar({
               ),
             };
           }
+
           return item;
         })
         .filter((item) => {
           if (item.key === "/settings" && item.children) {
             return item.children.length > 0;
           }
+
           return true;
         });
     }
@@ -68,6 +79,7 @@ export default function Sidebar({
               ),
             };
           }
+
           return item;
         })
         .filter((item) => {
@@ -105,8 +117,9 @@ export default function Sidebar({
     const startX = e.clientX;
     const startWidth = width;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = startWidth + (e.clientX - startX);
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = startWidth + (moveEvent.clientX - startX);
+
       if (newWidth > MIN_WIDTH && newWidth < MAX_WIDTH) {
         setWidth(newWidth);
       }
@@ -141,119 +154,258 @@ export default function Sidebar({
       ? t("role_company_user")
       : t("role_none");
 
-  return (
-    <div
-      style={{ width: collapsed ? 100 : width }}
-      className="bg-white border-r border-[#E5E7EB] min-h-screen px-[8px] py-[24px] relative transition-all duration-300"
-    >
-      <div className="flex flex-col items-center border-b border-[#DDE0E5] pb-4 gap-2">
-        <div className="flex items-center">
-          <Avatar shape="square" size={42} icon={<UserOutlined />} />
-          {!collapsed && (
-            <div className="ml-3 font-bold text-[#757575] text-base">
-              {detailUserLogin?.user?.username || t("common_guest")}
-            </div>
-          )}
+  const profileContent = (
+    <div className="w-[220px]">
+      <div className="flex items-center gap-3 pb-3 border-b border-[#EDF1F5]">
+        <Avatar size={36} icon={<UserOutlined />} />
+
+        <div className="min-w-0">
+          <div className="font-bold text-[#263548] text-sm truncate">
+            {detailUserLogin?.user?.username || t("common_guest")}
+          </div>
+
+          <div className="text-[11px] text-[#8C97A4] mt-1">
+            {roleLabel}
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <div className="flex items-center justify-between px-2 py-2 text-xs">
+          <span className="font-medium text-[#465468]">
+            {t("common_role")}
+          </span>
+
+          <span className="text-[#8792A1] ml-4 text-right">
+            {roleLabel}
+          </span>
         </div>
 
-        {!collapsed && (
-          <div className="flex items-center justify-center mt-2">
-            <span className="bg-[#0088FF] text-white text-[10px] rounded-[9px] px-2 py-2">
-              {t("common_role")}
-            </span>
-            <span className="font-semibold text-[#333D4B] text-xs ml-4">
-              {roleLabel}
-            </span>
-          </div>
-        )}
-
-        {!collapsed && (
+        <div className="border-t border-[#EDF1F5] mt-1 pt-1">
           <Button
-            className="mt-3 mb-3 min-w-[130px] px-4 text-sm bg-[#DDE0E5]! text-[#374151] font-semibold flex items-center justify-center mx-auto"
-            icon={<img src={LogoutIcon} alt="logout" />}
+            type="text"
+            danger
             onClick={handleLogout}
+            className="w-full flex! items-center! justify-start! px-2!"
+            icon={<img src={LogoutIcon} alt="logout" />}
           >
             {t("button_logout")}
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <aside
+      style={{
+        width: collapsed ? 64 : width,
+        flexBasis: collapsed ? 64 : width,
+      }}
+      className="
+        bg-white
+        border-r
+        border-[#E5E7EB]
+        h-screen
+        shrink-0
+        relative
+        transition-[width,flex-basis]
+        duration-300
+        overflow-visible
+        z-20
+      "
+    >
+      <div className="h-full flex flex-col px-2 py-3">
+        {/* Profile + collapse button */}
+        <div
+          className={`
+            flex
+            items-center
+            gap-2
+            pb-3
+            border-b
+            border-[#DDE0E5]
+
+            ${
+              collapsed
+                ? "flex-col justify-center"
+                : "justify-between"
+            }
+          `}
+        >
+          <Popover
+            content={profileContent}
+            trigger="click"
+            placement={collapsed ? "rightTop" : "bottomLeft"}
+            arrow={false}
+          >
+            <button
+              type="button"
+              className={`
+                border-0
+                bg-transparent
+                hover:bg-[#F5F8FB]
+                rounded-lg
+                transition-colors
+                min-w-0
+
+                ${
+                  collapsed
+                    ? "w-[42px] h-[42px] flex items-center justify-center"
+                    : "flex-1 h-[48px] px-2 flex items-center gap-2 text-left"
+                }
+              `}
+            >
+              <Avatar
+                size={collapsed ? 32 : 34}
+                icon={<UserOutlined />}
+                className="shrink-0"
+              />
+
+              {!collapsed && (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-[#333D4B] text-sm truncate">
+                      {detailUserLogin?.user?.username || t("common_guest")}
+                    </div>
+
+                    <div className="text-[10px] text-[#8C97A4] mt-[2px] truncate">
+                      {roleLabel}
+                    </div>
+                  </div>
+
+                  <DownOutlined className="text-[10px] text-[#9AA4B2]" />
+                </>
+              )}
+            </button>
+          </Popover>
+
+          <Button
+            type="default"
+            aria-label={
+              collapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
+            title={
+              collapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
+            onClick={() => setCollapsed(!collapsed)}
+            className={`
+              shrink-0
+              flex!
+              items-center!
+              justify-center!
+              p-0!
+              rounded-lg!
+
+              ${
+                collapsed
+                  ? "w-[42px]! h-[34px]!"
+                  : "w-[36px]! h-[36px]!"
+              }
+            `}
+            icon={
+              collapsed ? (
+                <RightOutlined className="text-xs" />
+              ) : (
+                <LeftOutlined className="text-xs" />
+              )
+            }
+          />
+        </div>
+
+        {/* Navigation */}
+        <Menu
+          mode="inline"
+          inlineCollapsed={collapsed}
+          selectedKeys={[location.pathname]}
+          onClick={(e) => navigate(e.key)}
+          items={translatedMenuItems}
+          className={`
+            mt-3
+            flex-1
+
+            [&_.ant-menu-item]:h-[46px]
+            [&_.ant-menu-item]:flex
+            [&_.ant-menu-item]:items-center
+            [&_.ant-menu-item]:gap-2
+            [&_.ant-menu-item]:px-3
+            [&_.ant-menu-item]:rounded-[8px]
+            [&_.ant-menu-item]:text-[#4B5563]
+            [&_.ant-menu-item]:font-medium
+            [&_.ant-menu-item]:transition-all
+            [&_.ant-menu-item]:duration-200
+
+            [&_.ant-menu-submenu-title]:h-[46px]
+            [&_.ant-menu-submenu-title]:flex
+            [&_.ant-menu-submenu-title]:items-center
+            [&_.ant-menu-submenu-title]:px-3
+            [&_.ant-menu-submenu-title]:rounded-[8px]
+            [&_.ant-menu-submenu-title]:text-[#4B5563]
+            [&_.ant-menu-submenu-title]:font-medium
+            [&_.ant-menu-submenu-title]:transition-all
+            [&_.ant-menu-submenu-title]:duration-200
+
+            [&_.ant-menu-title-content]:truncate
+
+            [&_.ant-menu-item-icon]:min-w-[24px]
+            [&_.ant-menu-item-icon]:flex
+            [&_.ant-menu-item-icon]:items-center
+            [&_.ant-menu-item-icon]:justify-center
+
+            [&_.ant-menu-item:hover]:bg-[#F3F7FF]
+            [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
+
+            [&_.ant-menu-item-selected]:bg-[#EAF3FF]
+            [&_.ant-menu-item-selected]:text-[#1677FF]
+            [&_.ant-menu-item-selected]:font-semibold
+
+            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
+            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
+            [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
+
+            ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
+
+            ${
+              collapsed
+                ? `
+                    [&_.ant-menu-item]:justify-center
+                    [&_.ant-menu-submenu-title]:justify-center
+
+                    [&_.ant-menu-item]:px-0
+                    [&_.ant-menu-submenu-title]:px-0
+
+                    [&_.ant-menu-item]:mx-auto
+                    [&_.ant-menu-submenu-title]:mx-auto
+
+                    [&_.ant-menu-item]:w-[44px]
+                    [&_.ant-menu-submenu-title]:w-[44px]
+                  `
+                : ""
+            }
+          `}
+          style={{
+            borderInlineEnd: 0,
+            backgroundColor: "transparent",
+          }}
+        />
+
+        {/* Resize handle - expanded only */}
+        {!collapsed && (
+          <div
+            onMouseDown={handleMouseDown}
+            className="
+              absolute
+              top-0
+              right-0
+              w-1
+              h-full
+              cursor-col-resize
+              hover:bg-blue-400
+              transition-colors
+            "
+          />
         )}
       </div>
-
-      <Menu
-  mode="inline"
-  inlineCollapsed={collapsed}
-  selectedKeys={[location.pathname]}
-  onClick={(e) => navigate(e.key)}
-  items={translatedMenuItems}
-  className={`
-    mt-6
-    [&_.ant-menu-item]:h-[50px]
-    [&_.ant-menu-item]:flex
-    [&_.ant-menu-item]:items-center
-    [&_.ant-menu-item]:gap-2
-    [&_.ant-menu-item]:px-3
-    [&_.ant-menu-item]:rounded-[10px]
-    [&_.ant-menu-item]:text-[#4B5563]
-    [&_.ant-menu-item]:font-medium
-    [&_.ant-menu-item]:transition-all
-    [&_.ant-menu-item]:duration-200
-
-    [&_.ant-menu-submenu-title]:h-[50px]
-    [&_.ant-menu-submenu-title]:flex
-    [&_.ant-menu-submenu-title]:items-center
-    [&_.ant-menu-submenu-title]:px-3
-    [&_.ant-menu-submenu-title]:rounded-[10px]
-    [&_.ant-menu-submenu-title]:text-[#4B5563]
-    [&_.ant-menu-submenu-title]:font-medium
-    [&_.ant-menu-submenu-title]:transition-all
-    [&_.ant-menu-submenu-title]:duration-200
-
-    [&_.ant-menu-title-content]:truncate
-
-    [&_.ant-menu-item-icon]:min-w-[24px]
-    [&_.ant-menu-item-icon]:flex
-    [&_.ant-menu-item-icon]:items-center
-    [&_.ant-menu-item-icon]:justify-center
-
-    [&_.ant-menu-item:hover]:bg-[#F3F7FF]
-    [&_.ant-menu-submenu-title:hover]:bg-[#F3F7FF]
-
-    [&_.ant-menu-item-selected]:bg-[#EAF3FF]
-    [&_.ant-menu-item-selected]:text-[#1677FF]
-    [&_.ant-menu-item-selected]:font-semibold
-
-    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:bg-[#EAF3FF]
-    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-[#1677FF]
-    [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:font-semibold
-
-    ${collapsed ? "[&_.ant-menu-submenu-arrow]:hidden" : ""}
-
-    ${
-      collapsed
-        ? `
-          [&_.ant-menu-item]:justify-center
-          [&_.ant-menu-submenu-title]:justify-center
-          [&_.ant-menu-item]:px-0
-          [&_.ant-menu-submenu-title]:px-0
-          [&_.ant-menu-item]:mx-auto
-          [&_.ant-menu-submenu-title]:mx-auto
-          [&_.ant-menu-item]:w-[52px]
-          [&_.ant-menu-submenu-title]:w-[52px]
-        `
-        : ""
-    }
-  `}
-  style={{
-    borderInlineEnd: 0,
-    backgroundColor: "transparent",
-  }}
-/>
-
-      {!collapsed && (
-        <div
-          onMouseDown={handleMouseDown}
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-gray-300 hover:bg-blue-500"
-        />
-      )}
-    </div>
+    </aside>
   );
 }
