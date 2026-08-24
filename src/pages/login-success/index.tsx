@@ -63,24 +63,7 @@ export default function LoginSuccessPage() {
     initializedRef.current = true;
 
     apiPilot.init();
-    apiPilot.registerBackClick(() => {
-      console.info(
-        "DJI Pilot Back pressed on ROBOPILOT login-success."
-      );
-
-      return false;
-    });
-
-    apiPilot.registerStopPlatform(() => {
-      console.warn(
-        "DJI Pilot onStopPlatform triggered."
-      );
-
-      localStorage.setItem(
-        "djiStopPlatformTriggered",
-        new Date().toISOString()
-      );
-    });
+    
 
     const deviceSn =
       localStorage.getItem(STORAGE_KEYS.deviceSn) ?? "";
@@ -105,12 +88,92 @@ const mqttUseSsl =
 const mqttUsername =
   localStorage.getItem(STORAGE_KEYS.mqttUsername) ?? "";
 
+
+  const reportDjiLifecycleEvent = (
+  event: string
+) => {
+  try {
+    const rawApiHost =
+      import.meta.env.VITE_API_URL;
+
+    if (!rawApiHost) {
+      console.warn(
+        "[DJI] Cannot report lifecycle event: API host missing."
+      );
+      return;
+    }
+
+    const apiBase =
+      rawApiHost.endsWith("/")
+        ? rawApiHost.slice(0, -1)
+        : rawApiHost;
+
+    const url =
+      `${apiBase}/v1/device/auth/diagnostic`;
+
+    const body = new URLSearchParams({
+      event,
+      deviceSn,
+      timestamp: new Date().toISOString(),
+    });
+
+    const queued =
+      navigator.sendBeacon(
+        url,
+        body
+      );
+
+    console.info(
+      "[DJI] Lifecycle event queued:",
+      event,
+      queued
+    );
+  } catch (diagnosticError) {
+    console.error(
+      "[DJI] Failed to report lifecycle event:",
+      event,
+      diagnosticError
+    );
+  }
+};
+
+apiPilot.registerBackClick(() => {
+      console.info(
+        "DJI Pilot Back pressed on ROBOPILOT login-success."
+      );
+
+      reportDjiLifecycleEvent(
+        "BACK_CLICK"
+      );
+
+      return false;
+    });
+
+    apiPilot.registerStopPlatform(() => {
+  console.warn(
+    "DJI Pilot onStopPlatform triggered."
+  );
+
+  reportDjiLifecycleEvent(
+    "STOP_PLATFORM"
+  );
+
+  localStorage.setItem(
+    "djiStopPlatformTriggered",
+    new Date().toISOString()
+  );
+});
+
 const initializeConnectedSession = () => {
   if (connectedInitRef.current) {
     return;
   }
 
   connectedInitRef.current = true;
+
+  reportDjiLifecycleEvent(
+  "CONNECTED_SESSION"
+);
 
   console.info(
     "[DJI] Initializing connected native session."
