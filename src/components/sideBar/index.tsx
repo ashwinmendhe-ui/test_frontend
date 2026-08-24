@@ -2,8 +2,8 @@ import { Menu, Avatar, Button, Popover } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   UserOutlined,
-  LeftOutlined,
-  RightOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   DownOutlined,
 } from "@ant-design/icons";
 import { menuItems } from "../../constants/menu";
@@ -304,12 +304,12 @@ export default function Sidebar({
               }
             `}
             icon={
-              collapsed ? (
-                <RightOutlined className="text-xs" />
-              ) : (
-                <LeftOutlined className="text-xs" />
-              )
-            }
+                collapsed ? (
+                  <MenuUnfoldOutlined className="text-[16px]" />
+                ) : (
+                  <MenuFoldOutlined className="text-[16px]" />
+                )
+              }
           />
         </div>
 

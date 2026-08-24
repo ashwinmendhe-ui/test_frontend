@@ -197,6 +197,8 @@ function clearDeviceLoginData() {
 }
 
 export default function DroneLoginPage() {
+  const [stopPlatformTriggered, setStopPlatformTriggered] =
+  useState("");
   const navigate = useNavigate();
   const [form] = Form.useForm<DroneLoginFormValues>();
 
@@ -219,7 +221,20 @@ export default function DroneLoginPage() {
     const initializeDjiPilot = () => {
       try {
         apiPilot.init();
-        
+
+        const stopPlatformMarker =
+          localStorage.getItem(
+            "djiStopPlatformTriggered"
+          ) ?? "";
+
+        setStopPlatformTriggered(
+          stopPlatformMarker
+        );
+
+        console.info(
+          "[DJI] Previous onStopPlatform marker:",
+          stopPlatformMarker
+        );
 
         if (!window.djiBridge) {
           setBridgeError(
@@ -257,66 +272,6 @@ export default function DroneLoginPage() {
           );
           return;
         }
-
-          const rawApiHost =
-            import.meta.env.VITE_API_URL;
-
-          if (!rawApiHost) {
-            setBridgeError(
-              "ROBOPILOT API host is not configured."
-            );
-            return;
-          }
-
-          const apiHost = rawApiHost.endsWith("/")
-            ? rawApiHost
-            : `${rawApiHost}/`;
-
-          const apiConfig = JSON.stringify({
-            host: apiHost,
-            token: "",
-          });
-
-          apiPilot.loadComponent(
-            "api",
-            apiConfig
-          );
-
-          const storedPilotToken =
-            apiPilot.getToken();
-
-          if (storedPilotToken) {
-            console.info(
-              "[DJI] Existing Pilot token detected."
-            );
-
-            const storedWorkspaceId =
-              localStorage.getItem(
-                STORAGE_KEYS.workspaceId
-              );
-
-            const storedDeviceSn =
-              localStorage.getItem(
-                STORAGE_KEYS.deviceSn
-              );
-
-            if (
-              storedWorkspaceId &&
-              storedDeviceSn
-            ) {
-              localStorage.setItem(
-                STORAGE_KEYS.token,
-                storedPilotToken
-              );
-
-              navigate("/login-success", {
-                replace: true,
-              });
-
-              return;
-            }
-          }
-
         const remoteControllerSn =
           apiPilot.getRemoteControllerSN();
 
@@ -486,6 +441,16 @@ export default function DroneLoginPage() {
                 message="DJI Pilot connected"
                 description={`Remote controller: ${deviceSn}`}
                 style={{ marginBottom: 24 }}
+              />
+            )}
+
+            {stopPlatformTriggered && (
+              <Alert
+                type="warning"
+                showIcon
+                message="DJI platform stop detected"
+                description={`onStopPlatform triggered at ${stopPlatformTriggered}`}
+                style={{ marginBottom: 16 }}
               />
             )}
 
