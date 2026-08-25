@@ -138,16 +138,16 @@ const mqttUsername =
 };
 
 apiPilot.registerBackClick(() => {
-      console.info(
-        "DJI Pilot Back pressed on ROBOPILOT login-success."
-      );
+  console.info(
+    "DJI Pilot Back pressed on ROBOPILOT login-success."
+  );
 
-      reportDjiLifecycleEvent(
-        "BACK_CLICK"
-      );
+  reportDjiLifecycleEvent(
+    "BACK_CLICK"
+  );
 
-      return false;
-    });
+  return true;
+});
 
     apiPilot.registerStopPlatform(() => {
   console.warn(
@@ -270,6 +270,43 @@ window.liveStatusCallback = (arg: any) => {
         );
         setInitializing(false);
         return;
+      }
+
+      const platformVersion =
+        apiPilot.getPlatformVersion();
+
+      console.info(
+        "[DJI] Platform version:",
+        platformVersion
+      );
+
+      if (platformVersion) {
+        reportDjiLifecycleEvent(
+          `PLATFORM_VERSION:${platformVersion}`
+        );
+      } else {
+        reportDjiLifecycleEvent(
+          "PLATFORM_VERSION_UNAVAILABLE"
+        );
+      }
+
+
+      const logPath =
+        apiPilot.getLogPath();
+
+      console.info(
+        "[DJI] Pilot log path:",
+        logPath
+      );
+
+      if (logPath) {
+        reportDjiLifecycleEvent(
+          `LOG_PATH:${logPath}`
+        );
+      } else {
+        reportDjiLifecycleEvent(
+          "LOG_PATH_UNAVAILABLE"
+        );
       }
 
       

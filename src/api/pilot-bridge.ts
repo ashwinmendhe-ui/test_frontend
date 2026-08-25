@@ -350,17 +350,53 @@ export const apiPilot = {
     );
   },
 
-  registerBackClick(
-    callback: () => boolean
-  ): void {
-    const bridge = getBridge();
+  getPlatformVersion(): string {
+  const bridge = getBridge();
 
-    if (!bridge) {
-      return;
-    }
+  if (
+    !bridge ||
+    typeof bridge.platformGetVersion !== "function"
+  ) {
+    console.warn(
+      "DJI platformGetVersion is unavailable."
+    );
+    return "";
+  }
 
-    bridge.onBackClick = callback;
-  },
+  return returnString(
+    bridge.platformGetVersion()
+  );
+},
+
+getLogPath(): string {
+  const bridge = getBridge();
+
+  if (
+    !bridge ||
+    typeof bridge.platformGetLogPath !== "function"
+  ) {
+    console.warn(
+      "DJI platformGetLogPath is unavailable."
+    );
+    return "";
+  }
+
+  return returnString(
+    bridge.platformGetLogPath()
+  );
+},
+
+registerBackClick(
+  callback: () => boolean
+): void {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return;
+  }
+
+  bridge.onBackClick = callback;
+},
 
   registerStopPlatform(
     callback: () => void
