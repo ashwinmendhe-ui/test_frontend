@@ -1,4 +1,3 @@
-
 import { Modal, Button, message } from "antd";
 import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,95 +30,146 @@ const WorkReportModal: React.FC<Props> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
+  const handleDownload = async () => {
+    if (!reportRef.current || isDownloading) {
+      return;
+    }
 
-const handleDownload = async () => {
-  if (!reportRef.current || isDownloading) {
-    return;
-  }
+    try {
+      setIsDownloading(true);
+      setIsExportingPdf(true);
 
-  try {
-    setIsDownloading(true);
-    setIsExportingPdf(true);
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
       });
+
+      await downloadWorkReportPdf(reportRef.current, detail);
+    } catch (error) {
+      console.error("Failed to download work report PDF:", error);
+      message.error("Failed to download PDF.");
+    } finally {
+      setIsExportingPdf(false);
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePlayVideo = () => {
+    if (!detail.playbackUrl) {
+      message.warning("Recorded video is not available.");
+      return;
+    }
+
+    if (!reportMeta) {
+      message.warning("Playback information is not available.");
+      return;
+    }
+
+    navigate("/playback", {
+      state: {
+        playbackUrl: detail.playbackUrl,
+        timestamp: "00:00:00",
+        displayTime: "",
+        label: "",
+
+        companyId: reportMeta.companyId,
+        siteId: reportMeta.siteId,
+        missionId: reportMeta.missionId,
+        deviceSn: detail.deviceSn,
+
+        historyDetail: detail,
+        historyMeta: reportMeta,
+      },
     });
+  };
 
-    await downloadWorkReportPdf(reportRef.current, detail);
-  } catch (error) {
-    console.error("Failed to download work report PDF:", error);
-    message.error("Failed to download PDF.");
-  } finally {
-    setIsExportingPdf(false);
-    setIsDownloading(false);
-  }
-};
+  const handleViewDetail = (record: {
+    label: string;
+    mdisplay: string;
+    duration?: string;
+  }) => {
+    if (!detail.playbackUrl) {
+      message.warning("Recorded video is not available.");
+      return;
+    }
 
-const handleViewDetail = (record: {
-  label: string;
-  mdisplay: string;
-  duration?: string;
-}) => {
-  navigate("/playback", {
-    state: {
-      playbackUrl: detail.playbackUrl,
-      timestamp: record.duration || "00:00:00",
-      displayTime: record.mdisplay,
-      label: record.label,
+    if (!reportMeta) {
+      message.warning("Playback information is not available.");
+      return;
+    }
 
-      companyId: reportMeta!.companyId,
-      siteId: reportMeta!.siteId,
-      missionId: reportMeta!.missionId,
-      deviceSn: detail.deviceSn,
+    navigate("/playback", {
+      state: {
+        playbackUrl: detail.playbackUrl,
+        timestamp: record.duration || "00:00:00",
+        displayTime: record.mdisplay,
+        label: record.label,
 
-      historyDetail: detail,
-      historyMeta: reportMeta,
-    },
-  });
-};
+        companyId: reportMeta.companyId,
+        siteId: reportMeta.siteId,
+        missionId: reportMeta.missionId,
+        deviceSn: detail.deviceSn,
+
+        historyDetail: detail,
+        historyMeta: reportMeta,
+      },
+    });
+  };
 
   return (
-  <Modal open={open} onCancel={onClose} footer={null} width={1250} closable={false}>
-    <div className="flex justify-between items-center mb-4">
-      <div className="flex items-end gap-4">
-        <h2 className="text-2xl font-semibold">
-          {t("work_report_title")}
-        </h2>
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={1250}
+      closable={false}
+    >
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-end gap-4">
+          <h2 className="text-2xl font-semibold">
+            {t("work_report_title")}
+          </h2>
 
-        <p className="text-sm text-gray-500">
-          {t("work_report_created")}: {detail.reportCreatedAt}
-        </p>
+          <p className="text-sm text-gray-500">
+            {t("work_report_created")}: {detail.reportCreatedAt}
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button onClick={onClose}>
+            {t("button_close")}
+          </Button>
+
+          <Button
+            onClick={handlePlayVideo}
+            disabled={!detail.playbackUrl}
+          >
+            Play Video
+          </Button>
+
+          <Button
+            type="primary"
+            onClick={handleDownload}
+            loading={isDownloading}
+            disabled={isDownloading}
+          >
+            {isDownloading
+              ? "Generating PDF..."
+              : t("work_report_download_pdf")}
+          </Button>
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <Button onClick={onClose}>
-          {t("button_close")}
-        </Button>
-
-        <Button
-          type="primary"
-          onClick={handleDownload}
-          loading={isDownloading}
-          disabled={isDownloading}
-        >
-          {isDownloading
-            ? "Generating PDF..."
-            : t("work_report_download_pdf")}
-        </Button>
-      </div>
-    </div>
-
-    <WorkReportContent
-      detail={detail}
-      reportMeta={reportMeta}
-      reportRef={reportRef}
-      isExportingPdf={isExportingPdf}
-      onViewDetail={handleViewDetail}
-    />
-  </Modal>
-);
+      <WorkReportContent
+        detail={detail}
+        reportMeta={reportMeta}
+        reportRef={reportRef}
+        isExportingPdf={isExportingPdf}
+        onViewDetail={handleViewDetail}
+      />
+    </Modal>
+  );
 };
 
 export default WorkReportModal;
