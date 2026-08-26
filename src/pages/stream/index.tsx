@@ -731,9 +731,6 @@ const handleStopWork = async () => {
 }
   try {
     setIsLoading(true);
-
-    const endTime = new Date();
-
     const stopRes = await streamApi.stop(streamPayload);
 
     const stoppedReport =
@@ -757,15 +754,57 @@ const handleStopWork = async () => {
 
     clearLocalStreamState();
 
-    const startTimeText = workStartTime
-      ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
-      : "-";
+    const backendStartedAt =
+        stoppedReport?.startedAt ??
+        stoppedReport?.startTime ??
+        stoppedReport?.started_at;
 
-    const endTimeText = endTime
-      .toLocaleString("sv-SE")
-      .replace("T", " ");
+      const backendStoppedAt =
+        stoppedReport?.stoppedAt ??
+        stoppedReport?.endTime ??
+        stoppedReport?.stopped_at;
 
-    const totalTimeText = formatDuration(elapsedSeconds);
+      const startedAtDate = backendStartedAt
+        ? new Date(backendStartedAt)
+        : workStartTime;
+
+      const stoppedAtDate = backendStoppedAt
+        ? new Date(backendStoppedAt)
+        : new Date();
+
+      const startTimeText =
+        startedAtDate &&
+        !Number.isNaN(startedAtDate.getTime())
+          ? startedAtDate
+              .toLocaleString("sv-SE")
+              .replace("T", " ")
+          : "-";
+
+      const endTimeText =
+        stoppedAtDate &&
+        !Number.isNaN(stoppedAtDate.getTime())
+          ? stoppedAtDate
+              .toLocaleString("sv-SE")
+              .replace("T", " ")
+          : "-";
+
+      const totalSeconds =
+        startedAtDate &&
+        stoppedAtDate &&
+        !Number.isNaN(startedAtDate.getTime()) &&
+        !Number.isNaN(stoppedAtDate.getTime())
+          ? Math.max(
+              0,
+              Math.floor(
+                (stoppedAtDate.getTime() -
+                  startedAtDate.getTime()) /
+                  1000
+              )
+            )
+          : elapsedSeconds;
+
+      const totalTimeText =
+        formatDuration(totalSeconds);
 
     const siteName =
       siteOptions.find((site) => site.value === values?.site)?.label || "-";
@@ -1190,10 +1229,86 @@ useEffect(() => {
         confirmationRes,
       });
 
-      const endTime = new Date();
-      const endTimeText = endTime
+      let stoppedInfo: any = null;
+
+const stoppedSessionId = sessionId;
+
+if (stoppedSessionId) {
+  try {
+    stoppedInfo =
+      await streamApi.startStream(
+        stoppedSessionId
+      );
+
+    console.info(
+      "[WorkReport] Observer stopped session",
+      stoppedInfo
+    );
+  } catch (error) {
+    console.warn(
+      "[WorkReport] Failed to load observer stopped session",
+      {
+        stoppedSessionId,
+        error,
+      }
+    );
+  }
+}
+
+const backendStartedAt =
+  stoppedInfo?.startedAt ??
+  stoppedInfo?.startTime ??
+  stoppedInfo?.started_at;
+
+const backendStoppedAt =
+  stoppedInfo?.stoppedAt ??
+  stoppedInfo?.endTime ??
+  stoppedInfo?.stopped_at;
+
+const startedAtDate =
+  backendStartedAt
+    ? new Date(backendStartedAt)
+    : workStartTime;
+
+const stoppedAtDate =
+  backendStoppedAt
+    ? new Date(backendStoppedAt)
+    : new Date();
+
+const startTimeText =
+  startedAtDate &&
+  !Number.isNaN(startedAtDate.getTime())
+    ? startedAtDate
         .toLocaleString("sv-SE")
-        .replace("T", " ");
+        .replace("T", " ")
+    : "-";
+
+const endTimeText =
+  stoppedAtDate &&
+  !Number.isNaN(stoppedAtDate.getTime())
+    ? stoppedAtDate
+        .toLocaleString("sv-SE")
+        .replace("T", " ")
+    : "-";
+
+const totalSeconds =
+  startedAtDate &&
+  stoppedAtDate &&
+  !Number.isNaN(startedAtDate.getTime()) &&
+  !Number.isNaN(stoppedAtDate.getTime())
+    ? Math.max(
+        0,
+        Math.floor(
+          (
+            stoppedAtDate.getTime() -
+            startedAtDate.getTime()
+          ) / 1000
+        )
+      )
+    : elapsedSecondsRef.current;
+
+const totalTimeText =
+  formatDuration(totalSeconds);
 
       playerRef.current?.pause();
 
@@ -1203,11 +1318,9 @@ useEffect(() => {
         companyId: values?.company,
         siteId: values?.site,
         missionId: values?.mission,
-        startTime: workStartTime
-          ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
-          : "-",
+        startTime: startTimeText,
         endTime: endTimeText,
-        totalTime: formatDuration(elapsedSecondsRef.current),
+        totalTime: totalTimeText,
         distance: "-",
         siteName:
           siteOptions.find((site) => site.value === values?.site)?.label ||
@@ -1260,6 +1373,7 @@ useEffect(() => {
   workStartTime,
   siteOptions,
   missionOptions,
+  sessionId,
 ]);
 
 
@@ -1634,6 +1748,7 @@ useEffect(() => {
   return () => window.clearInterval(timer);
 }, [isStreaming, workStartAtMs]);
 
+
 useEffect(() => {
   if (
     remoteStopSignal === null ||
@@ -1643,146 +1758,211 @@ useEffect(() => {
     return;
   }
 
-  const endTime = new Date();
+  let cancelled = false;
 
-  const startTimeText = workStartTime
-    ? workStartTime.toLocaleString("sv-SE").replace("T", " ")
-    : "-";
+  const loadStoppedReport = async () => {
+    const stoppedSessionId = sessionId;
 
-  const endTimeText = endTime
-    .toLocaleString("sv-SE")
-    .replace("T", " ");
+let stoppedInfo: any = null;
 
-  const siteName =
-    siteOptions.find(
-      (site) => site.value === values?.site
-    )?.label || "-";
+if (stoppedSessionId) {
+  try {
+    stoppedInfo =
+      await streamApi.startStream(stoppedSessionId);
+  } catch (error) {
+    console.warn(
+      "[WorkReport] Failed to load stopped session",
+      {
+        stoppedSessionId,
+        error,
+      }
+    );
+  }
+}
 
-  const robotName =
-    selectedRobotDetail?.deviceName ||
-    selectedRobotDetail?.deviceSn ||
-    "-";
-
-  const missionName =
-    missionOptions.find(
-      (mission) => mission.value === values?.mission
-    )?.label || "-";
-
-  const fallbackBookmarks = bookmarks.map(
-    (bookmark: any, index: number) => {
-      const label =
-        bookmark.labels?.[0] ||
-        bookmark.label ||
-        bookmark.type ||
-        "Unknown";
-
-      return {
-        label,
-        mdisplay: bookmark.timeSec
-          ? new Date(bookmark.timeSec * 1000)
-              .toISOString()
-              .substring(11, 19)
-          : "00:00:00",
-        m: bookmark.timeSec || 0,
-        s: bookmark.s || "",
-        o: 0,
-        duration: bookmark.timeSec
-          ? new Date(bookmark.timeSec * 1000)
-              .toISOString()
-              .substring(11, 19)
-          : "00:00:00",
-        id: bookmark.id || `${label}-${index}`,
-      };
+    if (cancelled) {
+      return;
     }
+
+   const backendStartedAt =
+  stoppedInfo?.startedAt ??
+  stoppedInfo?.startTime ??
+  stoppedInfo?.started_at;
+
+const backendStoppedAt =
+  stoppedInfo?.stoppedAt ??
+  stoppedInfo?.endTime ??
+  stoppedInfo?.stopped_at;
+    const startedAtDate = backendStartedAt
+      ? new Date(backendStartedAt)
+      : workStartTime;
+
+    const stoppedAtDate = backendStoppedAt
+      ? new Date(backendStoppedAt)
+      : new Date();
+
+    const startTimeText =
+      startedAtDate &&
+      !Number.isNaN(startedAtDate.getTime())
+        ? startedAtDate
+            .toLocaleString("sv-SE")
+            .replace("T", " ")
+        : "-";
+
+    const endTimeText =
+      stoppedAtDate &&
+      !Number.isNaN(stoppedAtDate.getTime())
+        ? stoppedAtDate
+            .toLocaleString("sv-SE")
+            .replace("T", " ")
+        : "-";
+
+    const totalSeconds =
+      startedAtDate &&
+      stoppedAtDate &&
+      !Number.isNaN(startedAtDate.getTime()) &&
+      !Number.isNaN(stoppedAtDate.getTime())
+        ? Math.max(
+            0,
+            Math.floor(
+              (stoppedAtDate.getTime() -
+                startedAtDate.getTime()) /
+                1000
+            )
+          )
+        : elapsedSecondsRef.current;
+
+    const totalTimeText =
+      formatDuration(totalSeconds);
+
+    const siteName =
+  siteOptions.find(
+    (site) => site.value === values?.site
+  )?.label || "-";
+
+const robotName =
+  selectedRobotDetail?.deviceName ||
+  selectedRobotDetail?.deviceSn ||
+  "-";
+
+const missionName =
+  missionOptions.find(
+    (mission) => mission.value === values?.mission
+  )?.label || "-";
+
+const fallbackBookmarks = bookmarks.map(
+  (bookmark: any, index: number) => {
+    const label =
+      bookmark.labels?.[0] ||
+      bookmark.label ||
+      bookmark.type ||
+      "Unknown";
+
+    return {
+      label,
+      mdisplay: bookmark.timeSec
+        ? new Date(bookmark.timeSec * 1000)
+            .toISOString()
+            .substring(11, 19)
+        : "00:00:00",
+      m: bookmark.timeSec || 0,
+      s: bookmark.s || "",
+      o: 0,
+      duration: bookmark.timeSec
+        ? new Date(bookmark.timeSec * 1000)
+            .toISOString()
+            .substring(11, 19)
+        : "00:00:00",
+      id: bookmark.id || `${label}-${index}`,
+    };
+  }
+);
+
+const fallbackLabelCounts =
+  fallbackBookmarks.reduce(
+    (
+      acc: Record<string, number>,
+      bookmark: any
+    ) => {
+      acc[bookmark.label] =
+        (acc[bookmark.label] || 0) + 1;
+
+      return acc;
+    },
+    {}
   );
 
-  const fallbackLabelCounts =
-    fallbackBookmarks.reduce(
-      (
-        acc: Record<string, number>,
-        bookmark: any
-      ) => {
-        acc[bookmark.label] =
-          (acc[bookmark.label] || 0) + 1;
+playerRef.current?.pause();
 
-        return acc;
-      },
-      {}
-    );
+setReportDetail({
+  reportCreatedAt: endTimeText,
+  playbackUrl: streamPlaybackUrl,
+  mapUrl: streamMapUrl,
+  companyId: values?.company,
+  siteId: values?.site,
+  missionId: values?.mission,
 
-  /*
-   * Stop video locally only after preserving all report information.
-   */
-  playerRef.current?.pause();
+  startTime: startTimeText,
+  endTime: endTimeText,
+  totalTime: totalTimeText,
 
-  setReportDetail({
-    reportCreatedAt: endTimeText,
-    playbackUrl: streamPlaybackUrl,
-    mapUrl: streamMapUrl,
-    companyId: values?.company,
-    siteId: values?.site,
-    missionId: values?.mission,
+  distance: "-",
+  siteName,
+  deviceName: robotName,
+  robotName,
+  missionName,
 
-    startTime: startTimeText,
-    endTime: endTimeText,
-    totalTime: formatDuration(elapsedSecondsRef.current),
+  userName: "sysadmin",
+  workerName: "sysadmin",
 
-    distance: "-",
-    siteName,
-    deviceName: robotName,
-    robotName,
-    missionName,
+  deviceSn:
+    selectedRobotDetail?.deviceSn || "",
 
-    userName: "sysadmin",
-    workerName: "sysadmin",
+  totalRecognition:
+    fallbackBookmarks.length,
 
-    deviceSn:
-      selectedRobotDetail?.deviceSn || "",
+  labelCounts:
+    fallbackLabelCounts,
 
-    totalRecognition:
-      fallbackBookmarks.length,
+  bookmarks:
+    fallbackBookmarks,
+});
 
-    labelCounts:
-      fallbackLabelCounts,
+setIsStreaming(false);
+setIsPlaying(false);
+setCurrentTime(0);
+setDuration(0);
+setSessionId(null);
 
-    bookmarks:
-      fallbackBookmarks,
-  });
+setStreamPlaybackUrl("");
+setStreamMapUrl("");
 
-  /*
-   * Now move this tab out of active monitoring.
-   */
-  setIsStreaming(false);
-  setIsPlaying(false);
-  setCurrentTime(0);
-  setDuration(0);
-  setSessionId(null);
+setPlayerStatus("OFFLINE");
+setHasConnectedOnce(false);
 
-  setStreamPlaybackUrl("");
-  setStreamMapUrl("");
+setMapReady(false);
+setMapRetryKey(0);
 
-  setPlayerStatus("OFFLINE");
-  setHasConnectedOnce(false);
+remoteSeenActiveRef.current = false;
+inactivePollCountRef.current = 0;
 
-  setMapReady(false);
-  setMapRetryKey(0);
+setRemoteStopSignal(null);
 
-  remoteSeenActiveRef.current = false;
-  inactivePollCountRef.current = 0;
+setIsReportOpen(true);
+  };
 
-  setRemoteStopSignal(null);
+  void loadStoppedReport();
 
-  /*
-   * Open report last.
-   */
-  setIsReportOpen(true);
+  return () => {
+    cancelled = true;
+  };
 }, [
   remoteStopSignal,
   isReportOpen,
   streamPlaybackUrl,
   streamMapUrl,
+  sessionId,
   workStartTime,
-  elapsedSeconds,
   bookmarks,
   values?.company,
   values?.site,
@@ -1792,6 +1972,7 @@ useEffect(() => {
   selectedRobotDetail?.deviceName,
   selectedRobotDetail?.deviceSn,
 ]);
+
 useEffect(() => {
   if (isDashboardPrefilling) {
     return;
