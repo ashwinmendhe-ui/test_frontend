@@ -734,7 +734,11 @@ const handleStopWork = async () => {
 
     const endTime = new Date();
 
-    await streamApi.stop(streamPayload);
+    const stopRes = await streamApi.stop(streamPayload);
+
+    const stoppedReport =
+      stopRes?.data ?? stopRes;
+      console.info("[WorkReport] STOP response", stoppedReport);
 
     const stoppedDeviceSn = getCurrentDeviceSn();
 
@@ -2050,46 +2054,23 @@ const applyDashboardPrefill = async () => {
         dashboardPrefill?.missionId ??
         null;
 
-      restoreMissionSelection(
+      if (!activeMissionId) {
+        return;
+      }
+
+      console.info(
+        "[DashboardPrefill] Active stream detected",
+        {
+          deviceSn,
+          missionId: activeMissionId,
+        }
+      );
+
+      restoreMissionSelection(activeMissionId);
+
+      setPendingAutoJoinMissionId(
         activeMissionId
       );
-
-      const streamInfo =
-        await startStream(deviceSn);
-
-      setSessionId(
-        statusRes?.sessionId ??
-          statusRes?.session_id ??
-          null
-      );
-
-      const playbackUrl =
-        streamInfo?.playback_url ??
-        streamInfo?.playbackUrl ??
-        "";
-
-      const backendMapUrl =
-        streamInfo?.map_url ??
-        streamInfo?.mapUrl ??
-        "";
-
-      const resolvedMapUrl =
-        resolveMapUrl(
-          playbackUrl,
-          backendMapUrl
-        );
-
-      setStreamPlaybackUrl(playbackUrl);
-      setStreamMapUrl(resolvedMapUrl);
-
-      setMapReady(false);
-      setMapRetryKey(0);
-
-      setPlayerStatus("LOADING");
-      setHlsRetryCount(0);
-      setHlsRetryKey(0);
-
-      setIsStreaming(true);
     }
   } catch (error) {
     console.error(
