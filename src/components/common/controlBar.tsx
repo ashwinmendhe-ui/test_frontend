@@ -33,6 +33,7 @@ interface ControlBarProps {
   className?: string;
   showCommonDetection?: boolean;
 showDangerDetection?: boolean;
+selectedClassIds?: number[];
 }
 
 const CLASS_LABELS: Record<number, string> = {
@@ -119,7 +120,8 @@ export default function ControlBar({
   onBookmarkClick,
   className = "",
   showCommonDetection = true,
-  showDangerDetection = true
+  showDangerDetection = true,
+  selectedClassIds = [],
 }: ControlBarProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragTime, setDragTime] = useState(0);
@@ -202,25 +204,36 @@ export default function ControlBar({
 
   const DANGER_CLASS_IDS = [3, 4, 5, 20, 21, 22];
 
-const filteredBookmarks = clusteredBookmarks.filter((bm) => {
-  const classIds = bm.classIds?.length
-    ? bm.classIds
-    : bm.c_ar ?? [];
+const filteredBookmarks = clusteredBookmarks
+  .map((bm) => {
+    const classIds = bm.classIds?.length
+      ? bm.classIds.map(Number)
+      : (bm.c_ar ?? []).map(Number);
 
-  const hasDanger = classIds.some((id) =>
-    DANGER_CLASS_IDS.includes(Number(id))
-  );
+    const visibleClassIds = classIds.filter((classId) => {
+      if (!selectedClassIds.includes(classId)) {
+        return false;
+      }
 
-  if (hasDanger && !showDangerDetection) {
-    return false;
-  }
+      const isDanger = DANGER_CLASS_IDS.includes(classId);
 
-  if (!hasDanger && !showCommonDetection) {
-    return false;
-  }
+      if (isDanger && !showDangerDetection) {
+        return false;
+      }
 
-  return true;
-});
+      if (!isDanger && !showCommonDetection) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return {
+      ...bm,
+      visibleClassIds,
+    };
+  })
+  .filter((bm) => bm.visibleClassIds.length > 0);
 
   return (
     <div className={`w-full mt-3 bg-white rounded-[7px] px-4 py-2.5 ${className}`}>
@@ -292,9 +305,7 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                 {filteredBookmarks.map((bm) => {
                   if (bm.timeSec == null) return null;
 
-                  const classIds = bm.classIds?.length
-                    ? bm.classIds
-                    : bm.c_ar ?? [];
+                 const classIds = bm.visibleClassIds;
 
 
                   const markerColor = getMarkerColor(
@@ -302,15 +313,11 @@ const filteredBookmarks = clusteredBookmarks.filter((bm) => {
                     classIds
                   );
 
-                  const markerLabels = bm.labels?.length
-                    ? bm.labels
-                    : bm.label
-                    ? [bm.label]
-                    : classIds.map(
-                        (id) =>
-                          CLASS_LABELS[Number(id)] ||
-                          `Class ${id}`
-                      );
+                  const markerLabels = classIds.map(
+                      (id) =>
+                        CLASS_LABELS[Number(id)] ||
+                        `Class ${id}`
+                    );
 
                   const tooltipContent = (
                     <div className="text-xs leading-5">

@@ -81,12 +81,11 @@ type PlayerStatus =
     22: "NO-Safety Rope(LLM)",
   };
 
-  const AI_MODULE_CLASS_IDS: Record<string, number> = {
+ const AI_MODULE_CLASS_IDS: Record<string, number> = {
   construction: 0,
   hardhat: 1,
   mask: 2,
   no_hardhat: 3,
-  no_mask_common: 4,
   no_mask: 4,
   no_safety_vest: 5,
   person: 6,
@@ -331,7 +330,6 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     { value: "hardhat", label: t("stream_ai_hardhat"), category: "YOLO", type: "common", color: "#F4C20D" },
     { value: "machinery", label: t("stream_ai_machinery"), category: "YOLO", type: "common", color: "#1FB6CF" },
     { value: "mask", label: t("stream_ai_mask"), category: "YOLO", type: "common", color: "#00BCD4" },
-    { value: "no_mask_common", label: t("stream_ai_no_mask"), category: "YOLO", type: "common", color: "#C218F3" },
     { value: "person", label: t("stream_ai_person"), category: "YOLO", type: "common", color: "#7C4DFF" },
     { value: "vehicle", label: t("stream_ai_vehicle"), category: "YOLO", type: "common", color: "#607D8B" },
     { value: "safety_vest", label: t("stream_ai_vest"), category: "YOLO", type: "common", color: "#34C759" },
@@ -352,12 +350,20 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
 
   const selectedClassIds = useMemo(
   () =>
-    selectedModules
-      .map((moduleValue) => AI_MODULE_CLASS_IDS[moduleValue])
-      .filter(
-        (classId): classId is number =>
-          typeof classId === "number" && Number.isFinite(classId)
+    [
+      ...new Set(
+        selectedModules
+          .map(
+            (moduleValue) =>
+              AI_MODULE_CLASS_IDS[moduleValue]
+          )
+          .filter(
+            (classId): classId is number =>
+              typeof classId === "number" &&
+              Number.isFinite(classId)
+          )
       ),
+    ],
   [selectedModules]
 );
 
@@ -2579,6 +2585,7 @@ const SmallStatusBadge = ({
                 disabled={!isStreaming || !streamPlaybackUrl}
                 isLive
                 bookmarks={bookmarks}
+                selectedClassIds={selectedClassIds}
                 showCommonDetection={showCommonDetection}
                 showDangerDetection={showDangerDetection}
                 onBookmarkClick={(time) => {
