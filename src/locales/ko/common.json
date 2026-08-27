@@ -648,6 +648,7 @@
 "common_no_data": "데이터 없음",
 "stream_ai_mask": "Mask",
 "stream_ai_vehicle": "Vehicle",
+"stream_ai_safety_cone": "Safety Cone",
 "user_duplicate_email": "이미 사용 중인 이메일 주소입니다.",
 "user_duplicate_username": "이미 사용 중인 사용자 이름입니다.",
 "user_duplicate_email_username": "이메일 주소와 사용자 이름이 모두 이미 사용 중입니다.",

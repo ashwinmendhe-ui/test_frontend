@@ -583,6 +583,6 @@
 "playback_loading": "Loading...",
 "playback_unavailable_status": "UNAVAILABLE",
 "playback_recording_unavailable": "Recording Unavailable",
-"playback_recording_unavailable_description": "This recording is incomplete or corrupted and cannot be played."
-
+"playback_recording_unavailable_description": "This recording is incomplete or corrupted and cannot be played.",
+"stream_ai_safety_cone": "Safety Cone"
   }

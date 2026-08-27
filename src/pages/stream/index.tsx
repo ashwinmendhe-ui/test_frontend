@@ -89,6 +89,7 @@ type PlayerStatus =
   no_mask: 4,
   no_safety_vest: 5,
   person: 6,
+  safety_cone: 7,
   safety_vest: 8,
   machinery: 9,
   vehicle: 10,
@@ -333,7 +334,8 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
     { value: "person", label: t("stream_ai_person"), category: "YOLO", type: "common", color: "#7C4DFF" },
     { value: "vehicle", label: t("stream_ai_vehicle"), category: "YOLO", type: "common", color: "#607D8B" },
     { value: "safety_vest", label: t("stream_ai_vest"), category: "YOLO", type: "common", color: "#34C759" },
-
+    {value: "safety_cone",label: t("stream_ai_safety_cone"),category: "YOLO",type: "common",color: "#FF8A00" },
+    
     { value: "no_hardhat", label: t("stream_ai_no_hardhat"), category: "YOLO", type: "danger", color: "#FF2D55" },
     { value: "no_safety_vest", label: t("stream_ai_no_safety_vest"), category: "YOLO", type: "danger", color: "#FF9500" },
     { value: "no_mask", label: t("stream_ai_no_mask"), category: "YOLO", type: "danger", color: "#C218F3" },
