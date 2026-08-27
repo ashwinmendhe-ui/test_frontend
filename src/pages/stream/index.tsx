@@ -1316,6 +1316,51 @@ const totalSeconds =
 const totalTimeText =
   formatDuration(totalSeconds);
 
+
+      const fallbackBookmarks = bookmarksRef.current.map(
+  (bookmark: any, index: number) => {
+    const label =
+      bookmark.labels?.[0] ||
+      bookmark.label ||
+      bookmark.type ||
+      "Unknown";
+
+    return {
+      label,
+      mdisplay: bookmark.timeSec
+        ? new Date(bookmark.timeSec * 1000)
+            .toISOString()
+            .substring(11, 19)
+        : "00:00:00",
+      m: bookmark.timeSec || 0,
+      s: bookmark.s || "",
+      o: 0,
+      duration: bookmark.timeSec
+        ? new Date(bookmark.timeSec * 1000)
+            .toISOString()
+            .substring(11, 19)
+        : "00:00:00",
+      id:
+        bookmark.id ||
+        `${label}-${index}`,
+    };
+  }
+);
+
+const fallbackLabelCounts =
+  fallbackBookmarks.reduce(
+    (
+      acc: Record<string, number>,
+      bookmark: any
+    ) => {
+      acc[bookmark.label] =
+        (acc[bookmark.label] || 0) + 1;
+
+      return acc;
+    },
+    {}
+  );
+
       playerRef.current?.pause();
 
       setReportDetail({
@@ -1340,9 +1385,9 @@ const totalTimeText =
         userName: "sysadmin",
         workerName: "sysadmin",
         deviceSn,
-        totalRecognition: bookmarksRef.current.length,
-        bookmarks: [],
-        labelCounts: {},
+        totalRecognition: fallbackBookmarks.length,
+        bookmarks: fallbackBookmarks,
+        labelCounts: fallbackLabelCounts,
       });
 
       setIsReportOpen(true);
