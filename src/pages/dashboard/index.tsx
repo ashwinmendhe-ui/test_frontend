@@ -171,11 +171,14 @@ useWebSocket(
     ]);
   }, [mergedDashboard, searchKeyword]);
 
+  const HOME_COLUMN_WIDTH = 180;
+
   const companyColumn: SortableTableColumn<DashboardRow> = {
     title: t("dashboard_table_company"),
     dataIndex: "companyName",
     key: "companyName",
     enableSort: true,
+    width: HOME_COLUMN_WIDTH,
     render: (value: string) => (
       <HighlightText text={value || "-"} query={searchKeyword} />
     ),
@@ -189,6 +192,7 @@ useWebSocket(
       dataIndex: "siteName",
       key: "siteName",
       enableSort: true,
+      width: HOME_COLUMN_WIDTH,
       render: (value: string) => (
         <HighlightText text={value || "-"} query={searchKeyword} />
       ),
@@ -199,6 +203,7 @@ useWebSocket(
       dataIndex: "deviceName",
       key: "deviceName",
       enableSort: true,
+      width: HOME_COLUMN_WIDTH,
       render: (value: string, record: DashboardRow) => (
         <div>
           <div>
@@ -222,6 +227,7 @@ useWebSocket(
       dataIndex: "location",
       key: "location",
       enableSort: true,
+      width: HOME_COLUMN_WIDTH,
       render: (value?: string) => (
         <HighlightText text={value || "-"} query={searchKeyword} />
       ),
@@ -243,6 +249,7 @@ useWebSocket(
       dataIndex: "missionName",
       key: "missionName",
       enableSort: true,
+      width: HOME_COLUMN_WIDTH,
       render: (value?: string) => (
         <div
           className="truncate max-w-[320px]"
@@ -259,7 +266,7 @@ useWebSocket(
     {
       title: t("dashboard_table_view_mission"),
       key: "action",
-      width: 120,
+      width: HOME_COLUMN_WIDTH,
       render: (_: unknown, record: DashboardRow) => {
         const currentStatus = String(
           record.status || ""
