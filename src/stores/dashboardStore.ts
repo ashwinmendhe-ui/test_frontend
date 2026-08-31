@@ -19,6 +19,8 @@ interface DashboardTable {
   siteId?: string;
   siteName: string;
 
+  location?: string;
+
   missionId?: string;
   missionName?: string;
 

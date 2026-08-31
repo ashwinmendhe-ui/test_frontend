@@ -79,7 +79,7 @@ export default function Dashboard() {
   // }, []);
 
   const handleDashboardDeviceMessage = useCallback(
-  (message: any) => {
+  () => {
     getDashboardSilent();
     getDashboardStatSilent();
   },
@@ -171,32 +171,19 @@ useWebSocket(
     ]);
   }, [mergedDashboard, searchKeyword]);
 
-  const columns = [
-    {
-      title: t("table_id"),
-      key: "rowIndex",
-      enableSort: false,
-      render: (_: unknown, __: DashboardRow, index: number) => index + 1,
-      width: 80,
-    },
-    {
-      title: t("dashboard_table_name"),
-      dataIndex: "deviceName",
-      key: "deviceName",
-      enableSort: true,
-      render: (value: string) => (
-        <HighlightText text={value || "-"} query={searchKeyword} />
-      ),
-    },
-    {
-      title: t("dashboard_table_company"),
-      dataIndex: "companyName",
-      key: "companyName",
-      enableSort: true,
-      render: (value: string) => (
-        <HighlightText text={value || "-"} query={searchKeyword} />
-      ),
-    },
+  const companyColumn: SortableTableColumn<DashboardRow> = {
+    title: t("dashboard_table_company"),
+    dataIndex: "companyName",
+    key: "companyName",
+    enableSort: true,
+    render: (value: string) => (
+      <HighlightText text={value || "-"} query={searchKeyword} />
+    ),
+  };
+
+  const columns: SortableTableColumn<DashboardRow>[] = [
+    ...(userRole === 1 ? [companyColumn] : []),
+
     {
       title: t("dashboard_table_site"),
       dataIndex: "siteName",
@@ -206,34 +193,81 @@ useWebSocket(
         <HighlightText text={value || "-"} query={searchKeyword} />
       ),
     },
+
+    {
+      title: t("dashboard_table_name"),
+      dataIndex: "deviceName",
+      key: "deviceName",
+      enableSort: true,
+      render: (value: string, record: DashboardRow) => (
+        <div>
+          <div>
+            <HighlightText text={value || "-"} query={searchKeyword} />
+          </div>
+
+          {record.deviceSn && (
+            <div className="text-xs text-gray-500 mt-1">
+              <HighlightText
+                text={record.deviceSn}
+                query={searchKeyword}
+              />
+            </div>
+          )}
+        </div>
+      ),
+    },
+
+    {
+      title: t("dashboard_table_location"),
+      dataIndex: "location",
+      key: "location",
+      enableSort: true,
+      render: (value?: string) => (
+        <HighlightText text={value || "-"} query={searchKeyword} />
+      ),
+    },
+
     {
       title: t("dashboard_table_status"),
       dataIndex: "status",
       key: "status",
       enableSort: true,
-      render: (value: string | boolean) => <StatusBadge status={value} />,
+      render: (value: string | boolean) => (
+        <StatusBadge status={value} />
+      ),
       width: 140,
     },
+
     {
       title: t("dashboard_table_mission"),
       dataIndex: "missionName",
       key: "missionName",
       enableSort: true,
       render: (value?: string) => (
-        <div className="truncate max-w-[320px]" title={value || "-"}>
-          <HighlightText text={value || "-"} query={searchKeyword} />
+        <div
+          className="truncate max-w-[320px]"
+          title={value || "-"}
+        >
+          <HighlightText
+            text={value || "-"}
+            query={searchKeyword}
+          />
         </div>
       ),
     },
+
     {
-      title: "",
+      title: t("dashboard_table_view_mission"),
       key: "action",
-      width: 100,
+      width: 120,
       render: (_: unknown, record: DashboardRow) => {
-        const currentStatus = String(record.status || "").toLowerCase();
+        const currentStatus = String(
+          record.status || ""
+        ).toLowerCase();
 
         const isBlocked =
-          currentStatus === "offline" || currentStatus === "inactive";
+          currentStatus === "offline" ||
+          currentStatus === "inactive";
 
         if (isBlocked) {
           return (
@@ -247,7 +281,6 @@ useWebSocket(
 
         return (
           <Link
-            // to="/stream"
             to={`/stream/${record.deviceId}`}
             state={{
               fromDashboard: true,
@@ -274,8 +307,10 @@ useWebSocket(
         );
       },
     },
-  ] satisfies SortableTableColumn<DashboardRow>[];
+  ];
+  
 
+  
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[11px]">
