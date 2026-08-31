@@ -100,6 +100,16 @@ export default function Mission() {
         <HighlightText text={value} query={searchKeyword} />
       ),
     },
+
+    {
+      title: t("mission_table_location"),
+      dataIndex: "location",
+      key: "location",
+      enableSort: true,
+      render: (value?: string) => (
+        <HighlightText text={value || "-"} query={searchKeyword} />
+      ),
+    },
     {
       title: t("mission_table_device_type"),
       dataIndex: "deviceType",
@@ -165,6 +175,7 @@ export default function Mission() {
     "missionName",
     "companyName",
     "siteName",
+    "location",
     "deviceType",
     "missionType",
     "file",

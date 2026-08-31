@@ -662,5 +662,8 @@
 "robot_validation_enter_serial_number": "시리얼 번호를 입력해주세요.",
 "playback_unavailable_status": "사용 불가",
 "playback_recording_unavailable": "녹화 영상을 사용할 수 없습니다",
-"playback_recording_unavailable_description": "이 녹화 영상은 불완전하거나 손상되어 재생할 수 없습니다."
+"playback_recording_unavailable_description": "이 녹화 영상은 불완전하거나 손상되어 재생할 수 없습니다.",
+"mission_form_location": "위치",
+  "mission_placeholder_location": "위치를 입력하세요",
+  "mission_table_location": "위치"
 }

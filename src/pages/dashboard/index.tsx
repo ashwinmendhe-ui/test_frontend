@@ -32,6 +32,8 @@ type DashboardRow = {
   siteId?: string;
   siteName: string;
 
+  location?: string;
+
   status: string | boolean;
 
   missionId?: string;
@@ -161,6 +163,7 @@ useWebSocket(
       "deviceName",
       "companyName",
       "siteName",
+      "location",
       "status",
       "missionName",
       "deviceId",

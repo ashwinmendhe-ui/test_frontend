@@ -249,6 +249,19 @@ useEffect(() => {
             <Form.Item
               label={
                 <div className="text-[18px] font-semibold text-[#333D4B]">
+                  {t("mission_form_location")}
+                </div>
+              }
+              name="location"
+            >
+              <Input
+                placeholder={t("mission_placeholder_location")}
+                className="h-[41px]"
+              />
+            </Form.Item>
+            <Form.Item
+              label={
+                <div className="text-[18px] font-semibold text-[#333D4B]">
                   {t("mission_form_device_type")}
                 </div>
               }

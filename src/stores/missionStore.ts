@@ -8,6 +8,7 @@ export interface MissionManagementTable {
   companyName: string;
   siteId: string;
   siteName: string;
+  location?: string;
   deviceType: string;
   missionType: string;
   file: string;
@@ -19,6 +20,7 @@ export interface MissionFormValue {
   companyId?: string;
   companyName?: string;
   siteId: string;
+  location?: string;
   missionName: string;
   missionType: string;
   file?: string;
@@ -52,6 +54,7 @@ const defaultDetail: MissionFormValue = {
   companyId: "",
   companyName: "",
   siteId: "",
+  location: "",
   missionName: "",
   missionType: "",
   file: "",
@@ -67,6 +70,7 @@ const mapMissionListItem = (item: any): MissionManagementTable => ({
   companyName: item.companyName || item.company?.name || "",
   siteId: item.siteId || item.site?.siteId || item.site?.id || "",
   siteName: item.siteName || item.site?.name || "",
+  location: item.location || "",
   deviceType: item.deviceType || "",
   missionType: item.missionType || item.category || "",
   file: item.file || item.fileName || "",
@@ -78,6 +82,7 @@ const mapMissionDetail = (item: any): MissionFormValue => ({
   companyId: item.companyId || item.company?.companyId || item.company?.id || "",
   companyName: item.companyName || item.company?.name || "",
   siteId: item.siteId || item.site?.siteId || item.site?.id || "",
+  location: item.location || "",
   missionName: item.missionName || item.name || "",
   missionType: item.missionType || item.category || "",
   file: item.file || item.fileName || "",
@@ -160,6 +165,7 @@ export const useMissionStore = create<Store>((set, get) => ({
     const payload = {
       companyId: param.companyId || "",
       siteId: param.siteId,
+      location: param.location || "",
       missionName: param.missionName,
       missionType: param.missionType,
       file: param.file || "",
@@ -188,6 +194,7 @@ export const useMissionStore = create<Store>((set, get) => ({
     const payload = {
       companyId: param.companyId || "",
       siteId: param.siteId,
+      location: param.location || "",
       missionName: param.missionName,
       missionType: param.missionType,
       file: param.file || "",
