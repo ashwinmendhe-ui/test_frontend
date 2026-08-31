@@ -140,6 +140,7 @@ export default function History() {
     "siteName",
     "missionName",
     "deviceName",
+    "deviceSn",
     "userName",
   ]);
 

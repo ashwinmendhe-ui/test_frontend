@@ -51,7 +51,7 @@ interface Store {
   loading: boolean;
   list: HistoryManagementTable[];
   detail: ReportData;
-  getList: (param?: string, from?: string, to?: string) => void;
+  getList: () => Promise<void>;
   getDetail: (id: string) => Promise<ReportData>;
   downloadHistory: (id: string) => Promise<{ code?: number | string; message?: string }>;
 }
@@ -74,46 +74,20 @@ export const useHistoryStore = create<Store>((set) => ({
     bookmarks: [],
   },
 
-  getList: async (param, from, to) => {
-    try {
-      set({ loading: true });
+  getList: async () => {
+  try {
+    set({ loading: true });
 
-      const res = await historyApi.getList();
+    const res = await historyApi.getList();
 
-      let filtered = [...res];
-
-      // 🔍 Search filter (frontend)
-      if (param?.trim()) {
-        const q = param.toLowerCase();
-        filtered = filtered.filter(
-          (item) =>
-            item.companyName?.toLowerCase().includes(q) ||
-            item.siteName?.toLowerCase().includes(q) ||
-            item.missionName?.toLowerCase().includes(q) ||
-            item.deviceName?.toLowerCase().includes(q) ||
-            item.userName?.toLowerCase().includes(q)
-        );
-      }
-
-      // 📅 Date filter (frontend)
-      if (from && to) {
-        const fromTime = new Date(from).getTime();
-        const toTime = new Date(to).getTime();
-
-        filtered = filtered.filter((item) => {
-          const itemTime = new Date(item.createdAt.replace(" ", "T")).getTime();
-          return itemTime >= fromTime && itemTime <= toTime;
-        });
-      }
-
-      set({ list: filtered });
-    } catch (error) {
-      console.error("History list API error:", error);
-      set({ list: [] });
-    } finally {
-      set({ loading: false });
-    }
-  },
+    set({ list: res });
+  } catch (error) {
+    console.error("History list API error:", error);
+    set({ list: [] });
+  } finally {
+    set({ loading: false });
+  }
+},
 
  getDetail: async (id) => {
   try {

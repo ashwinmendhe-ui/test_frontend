@@ -238,10 +238,10 @@ useWebSocket(
       dataIndex: "status",
       key: "status",
       enableSort: true,
+      width: HOME_COLUMN_WIDTH,
       render: (value: string | boolean) => (
         <StatusBadge status={value} />
       ),
-      width: 140,
     },
 
     {
