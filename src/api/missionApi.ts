@@ -44,6 +44,7 @@ export const missionApi = {
     const payload = {
       companyId: data.companyId ?? "",
       siteId: data.siteId,
+      location: data.location ?? "",
       missionName: data.missionName,
       missionType: data.missionType,
       file: data.file ?? "",
@@ -60,6 +61,7 @@ export const missionApi = {
     const payload = {
       companyId: data.companyId ?? "",
       siteId: data.siteId,
+      location: data.location ?? "",
       missionName: data.missionName,
       missionType: data.missionType,
       file: data.file ?? "",

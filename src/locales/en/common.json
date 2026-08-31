@@ -587,5 +587,7 @@
 "stream_ai_safety_cone": "Safety Cone",
 "mission_form_location": "Location",
   "mission_placeholder_location": "Enter location",
-  "mission_table_location": "Location"
+  "mission_table_location": "Location",
+  "dashboard_table_location": "Location",
+"dashboard_table_view_mission": "View Mission"
   }
