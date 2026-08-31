@@ -814,6 +814,7 @@ const handleStopWork = async () => {
       const totalTimeText =
         formatDuration(totalSeconds);
 
+      
     const siteName =
       siteOptions.find((site) => site.value === values?.site)?.label || "-";
 
@@ -827,7 +828,13 @@ const handleStopWork = async () => {
         (mission) => mission.value === values?.mission
       )?.label || "-";
 
-    const fallbackBookmarks = bookmarks.map(
+    const finalBookmarks =
+      await fetchFinalBookmarks(
+        streamPlaybackUrl,
+        bookmarks
+      );
+
+    const fallbackBookmarks = finalBookmarks.map(
       (bookmark: any, index: number) => {
         const label =
           bookmark.labels?.[0] ||
@@ -927,6 +934,163 @@ const formatDuration = (seconds: number) => {
     "0"
   )}:${String(s).padStart(2, "0")}`;
 };
+
+
+const fetchLatestBookmarks = async (
+          playbackUrl: string
+        ): Promise<any[]> => {
+          if (!playbackUrl) {
+            return [];
+          }
+
+          const bookmarkUrl = playbackUrl.replace(
+            "index.m3u8",
+            "bookmark.ndjson"
+          );
+
+          const response = await fetch(bookmarkUrl, {
+            cache: "no-store",
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Bookmark request failed: ${response.status}`
+            );
+          }
+
+          const text = await response.text();
+
+          const lines = text
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const parsedRaw = lines.map((line) =>
+            JSON.parse(line)
+          );
+
+          const firstTimestamp =
+            parsedRaw[0]?.m || 0;
+
+          return parsedRaw.map((item, index) => {
+            const classIds = item.c_ar || [];
+
+            return {
+              id: `${item.s}-${index}`,
+              timeSec:
+                (item.m - firstTimestamp) / 1000,
+              type: classIds.some((id: number) =>
+                [3, 4, 5, 20, 21, 22].includes(id)
+              )
+                ? "alert"
+                : "person",
+              classIds,
+              c_ar: classIds,
+              labels: classIds.map(
+                (id: number) =>
+                  CLASS_LABELS[id] ||
+                  `Class ${id}`
+              ),
+              confidence: 90,
+              position: "top",
+            };
+          });
+        };
+
+       const fetchFinalBookmarks = async (
+  playbackUrl: string,
+  fallback: any[] = []
+): Promise<any[]> => {
+  let latest = fallback;
+
+  let previousCount = -1;
+  let stableCount = 0;
+
+  const maxAttempts = 8;
+  const requiredStableChecks = 3;
+  const intervalMs = 1000;
+
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      const fetched =
+        await fetchLatestBookmarks(
+          playbackUrl
+        );
+
+      /*
+       * Never replace a larger known snapshot
+       * with a temporarily smaller/empty response.
+       */
+      if (fetched.length >= latest.length) {
+        latest = fetched;
+      }
+
+      console.info(
+        "[WorkReport] Final bookmark check",
+        {
+          attempt,
+          fetchedCount: fetched.length,
+          latestCount: latest.length,
+          stableCount,
+        }
+      );
+
+      if (latest.length === previousCount) {
+        stableCount += 1;
+      } else {
+        stableCount = 0;
+      }
+
+      previousCount = latest.length;
+
+      if (
+        stableCount >= requiredStableChecks
+      ) {
+        console.info(
+          "[WorkReport] Bookmark data stabilized",
+          {
+            count: latest.length,
+            attempt,
+          }
+        );
+
+        return latest;
+      }
+    } catch (error) {
+      console.warn(
+        "[WorkReport] Final bookmark check failed",
+        {
+          attempt,
+          error,
+        }
+      );
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(
+          resolve,
+          intervalMs
+        );
+      });
+    }
+  }
+
+  console.info(
+    "[WorkReport] Bookmark finalization timeout",
+    {
+      finalCount: latest.length,
+    }
+  );
+
+  return latest;
+};
+
+
 
 const handleReportCancel = () => {
   setIsReportOpen(false);
@@ -1319,7 +1483,14 @@ const totalTimeText =
   formatDuration(totalSeconds);
 
 
-      const fallbackBookmarks = bookmarksRef.current.map(
+  const finalBookmarks =
+  await fetchFinalBookmarks(
+    streamPlaybackUrl,
+    bookmarksRef.current
+  );
+
+
+      const fallbackBookmarks = finalBookmarks.map(
   (bookmark: any, index: number) => {
     const label =
       bookmark.labels?.[0] ||
@@ -1903,7 +2074,13 @@ const missionName =
     (mission) => mission.value === values?.mission
   )?.label || "-";
 
-const fallbackBookmarks = bookmarks.map(
+  const finalBookmarks =
+  await fetchFinalBookmarks(
+    streamPlaybackUrl,
+    bookmarks
+  );
+
+const fallbackBookmarks = finalBookmarks.map(
   (bookmark: any, index: number) => {
     const label =
       bookmark.labels?.[0] ||
