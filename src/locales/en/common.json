@@ -589,5 +589,11 @@
   "mission_placeholder_location": "Enter location",
   "mission_table_location": "Location",
   "dashboard_table_location": "Location",
-"dashboard_table_view_mission": "View Mission"
+"dashboard_table_view_mission": "View Mission",
+"history_applied_filters": "Applied Filters",
+"history_add_filter": "Add Filter",
+"history_filter_apply": "Apply",
+"history_filter_cancel": "Cancel",
+"history_filter_no_results": "No results",
+"history_filter_search": "Search"
   }
