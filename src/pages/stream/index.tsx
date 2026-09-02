@@ -1,5 +1,4 @@
 import NoVideoIcon from "@/assets/no-video-icon.svg";
-import CustomModal from "@/components/common/customModal";
 import { Button, Form, Select, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -202,10 +201,13 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [remoteStopSignal, setRemoteStopSignal] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [activeMissionId, setActiveMissionId] = useState<string | null>(null);
   const [streamPlaybackUrl, setStreamPlaybackUrl] = useState("");
   const [streamMapUrl, setStreamMapUrl] = useState("");
 
   const userRole = detailUserLogin?.roles?.[0];
+  const currentUserName =
+  detailUserLogin?.user?.username || "-";
   const {
     optimisticStopDevice,
     getDashboardSilent,
@@ -388,8 +390,7 @@ const currentPlayerStatus = playerStatusConfig[playerStatus];
    autoJoinTriggeredRef.current = false;
 setPendingAutoJoinMissionId(null);
 
-setCanStopStream(true);
-setShouldSendHeartbeat(true);
+
     if (fieldName === "company") {
       form.setFieldsValue({
         site: undefined,
@@ -536,8 +537,9 @@ setShouldSendHeartbeat(true);
   setShouldSendHeartbeat(true);
   setRemoteStopSignal(null);
   autoJoinTriggeredRef.current = false;
-setPendingAutoJoinMissionId(null);
-}, []);
+  setPendingAutoJoinMissionId(null);
+  setActiveMissionId(null);
+  }, []);
 
   const broadcastStreamMessage = useCallback(
   (message: StreamSyncMessage) => {
@@ -671,26 +673,29 @@ setStreamMapUrl(resolvedMapUrl);
 
       setIsStreaming(active);
 
-     const activeMissionId =
-  res?.data?.missionId ??
-  res?.data?.mission_id ??
-  streamInfo?.missionId ??
-  streamInfo?.mission_id ??
-  values?.mission ??
-  null;
+     const resolvedActiveMissionId =
+      res?.data?.missionId ??
+      res?.data?.mission_id ??
+      streamInfo?.missionId ??
+      streamInfo?.mission_id ??
+      values?.mission ??
+      null;
 
-if (!joinedExisting) {
-  broadcastStreamMessage({
-    type: "STREAM_STARTED",
-    deviceSn: getCurrentDeviceSn(),
-    sessionId: res?.data?.sessionId || null,
-    playbackUrl,
-    mapUrl: resolvedMapUrl,
-    missionId: activeMissionId,
-    startTime: now.toISOString(),
-    startAtMs,
-  });
-}
+      setActiveMissionId(resolvedActiveMissionId);
+
+
+      if (!joinedExisting) {
+          broadcastStreamMessage({
+          type: "STREAM_STARTED",
+          deviceSn: getCurrentDeviceSn(),
+          sessionId: res?.data?.sessionId || null,
+          playbackUrl,
+          mapUrl: resolvedMapUrl,
+          missionId: resolvedActiveMissionId,
+          startTime: now.toISOString(),
+          startAtMs,
+        });
+      }
     }
 
    if (res?.data?.sessionId) {
@@ -754,11 +759,15 @@ const handleStopWork = async () => {
       getDashboardStatSilent();
     }, 800);
 
+    const stoppedMissionId =
+      activeMissionId ?? values?.mission ?? null;
+
     broadcastStreamMessage({
       type: "STREAM_STOPPED",
       deviceSn: stoppedDeviceSn,
       sessionId,
     });
+
 
     clearLocalStreamState();
 
@@ -816,16 +825,20 @@ const handleStopWork = async () => {
 
       
     const siteName =
-      siteOptions.find((site) => site.value === values?.site)?.label || "-";
+      siteOptions.find(
+        (site) => site.value === values?.site
+      )?.label || "-";
 
     const robotName =
       selectedRobotDetail?.deviceName ||
       selectedRobotDetail?.deviceSn ||
       "-";
 
-    const missionName =
+    const reportMissionId = stoppedMissionId;
+
+    const reportMissionName =
       missionOptions.find(
-        (mission) => mission.value === values?.mission
+        (mission) => mission.value === reportMissionId
       )?.label || "-";
 
     const finalBookmarks =
@@ -862,15 +875,19 @@ const handleStopWork = async () => {
       }
     );
 
-    const fallbackLabelCounts = fallbackBookmarks.reduce(
-      (acc: Record<string, number>, bookmark: any) => {
-        acc[bookmark.label] =
-          (acc[bookmark.label] || 0) + 1;
+    const fallbackLabelCounts =
+      fallbackBookmarks.reduce(
+        (
+          acc: Record<string, number>,
+          bookmark: any
+        ) => {
+          acc[bookmark.label] =
+            (acc[bookmark.label] || 0) + 1;
 
-        return acc;
-      },
-      {}
-    );
+          return acc;
+        },
+        {}
+      );
 
     setReportDetail({
       reportCreatedAt: endTimeText,
@@ -878,22 +895,35 @@ const handleStopWork = async () => {
       mapUrl: streamMapUrl,
       companyId: values?.company,
       siteId: values?.site,
-      missionId: values?.mission,
+      missionId: reportMissionId,
+
       startTime: startTimeText,
       endTime: endTimeText,
       totalTime: totalTimeText,
+
       distance: "-",
       siteName,
+
       deviceName: robotName,
       robotName,
-      missionName,
-      userName: "sysadmin",
-      workerName: "sysadmin",
-      deviceSn: selectedRobotDetail?.deviceSn || "",
-      totalRecognition: fallbackBookmarks.length,
-      labelCounts: fallbackLabelCounts,
-      bookmarks: fallbackBookmarks,
+
+      missionName: reportMissionName,
+
+      userName: currentUserName,
+      workerName: currentUserName,
+      deviceSn:
+        selectedRobotDetail?.deviceSn || "",
+
+      totalRecognition:
+        fallbackBookmarks.length,
+
+      labelCounts:
+        fallbackLabelCounts,
+
+      bookmarks:
+        fallbackBookmarks,
     });
+
 
     remoteSeenActiveRef.current = false;
     inactivePollCountRef.current = 0;
@@ -1536,27 +1566,33 @@ const fallbackLabelCounts =
 
       playerRef.current?.pause();
 
-      setReportDetail({
+      const reportMissionId =
+  activeMissionId ?? values?.mission ?? null;
+
+const reportMissionName =
+  missionOptions.find(
+    (mission) => mission.value === reportMissionId
+  )?.label || "-";
+
+       setReportDetail({
         reportCreatedAt: endTimeText,
         playbackUrl: streamPlaybackUrl,
         companyId: values?.company,
         siteId: values?.site,
-        missionId: values?.mission,
+        missionId: reportMissionId,
         startTime: startTimeText,
         endTime: endTimeText,
         totalTime: totalTimeText,
         distance: "-",
         siteName:
-          siteOptions.find((site) => site.value === values?.site)?.label ||
-          "-",
+          siteOptions.find(
+            (site) => site.value === values?.site
+          )?.label || "-",
         deviceName,
         robotName: deviceName,
-        missionName:
-          missionOptions.find(
-            (mission) => mission.value === values?.mission
-          )?.label || "-",
-        userName: "sysadmin",
-        workerName: "sysadmin",
+        missionName: reportMissionName,
+        userName: currentUserName,
+        workerName: currentUserName,
         deviceSn,
         totalRecognition: fallbackBookmarks.length,
         bookmarks: fallbackBookmarks,
@@ -1598,6 +1634,8 @@ const fallbackLabelCounts =
   siteOptions,
   missionOptions,
   sessionId,
+  activeMissionId,
+  currentUserName,
 ]);
 
 
@@ -1810,6 +1848,7 @@ useEffect(() => {
 
   const applyActiveStream = (message: StreamSyncMessage) => {
     if (!message?.deviceSn || !message.playbackUrl) return;
+    
 
     const currentDeviceSn = getCurrentDeviceSn();
     if (!currentDeviceSn || currentDeviceSn !== message.deviceSn) return;
@@ -1847,6 +1886,7 @@ setStreamMapUrl(resolvedMapUrl);
     setHlsRetryKey((prev) => prev + 1);
     setMapReady(false);
     setMapRetryKey(0);
+    setActiveMissionId(message.missionId ?? null);
   };
 
   const savedActiveStream = localStorage.getItem(ACTIVE_STREAM_KEY);
@@ -2069,9 +2109,12 @@ const robotName =
   selectedRobotDetail?.deviceSn ||
   "-";
 
+const reportMissionId =
+  activeMissionId ?? values?.mission ?? null;
+
 const missionName =
   missionOptions.find(
-    (mission) => mission.value === values?.mission
+    (mission) => mission.value === reportMissionId
   )?.label || "-";
 
   const finalBookmarks =
@@ -2130,7 +2173,7 @@ setReportDetail({
   mapUrl: streamMapUrl,
   companyId: values?.company,
   siteId: values?.site,
-  missionId: values?.mission,
+  missionId: reportMissionId,
 
   startTime: startTimeText,
   endTime: endTimeText,
@@ -2142,8 +2185,8 @@ setReportDetail({
   robotName,
   missionName,
 
-  userName: "sysadmin",
-  workerName: "sysadmin",
+  userName: currentUserName,
+  workerName: currentUserName,
 
   deviceSn:
     selectedRobotDetail?.deviceSn || "",
@@ -2201,6 +2244,8 @@ setIsReportOpen(true);
   missionOptions,
   selectedRobotDetail?.deviceName,
   selectedRobotDetail?.deviceSn,
+  activeMissionId,
+  currentUserName,
 ]);
 
 useEffect(() => {
@@ -2702,9 +2747,11 @@ const SmallStatusBadge = ({
                 <Select
                   placeholder={t("stream_select_mission")}
                   options={missionOptions}
-                  disabled={!values?.device}
+                  disabled={!values?.device || isStreaming}
                   className="h-[48px]"
-                  onChange={(value) => handleSelectChange("mission", value)}
+                  onChange={(value) =>
+                    handleSelectChange("mission", value)
+                  }
                 />
               </Form.Item>
 
