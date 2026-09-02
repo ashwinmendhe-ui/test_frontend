@@ -9,7 +9,7 @@ import { useSiteStore } from "@/stores/siteStore";
 import { useMissionStore } from "@/stores/missionStore";
 import { useRobotStore } from "@/stores/robotStore";
 import { useStreamStore } from "@/stores/streamStore";
-import { robotApi,streamApi } from "@/api";
+import { robotApi,streamApi, historyApi, } from "@/api";
 import { showNotification } from "@/utils/notification";
 import HLSPlayer from "@/components/hlsPlayer/hlsPlayer";
 import type { HLSPlayerRef } from "@/components/hlsPlayer/types";
@@ -136,6 +136,30 @@ const parseCoordinate = (...values: unknown[]): number | undefined => {
   }
 
   return undefined;
+};
+
+const normalizeDeviceTypeForCompare = (
+  value?: string | null
+): string => {
+  const normalized =
+    value?.trim().toLowerCase() || "";
+
+  if (
+    normalized === "drone" ||
+    normalized === "드론"
+  ) {
+    return "drone";
+  }
+
+  if (
+    normalized === "robot" ||
+    normalized === "quadruped robot" ||
+    normalized === "4족보행 로봇"
+  ) {
+    return "robot";
+  }
+
+  return normalized;
 };
 
 export default function StreamIndex() {
@@ -265,7 +289,12 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
       return true;
     }
 
-    return item.deviceType === selectedDevice.deviceType;
+    return (
+      normalizeDeviceTypeForCompare(item.deviceType) ===
+      normalizeDeviceTypeForCompare(
+        selectedDevice.deviceType
+      )
+    );
   });
 
   return filteredMissions.map((item) => ({
@@ -744,6 +773,8 @@ const handleStopWork = async () => {
 }
   try {
     setIsLoading(true);
+    const stoppedSessionId = sessionId;
+
     const stopRes = await streamApi.stop(streamPayload);
 
     const stoppedReport =
@@ -840,6 +871,56 @@ const handleStopWork = async () => {
       missionOptions.find(
         (mission) => mission.value === reportMissionId
       )?.label || "-";
+
+    const finalizedHistoryReport =
+      stoppedSessionId
+        ? await fetchFinalHistoryReport(
+            stoppedSessionId
+          )
+        : null;
+
+    if (finalizedHistoryReport) {
+      console.info(
+        "[WorkReport] Using finalized History report",
+        {
+          sessionId: stoppedSessionId,
+          totalRecognition:
+            finalizedHistoryReport
+              ?.totalRecognition,
+        }
+      );
+
+      setReportDetail({
+        ...finalizedHistoryReport,
+
+        mapUrl: streamMapUrl,
+
+        missionId:
+          finalizedHistoryReport?.missionId ??
+          reportMissionId,
+
+        missionName:
+          finalizedHistoryReport?.missionName ||
+          reportMissionName,
+
+        playbackUrl:
+          finalizedHistoryReport?.playbackUrl ||
+          streamPlaybackUrl,
+      });
+
+      remoteSeenActiveRef.current = false;
+      inactivePollCountRef.current = 0;
+
+      setIsReportOpen(true);
+
+      showNotification(
+        "success",
+        "Stream stopped",
+        "Work session stopped successfully."
+      );
+
+      return;
+    }
 
     const finalBookmarks =
       await fetchFinalBookmarks(
@@ -1027,24 +1108,24 @@ const fetchLatestBookmarks = async (
           });
         };
 
-       const fetchFinalBookmarks = async (
-  playbackUrl: string,
-  fallback: any[] = []
-): Promise<any[]> => {
-  let latest = fallback;
+  const fetchFinalBookmarks = async (
+      playbackUrl: string,
+      fallback: any[] = []
+    ): Promise<any[]> => {
+      let latest = fallback;
 
-  let previousCount = -1;
-  let stableCount = 0;
+      let previousCount = -1;
+      let stableCount = 0;
 
-  const maxAttempts = 8;
-  const requiredStableChecks = 3;
-  const intervalMs = 1000;
+      const maxAttempts = 8;
+      const requiredStableChecks = 3;
+      const intervalMs = 1000;
 
-  for (
-    let attempt = 1;
-    attempt <= maxAttempts;
-    attempt++
-  ) {
+      for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+      ) {
     try {
       const fetched =
         await fetchLatestBookmarks(
@@ -1121,6 +1202,111 @@ const fetchLatestBookmarks = async (
 };
 
 
+const fetchFinalHistoryReport = async (
+  sessionId: string
+): Promise<any | null> => {
+  if (!sessionId) {
+    return null;
+  }
+
+  let latestReport: any = null;
+  let previousTotal = -1;
+  let stableCount = 0;
+
+  const maxAttempts = 10;
+  const requiredStableChecks = 2;
+  const intervalMs = 700;
+
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      const report =
+        await historyApi.getBySessionId(
+          sessionId
+        );
+
+      if (report) {
+        latestReport = report;
+
+        const total =
+          Number(
+            report?.totalRecognition ??
+            report?.bookmarks?.length ??
+            0
+          );
+
+        console.info(
+          "[WorkReport] History finalization check",
+          {
+            sessionId,
+            attempt,
+            totalRecognition: total,
+            bookmarkCount:
+              report?.bookmarks?.length ?? 0,
+            stableCount,
+          }
+        );
+
+        /*
+         * Give AI/history some minimum settling time.
+         * Do not accept an early 98 -> 98 plateau
+         * immediately after STOP.
+         */
+        if (attempt >= 3) {
+          if (total === previousTotal) {
+            stableCount += 1;
+          } else {
+            stableCount = 0;
+          }
+
+          if (
+            stableCount >= requiredStableChecks
+          ) {
+            console.info(
+              "[WorkReport] History report stabilized",
+              {
+                sessionId,
+                totalRecognition: total,
+                attempt,
+              }
+            );
+
+            return latestReport;
+          }
+        }
+
+        previousTotal = total;
+      }
+    } catch (error) {
+      /*
+       * History may not exist during the first few
+       * requests while stream cleanup is completing.
+       */
+      console.warn(
+        "[WorkReport] History report not ready",
+        {
+          sessionId,
+          attempt,
+          error,
+        }
+      );
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(
+          resolve,
+          intervalMs
+        );
+      });
+    }
+  }
+
+  return latestReport;
+};
 
 const handleReportCancel = () => {
   setIsReportOpen(false);
@@ -1512,6 +1698,74 @@ const totalSeconds =
 const totalTimeText =
   formatDuration(totalSeconds);
 
+  const reportMissionId =
+  activeMissionId ?? values?.mission ?? null;
+
+const reportMissionName =
+  missionOptions.find(
+    (mission) => mission.value === reportMissionId
+  )?.label || "-";
+
+
+  const finalizedHistoryReport =
+  stoppedSessionId
+    ? await fetchFinalHistoryReport(
+        stoppedSessionId
+      )
+    : null;
+
+if (finalizedHistoryReport) {
+  console.info(
+    "[WorkReport] Observer using finalized History report",
+    {
+      sessionId: stoppedSessionId,
+      totalRecognition:
+        finalizedHistoryReport
+          ?.totalRecognition,
+    }
+  );
+
+  playerRef.current?.pause();
+
+  setReportDetail({
+    ...finalizedHistoryReport,
+
+    mapUrl: streamMapUrl,
+
+    missionId:
+      finalizedHistoryReport?.missionId ??
+      reportMissionId,
+
+    missionName:
+      finalizedHistoryReport?.missionName ||
+      reportMissionName,
+
+    playbackUrl:
+      finalizedHistoryReport?.playbackUrl ||
+      streamPlaybackUrl,
+  });
+
+  setIsReportOpen(true);
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+  setSessionId(null);
+
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+
+  setMapReady(false);
+  setMapRetryKey(0);
+
+  remoteSeenActiveRef.current = false;
+  inactivePollCountRef.current = 0;
+
+  return;
+}
 
   const finalBookmarks =
   await fetchFinalBookmarks(
@@ -1566,13 +1820,7 @@ const fallbackLabelCounts =
 
       playerRef.current?.pause();
 
-      const reportMissionId =
-  activeMissionId ?? values?.mission ?? null;
-
-const reportMissionName =
-  missionOptions.find(
-    (mission) => mission.value === reportMissionId
-  )?.label || "-";
+      
 
        setReportDetail({
         reportCreatedAt: endTimeText,
@@ -1636,6 +1884,7 @@ const reportMissionName =
   sessionId,
   activeMissionId,
   currentUserName,
+  streamMapUrl,
 ]);
 
 
@@ -2116,6 +2365,73 @@ const missionName =
   missionOptions.find(
     (mission) => mission.value === reportMissionId
   )?.label || "-";
+
+
+  const finalizedHistoryReport =
+  stoppedSessionId
+    ? await fetchFinalHistoryReport(
+        stoppedSessionId
+      )
+    : null;
+
+if (cancelled) {
+  return;
+}
+
+if (finalizedHistoryReport) {
+  console.info(
+    "[WorkReport] Remote tab using finalized History report",
+    {
+      sessionId: stoppedSessionId,
+      totalRecognition:
+        finalizedHistoryReport
+          ?.totalRecognition,
+    }
+  );
+
+  playerRef.current?.pause();
+
+  setReportDetail({
+    ...finalizedHistoryReport,
+
+    mapUrl: streamMapUrl,
+
+    missionId:
+      finalizedHistoryReport?.missionId ??
+      reportMissionId,
+
+    missionName:
+      finalizedHistoryReport?.missionName ||
+      missionName,
+
+    playbackUrl:
+      finalizedHistoryReport?.playbackUrl ||
+      streamPlaybackUrl,
+  });
+
+  setIsStreaming(false);
+  setIsPlaying(false);
+  setCurrentTime(0);
+  setDuration(0);
+  setSessionId(null);
+
+  setStreamPlaybackUrl("");
+  setStreamMapUrl("");
+
+  setPlayerStatus("OFFLINE");
+  setHasConnectedOnce(false);
+
+  setMapReady(false);
+  setMapRetryKey(0);
+
+  remoteSeenActiveRef.current = false;
+  inactivePollCountRef.current = 0;
+
+  setRemoteStopSignal(null);
+  setIsReportOpen(true);
+
+  return;
+}
 
   const finalBookmarks =
   await fetchFinalBookmarks(
@@ -2756,7 +3072,7 @@ const SmallStatusBadge = ({
               </Form.Item>
 
               <div className="flex items-center justify-end">
-                {!isStreaming ? (
+                {!isStreaming && !isLoading ? (
                   <Button
                     type="primary"
                     loading={isLoading}

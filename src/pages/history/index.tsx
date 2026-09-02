@@ -889,10 +889,10 @@ export default function History() {
         )}
 
         {/* Date + Search */}
-        <div className="flex gap-4 mt-[26px] mb-[14px]">
+        <div className="flex gap-4 mt-[26px] mb-[14px] w-1/2">
           <RangePicker
             size="large"
-            className="w-[310px]"
+            className="min-w-[300px]"
             onChange={handleDateRangeChange}
             value={dateRange}
             placeholder={[
@@ -903,14 +903,12 @@ export default function History() {
 
           <Search
             size="large"
-            placeholder={t(
-              "history_search_placeholder"
-            )}
+            placeholder={t("history_search_placeholder")}
             value={searchKeyword}
             onChange={(e) =>
               setSearchKeyword(e.target.value)
             }
-            className="w-[430px] rounded-[7px]"
+            className="flex-1 rounded-[7px]"
             allowClear
           />
         </div>

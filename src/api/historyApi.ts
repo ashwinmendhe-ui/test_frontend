@@ -10,4 +10,12 @@ export const historyApi = {
     const res = await axiosClient.get(`/v1/history/${id}`);
     return res.data;
   },
+
+  getBySessionId: async (sessionId: string) => {
+  const res = await axiosClient.get(
+    `/v1/history/session/${sessionId}`
+  );
+
+  return res.data?.data ?? res.data;
+},
 };
