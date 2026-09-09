@@ -1,6 +1,7 @@
 import ActionIcon from "@/assets/table-action-icon.svg";
 import ActionMenu from "@/components/common/actionMenu";
 import WorkReportModal from "@/components/common/workReportModal";
+import { useNavigate } from "react-router-dom";
 import {
   SortableTable,
   type SortableTableColumn,
@@ -17,6 +18,7 @@ import {
   Dropdown,
   Input,
   message,
+  Modal,
 } from "antd";
 import type { Dayjs } from "dayjs";
 import {
@@ -80,12 +82,14 @@ const EMPTY_FILTERS: HistoryFilters = {
 
 export default function History() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const {
     loading,
     list,
     getList,
     getDetail,
+    updateWorkIssue,
     detail,
   } = useHistoryStore();
 
@@ -100,17 +104,10 @@ export default function History() {
   const [selectedHistory, setSelectedHistory] =
     useState<HistoryManagementTable | null>(null);
 
-  /*
-   * Filters currently applied to the History list.
-   */
   const [filters, setFilters] = useState<HistoryFilters>({
     ...EMPTY_FILTERS,
   });
 
-  /*
-   * Temporary selections inside Add Filter.
-   * They are committed only after Apply.
-   */
   const [draftFilters, setDraftFilters] =
     useState<HistoryFilters>({
       ...EMPTY_FILTERS,
@@ -130,11 +127,24 @@ export default function History() {
   const [downloadingHistoryId, setDownloadingHistoryId] =
     useState<string | number | null>(null);
 
+  const [isWorkIssueModalOpen, setIsWorkIssueModalOpen] =
+    useState(false);
+
+  const [workIssueRecord, setWorkIssueRecord] =
+    useState<HistoryManagementTable | null>(null);
+
+  const [workIssueText, setWorkIssueText] =
+    useState("");
+
+  const [savingWorkIssue, setSavingWorkIssue] =
+    useState(false);
+
   const directDownloadRef = useRef<HTMLDivElement>(null);
 
   /*
-   * Company filter options
+   * Filter options
    */
+
   const companyOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -150,9 +160,6 @@ export default function History() {
     }));
   }, [list]);
 
-  /*
-   * Site filter options
-   */
   const siteOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -168,9 +175,6 @@ export default function History() {
     }));
   }, [list]);
 
-  /*
-   * Mission filter options
-   */
   const missionOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -186,9 +190,6 @@ export default function History() {
     }));
   }, [list]);
 
-  /*
-   * Robot filter options
-   */
   const robotOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -204,9 +205,6 @@ export default function History() {
     }));
   }, [list]);
 
-  /*
-   * Worker filter options
-   */
   const workerOptions = useMemo<FilterOption[]>(() => {
     return Array.from(
       new Set(
@@ -225,12 +223,6 @@ export default function History() {
       }));
   }, [list]);
 
-  /*
-   * AI Detection Type options.
-   *
-   * A History record may contain multiple detection types.
-   * Build one unique option list across all History records.
-   */
   const detectionTypeOptions =
     useMemo<FilterOption[]>(() => {
       const values = new Set<string>();
@@ -253,12 +245,6 @@ export default function History() {
         }));
     }, [list]);
 
-  /*
-   * Work Issue is free-text data.
-   *
-   * For filtering, the useful distinction is whether
-   * a History record has an issue or not.
-   */
   const workIssueOptions =
     useMemo<FilterOption[]>(
       () => [
@@ -274,9 +260,6 @@ export default function History() {
       [t]
     );
 
-  /*
-   * All categories shown in + Add Filter.
-   */
   const filterCategories = useMemo<FilterCategory[]>(
     () => [
       {
@@ -336,9 +319,6 @@ export default function History() {
     [filterCategories, activeFilterCategory]
   );
 
-  /*
-   * Search inside the currently selected filter category.
-   */
   const visibleFilterOptions = useMemo(() => {
     if (!activeCategory) {
       return [];
@@ -362,6 +342,7 @@ export default function History() {
   /*
    * Work Report
    */
+
   const handleView = async (
     record: HistoryManagementTable
   ) => {
@@ -374,6 +355,7 @@ export default function History() {
   /*
    * PDF download
    */
+
   const handleDownload = async (
     record: HistoryManagementTable
   ) => {
@@ -406,8 +388,127 @@ export default function History() {
   };
 
   /*
+   * Playback navigation
+   */
+
+  const handlePlayVideo = (
+    record: HistoryManagementTable
+  ) => {
+    if (!record.playbackUrl) {
+      message.warning(
+        t("history_video_unavailable")
+      );
+      return;
+    }
+
+    navigate("/playback", {
+      state: {
+        playbackUrl: record.playbackUrl,
+        companyId: record.companyId,
+        siteId: record.siteId,
+        missionId: record.missionId,
+        deviceSn: record.deviceSn,
+
+        historyDetail: {
+          historyId: record.historyId,
+
+          companyName:
+            record.companyName,
+
+          siteName:
+            record.siteName,
+
+          missionName:
+            record.missionName,
+
+          deviceName:
+            record.deviceName,
+
+          userName:
+            record.userName,
+
+          startTime:
+            record.startTime,
+
+          endTime:
+            record.endTime,
+
+          totalTime:
+            record.totalTime,
+
+          detectionTypes:
+            record.detectionTypes,
+
+          mainDetectionType:
+            record.mainDetectionType,
+
+          workIssue:
+            record.workIssue,
+        },
+      },
+    });
+  };
+
+  /*
+   * Work Issue
+   */
+
+  const handleEditWorkIssue = (
+    record: HistoryManagementTable
+  ) => {
+    setWorkIssueRecord(record);
+    setWorkIssueText(record.workIssue || "");
+    setIsWorkIssueModalOpen(true);
+  };
+
+  const handleCloseWorkIssueModal = () => {
+    if (savingWorkIssue) {
+      return;
+    }
+
+    setIsWorkIssueModalOpen(false);
+    setWorkIssueRecord(null);
+    setWorkIssueText("");
+  };
+
+  const handleSaveWorkIssue = async () => {
+    if (!workIssueRecord) {
+      return;
+    }
+
+    try {
+      setSavingWorkIssue(true);
+
+      await updateWorkIssue(
+        workIssueRecord.historyId,
+        workIssueText
+      );
+
+      message.success(
+        t("history_work_issue_saved")
+      );
+
+      setIsWorkIssueModalOpen(false);
+      setWorkIssueRecord(null);
+      setWorkIssueText("");
+    } catch (error) {
+      console.error(
+        "Failed to update work issue:",
+        error
+      );
+
+      message.error(
+        t("history_work_issue_save_failed")
+      );
+    } finally {
+      setSavingWorkIssue(false);
+    }
+  };
+
+  /*
    * Date filter
    */
+
   const handleDateRangeChange = (
     dates: [Dayjs | null, Dayjs | null] | null
   ) => {
@@ -415,11 +516,9 @@ export default function History() {
   };
 
   /*
-   * Open Add Filter popup.
-   *
-   * Copy applied filters into draft state so Cancel can
-   * safely discard any new selections.
+   * Filter popup
    */
+
   const openFilterPanel = () => {
     setDraftFilters({
       companyIds: [...filters.companyIds],
@@ -450,9 +549,6 @@ export default function History() {
     setFilterSearchKeyword("");
   };
 
-  /*
-   * Add/remove one temporary filter option.
-   */
   const toggleDraftFilter = (
     key: AvailableFilterKey,
     value: string
@@ -475,9 +571,6 @@ export default function History() {
     });
   };
 
-  /*
-   * Commit filter selections.
-   */
   const handleApplyFilters = () => {
     setFilters({
       companyIds: [...draftFilters.companyIds],
@@ -495,9 +588,6 @@ export default function History() {
     setIsFilterOpen(false);
   };
 
-  /*
-   * Discard selections made after opening the popup.
-   */
   const handleCancelFilter = () => {
     setDraftFilters({
       companyIds: [...filters.companyIds],
@@ -515,9 +605,6 @@ export default function History() {
     setIsFilterOpen(false);
   };
 
-  /*
-   * Remove one applied chip.
-   */
   const removeAppliedFilter = (
     key: AvailableFilterKey,
     value: string
@@ -532,8 +619,9 @@ export default function History() {
   };
 
   /*
-   * Convert applied filter values to UI chips.
+   * Applied filter chips
    */
+
   const appliedFilterChips = useMemo(() => {
     return filterCategories.flatMap(
       (category) => {
@@ -561,11 +649,13 @@ export default function History() {
   /*
    * History table
    */
+
   const columns = [
     {
       title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
+      width: 70,
 
       render: (
         _: unknown,
@@ -573,137 +663,254 @@ export default function History() {
         index: number
       ) => index + 1,
     },
-    {
-      title: t("history_created_at"),
-      dataIndex: "createdAt",
-      key: "createdAt",
-      enableSort: true,
 
-      render: (item: string) => (
-        <>{item || "-"}</>
-      ),
-    },
     {
-      title: t("history_company_name"),
-      dataIndex: "companyName",
-      key: "companyName",
-      enableSort: true,
-
-      render: (value: string) => (
-        <HighlightText
-          text={value}
-          query={searchKeyword}
-        />
-      ),
-    },
-    {
-      title: t("history_site_name"),
-      dataIndex: "siteName",
-      key: "siteName",
-      enableSort: true,
-
-      render: (value: string) => (
-        <HighlightText
-          text={value}
-          query={searchKeyword}
-        />
-      ),
-    },
-    {
-      title: t("history_mission_name"),
-      dataIndex: "missionName",
-      key: "missionName",
-      enableSort: true,
-
-      render: (value: string) => (
-        <HighlightText
-          text={value}
-          query={searchKeyword}
-        />
-      ),
-    },
-    {
-      title: t("history_robot_name"),
-      dataIndex: "deviceName",
-      key: "deviceName",
-      enableSort: true,
-
-      render: (value: string) => (
-        <HighlightText
-          text={value}
-          query={searchKeyword}
-        />
-      ),
-    },
-    {
-      title: t("history_worker_name"),
-      dataIndex: "userName",
-      key: "userName",
-      enableSort: true,
-
-      render: (value: string) => (
-        <HighlightText
-          text={value}
-          query={searchKeyword}
-        />
-      ),
-    },
-    {
-      title: t("history_total_recognition"),
-      dataIndex: "totalRecognition",
-      key: "totalRecognition",
+      title: t("history_work_time"),
+      key: "workTime",
       enableSort: false,
-    },
-    {
-      title: "",
-      key: "action",
+      width: 190,
 
       render: (
         _: unknown,
         record: HistoryManagementTable
       ) => (
-        <Dropdown
-          className="relative"
-          trigger={["hover"]}
-          popupRender={() => (
-            <ActionMenu
-              onEdit={() =>
-                handleView(record)
-              }
-              onDownload={() =>
-                handleDownload(record)
-              }
-              isShowEdit={true}
-              isShowDownload={true}
-              isShowDelete={false}
-              editLabel={t(
-                "history_view_report"
-              )}
-              isDownloading={
-                downloadingHistoryId ===
-                record.historyId
-              }
-            />
-          )}
-        >
-          <a
-            onClick={(e) =>
-              e.preventDefault()
-            }
-          >
-            <img
-              src={ActionIcon}
-              alt="ActionIcon"
-            />
-          </a>
-        </Dropdown>
+        <div className="flex flex-col gap-1">
+          <span className="font-medium text-[#111827]">
+            {record.startTime ||
+              record.createdAt ||
+              "-"}
+          </span>
+
+          <span className="text-xs text-[#6B7280]">
+            {record.totalTime || "-"}
+          </span>
+        </div>
       ),
     },
+
+    {
+      title: t("history_site_mission"),
+      key: "siteMission",
+      enableSort: false,
+      width: 190,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <div className="flex flex-col gap-1">
+          <HighlightText
+            text={record.siteName || "-"}
+            query={searchKeyword}
+          />
+
+          <span className="text-xs text-[#6B7280]">
+            <HighlightText
+              text={
+                record.missionName || "-"
+              }
+              query={searchKeyword}
+            />
+          </span>
+        </div>
+      ),
+    },
+
+    {
+      title: t("history_robot_name"),
+      key: "robot",
+      enableSort: false,
+      width: 170,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <div className="flex flex-col gap-1">
+          <HighlightText
+            text={record.deviceName || "-"}
+            query={searchKeyword}
+          />
+
+          <span className="text-xs text-[#6B7280]">
+            {record.deviceSn || "-"}
+          </span>
+        </div>
+      ),
+    },
+
+    {
+      title: t("history_worker_name"),
+      dataIndex: "userName",
+      key: "userName",
+      enableSort: true,
+      width: 150,
+
+      render: (value: string) => (
+        <HighlightText
+          text={value || "-"}
+          query={searchKeyword}
+        />
+      ),
+    },
+
+    {
+      title: t("history_detection_result"),
+      key: "detectionResult",
+      enableSort: false,
+      width: 190,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <div className="flex flex-col gap-1">
+          <span className="font-medium text-[#111827]">
+            {record.totalRecognition ?? 0}
+          </span>
+
+          {record.detectionTypes?.length >
+            0 && (
+            <span
+              className="text-xs text-[#6B7280] truncate max-w-[170px]"
+              title={record.detectionTypes.join(
+                ", "
+              )}
+            >
+              {record.detectionTypes.join(
+                ", "
+              )}
+            </span>
+          )}
+        </div>
+      ),
+    },
+
+    {
+      title: t(
+        "history_main_detection_type"
+      ),
+      key: "mainDetectionType",
+      enableSort: false,
+      width: 175,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <span
+          title={
+            record.mainDetectionType || ""
+          }
+        >
+          {record.mainDetectionType || "-"}
+        </span>
+      ),
+    },
+
+    {
+      title: t("history_work_issue"),
+      key: "workIssue",
+      enableSort: false,
+      width: 220,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <button
+          type="button"
+          onClick={() =>
+            handleEditWorkIssue(record)
+          }
+          className="w-full text-left"
+        >
+          {record.workIssue ? (
+            <span
+              className="block truncate text-[#374151] hover:text-[#1677ff]"
+              title={record.workIssue}
+            >
+              {record.workIssue}
+            </span>
+          ) : (
+            <span className="text-[#9CA3AF] hover:text-[#1677ff]">
+              +{" "}
+              {t(
+                "history_add_work_issue"
+              )}
+            </span>
+          )}
+        </button>
+      ),
+    },
+
+    {
+      title: "",
+      key: "playVideo",
+      enableSort: false,
+      width: 125,
+
+      render: (
+        _: unknown,
+        record: HistoryManagementTable
+      ) => (
+        <Button
+          type="primary"
+          disabled={
+            !record.playbackUrl ||
+            record.videoStatus !==
+              "AVAILABLE"
+          }
+          onClick={() =>
+            handlePlayVideo(record)
+          }
+        >
+          {t("history_play_video")}
+        </Button>
+      ),
+    },
+
+    {
+  title: "",
+  key: "action",
+  enableSort: false,
+
+  render: (
+    _: unknown,
+    record: HistoryManagementTable
+  ) => (
+    <Dropdown
+      className="relative"
+      trigger={["hover"]}
+      popupRender={() => (
+        <ActionMenu
+          onEdit={() => handleView(record)}
+          onDownload={() => handleDownload(record)}
+          isShowEdit={true}
+          isShowDownload={true}
+          isShowDelete={false}
+          editLabel={t("history_view_report")}
+          isDownloading={
+            downloadingHistoryId === record.historyId
+          }
+        />
+      )}
+    >
+      <a onClick={(e) => e.preventDefault()}>
+        <img
+          src={ActionIcon}
+          alt="ActionIcon"
+        />
+      </a>
+    </Dropdown>
+  ),
+},
   ] satisfies SortableTableColumn<HistoryManagementTable>[];
 
   /*
    * Keyword search
    */
+
   const searchFilteredList = filterByQuery(
     list,
     searchKeyword,
@@ -714,15 +921,15 @@ export default function History() {
       "deviceName",
       "deviceSn",
       "userName",
+      "workIssue",
+      "mainDetectionType",
     ]
   );
 
   /*
    * Structured filtering
-   *
-   * OR inside the same category.
-   * AND between different categories.
    */
+
   const filteredList =
     searchFilteredList.filter((item) => {
       const matchesDate =
@@ -787,14 +994,6 @@ export default function History() {
           item.userName
         );
 
-      /*
-       * Same-category OR:
-       *
-       * Person OR Vehicle OR NO-Hardhat
-       *
-       * A row passes when at least one selected detection
-       * type exists in its detectionTypes array.
-       */
       const matchesDetectionType =
         filters.detectionTypes.length ===
           0 ||
@@ -808,12 +1007,6 @@ export default function History() {
       const hasWorkIssue =
         Boolean(item.workIssue?.trim());
 
-      /*
-       * Work Issue options also use OR behavior.
-       *
-       * HAS_ISSUE OR NO_ISSUE means all records,
-       * which follows the same-category OR rule.
-       */
       const matchesWorkIssue =
         filters.workIssues.length === 0 ||
         filters.workIssues.some(
@@ -849,8 +1042,9 @@ export default function History() {
     });
 
   /*
-   * + Add Filter popup
+   * Filter popup
    */
+
   const filterPopup = (
     <div
       className="bg-white rounded-[8px] shadow-lg overflow-hidden"
@@ -865,7 +1059,6 @@ export default function History() {
           minHeight: 350,
         }}
       >
-        {/* Filter categories */}
         <div className="w-[190px] border-r border-gray-200 bg-gray-50">
           <div className="px-4 py-4 font-semibold text-[15px] border-b border-gray-200">
             {t("history_add_filter")}
@@ -922,7 +1115,6 @@ export default function History() {
           </div>
         </div>
 
-        {/* Filter values */}
         <div className="flex-1 flex flex-col">
           <div className="px-4 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3">
@@ -989,7 +1181,6 @@ export default function History() {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 bg-white">
         <Button
           onClick={handleCancelFilter}
@@ -1010,6 +1201,7 @@ export default function History() {
   /*
    * Load History
    */
+
   useEffect(() => {
     getList();
   }, [getList]);
@@ -1017,6 +1209,7 @@ export default function History() {
   /*
    * PDF generation
    */
+
   useEffect(() => {
     if (
       !downloadDetail ||
@@ -1200,6 +1393,44 @@ export default function History() {
           rowKey="historyId"
         />
       </div>
+
+      {/* Work Issue edit */}
+      <Modal
+        open={isWorkIssueModalOpen}
+        title={t("history_work_issue")}
+        onCancel={
+          handleCloseWorkIssueModal
+        }
+        onOk={handleSaveWorkIssue}
+        okText={t(
+          "history_work_issue_save"
+        )}
+        cancelText={t(
+          "history_filter_cancel"
+        )}
+        confirmLoading={
+          savingWorkIssue
+        }
+        destroyOnHidden
+      >
+        <Input.TextArea
+          value={workIssueText}
+          onChange={(e) =>
+            setWorkIssueText(
+              e.target.value
+            )
+          }
+          placeholder={t(
+            "history_work_issue_placeholder"
+          )}
+          autoSize={{
+            minRows: 4,
+            maxRows: 8,
+          }}
+          maxLength={1000}
+          showCount
+        />
+      </Modal>
 
       <WorkReportModal
         open={isModalOpen}

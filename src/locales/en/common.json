@@ -599,5 +599,24 @@
 "history_detection_type": "AI Detection Type",
 "history_work_issue": "Work Issue",
 "history_has_work_issue": "Has Work Issue",
-"history_no_work_issue": "No Work Issue" 
+"history_no_work_issue": "No Work Issue" ,
+
+"history_work_time": "Work Time",
+"history_site_mission": "Site / Mission",
+"history_detection_result": "Detection Result",
+"history_main_detection_type": "Main Detection Type",
+"history_play_video": "Play Video",
+"history_add_work_issue": "Add Work Issue",
+"history_work_issue_save": "Save",
+"history_work_issue_saved": "Work issue saved.",
+"history_work_issue_save_failed": "Failed to save work issue.",
+"history_work_issue_placeholder": "Enter work issue",
+"history_video_unavailable": "Video is not available.",
+"work_report_add_work_issue": "Add Work Issue",
+"work_report_edit_work_issue": "Edit Work Issue",
+"work_report_no_work_issue": "No work issue entered.",
+"work_report_generating_pdf": "Generating PDF...",
+"work_report_pdf_failed": "Failed to download PDF.",
+"work_report_playback_info_unavailable": "Playback information is not available.",
+"work_report_history_id_unavailable": "History information is not available."
   }
