@@ -290,9 +290,8 @@
   "company_validation_enter_address": "주소를 입력하세요",
 
   "site_search_placeholder": "사이트 검색",
-  
-  "site_table_registered_drone": "등록된 드론",
-  "site_table_online_drone": "온라인 드론",
+  "site_table_registered_drone": "등록된 로봇",
+"site_table_online_drone": "온라인 로봇",
   "site_table_created_date": "생성일",
   
   "site_delete_title": "삭제",
