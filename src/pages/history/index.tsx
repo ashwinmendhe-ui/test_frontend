@@ -35,6 +35,9 @@ import { downloadWorkReportPdf } from "@/utils/downloadWorkReportPdf";
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
+const WORK_ISSUE_HAS = "HAS_ISSUE";
+const WORK_ISSUE_NONE = "NO_ISSUE";
+
 interface HistoryFilters {
   companyIds: string[];
   siteIds: string[];
@@ -50,7 +53,9 @@ type AvailableFilterKey =
   | "siteIds"
   | "missionIds"
   | "deviceSns"
-  | "workers";
+  | "workers"
+  | "detectionTypes"
+  | "workIssues";
 
 interface FilterOption {
   value: string;
@@ -96,18 +101,15 @@ export default function History() {
     useState<HistoryManagementTable | null>(null);
 
   /*
-   * Applied filters.
-   *
-   * These are the filters currently affecting the History list.
+   * Filters currently applied to the History list.
    */
   const [filters, setFilters] = useState<HistoryFilters>({
     ...EMPTY_FILTERS,
   });
 
   /*
-   * Temporary selections inside the filter popup.
-   *
-   * The History list is NOT changed until Apply is clicked.
+   * Temporary selections inside Add Filter.
+   * They are committed only after Apply.
    */
   const [draftFilters, setDraftFilters] =
     useState<HistoryFilters>({
@@ -131,9 +133,8 @@ export default function History() {
   const directDownloadRef = useRef<HTMLDivElement>(null);
 
   /*
-   * Filter options
+   * Company filter options
    */
-
   const companyOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -149,6 +150,9 @@ export default function History() {
     }));
   }, [list]);
 
+  /*
+   * Site filter options
+   */
   const siteOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -164,6 +168,9 @@ export default function History() {
     }));
   }, [list]);
 
+  /*
+   * Mission filter options
+   */
   const missionOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -179,6 +186,9 @@ export default function History() {
     }));
   }, [list]);
 
+  /*
+   * Robot filter options
+   */
   const robotOptions = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
 
@@ -194,6 +204,9 @@ export default function History() {
     }));
   }, [list]);
 
+  /*
+   * Worker filter options
+   */
   const workerOptions = useMemo<FilterOption[]>(() => {
     return Array.from(
       new Set(
@@ -204,12 +217,66 @@ export default function History() {
               Boolean(name && name.trim())
           )
       )
-    ).map((name) => ({
-      value: name,
-      label: name,
-    }));
+    )
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        value: name,
+        label: name,
+      }));
   }, [list]);
 
+  /*
+   * AI Detection Type options.
+   *
+   * A History record may contain multiple detection types.
+   * Build one unique option list across all History records.
+   */
+  const detectionTypeOptions =
+    useMemo<FilterOption[]>(() => {
+      const values = new Set<string>();
+
+      list.forEach((item) => {
+        (item.detectionTypes || []).forEach(
+          (detectionType) => {
+            if (detectionType?.trim()) {
+              values.add(detectionType.trim());
+            }
+          }
+        );
+      });
+
+      return Array.from(values)
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({
+          value,
+          label: value,
+        }));
+    }, [list]);
+
+  /*
+   * Work Issue is free-text data.
+   *
+   * For filtering, the useful distinction is whether
+   * a History record has an issue or not.
+   */
+  const workIssueOptions =
+    useMemo<FilterOption[]>(
+      () => [
+        {
+          value: WORK_ISSUE_HAS,
+          label: t("history_has_work_issue"),
+        },
+        {
+          value: WORK_ISSUE_NONE,
+          label: t("history_no_work_issue"),
+        },
+      ],
+      [t]
+    );
+
+  /*
+   * All categories shown in + Add Filter.
+   */
   const filterCategories = useMemo<FilterCategory[]>(
     () => [
       {
@@ -237,6 +304,16 @@ export default function History() {
         label: t("history_worker_name"),
         options: workerOptions,
       },
+      {
+        key: "detectionTypes",
+        label: t("history_detection_type"),
+        options: detectionTypeOptions,
+      },
+      {
+        key: "workIssues",
+        label: t("history_work_issue"),
+        options: workIssueOptions,
+      },
     ],
     [
       t,
@@ -245,6 +322,8 @@ export default function History() {
       missionOptions,
       robotOptions,
       workerOptions,
+      detectionTypeOptions,
+      workIssueOptions,
     ]
   );
 
@@ -257,6 +336,9 @@ export default function History() {
     [filterCategories, activeFilterCategory]
   );
 
+  /*
+   * Search inside the currently selected filter category.
+   */
   const visibleFilterOptions = useMemo(() => {
     if (!activeCategory) {
       return [];
@@ -271,14 +353,15 @@ export default function History() {
     }
 
     return activeCategory.options.filter((option) =>
-      option.label.toLowerCase().includes(keyword)
+      option.label
+        .toLowerCase()
+        .includes(keyword)
     );
   }, [activeCategory, filterSearchKeyword]);
 
   /*
-   * Work Report actions
+   * Work Report
    */
-
   const handleView = async (
     record: HistoryManagementTable
   ) => {
@@ -288,6 +371,9 @@ export default function History() {
     setIsModalOpen(true);
   };
 
+  /*
+   * PDF download
+   */
   const handleDownload = async (
     record: HistoryManagementTable
   ) => {
@@ -320,9 +406,8 @@ export default function History() {
   };
 
   /*
-   * Date
+   * Date filter
    */
-
   const handleDateRangeChange = (
     dates: [Dayjs | null, Dayjs | null] | null
   ) => {
@@ -330,26 +415,32 @@ export default function History() {
   };
 
   /*
-   * Filter popup
+   * Open Add Filter popup.
+   *
+   * Copy applied filters into draft state so Cancel can
+   * safely discard any new selections.
    */
-
   const openFilterPanel = () => {
-  setDraftFilters({
-    companyIds: [...filters.companyIds],
-    siteIds: [...filters.siteIds],
-    missionIds: [...filters.missionIds],
-    deviceSns: [...filters.deviceSns],
-    workers: [...filters.workers],
-    detectionTypes: [...filters.detectionTypes],
-    workIssues: [...filters.workIssues],
-  });
+    setDraftFilters({
+      companyIds: [...filters.companyIds],
+      siteIds: [...filters.siteIds],
+      missionIds: [...filters.missionIds],
+      deviceSns: [...filters.deviceSns],
+      workers: [...filters.workers],
+      detectionTypes: [
+        ...filters.detectionTypes,
+      ],
+      workIssues: [...filters.workIssues],
+    });
 
-  setActiveFilterCategory("companyIds");
-  setFilterSearchKeyword("");
-  setIsFilterOpen(true);
-};
+    setActiveFilterCategory("companyIds");
+    setFilterSearchKeyword("");
+    setIsFilterOpen(true);
+  };
 
-  const handleFilterOpenChange = (open: boolean) => {
+  const handleFilterOpenChange = (
+    open: boolean
+  ) => {
     if (open) {
       openFilterPanel();
       return;
@@ -359,6 +450,9 @@ export default function History() {
     setFilterSearchKeyword("");
   };
 
+  /*
+   * Add/remove one temporary filter option.
+   */
   const toggleDraftFilter = (
     key: AvailableFilterKey,
     value: string
@@ -366,10 +460,12 @@ export default function History() {
     setDraftFilters((prev) => {
       const currentValues = prev[key];
 
-      const exists = currentValues.includes(value);
+      const exists =
+        currentValues.includes(value);
 
       return {
         ...prev,
+
         [key]: exists
           ? currentValues.filter(
               (item) => item !== value
@@ -379,6 +475,9 @@ export default function History() {
     });
   };
 
+  /*
+   * Commit filter selections.
+   */
   const handleApplyFilters = () => {
     setFilters({
       companyIds: [...draftFilters.companyIds],
@@ -396,6 +495,9 @@ export default function History() {
     setIsFilterOpen(false);
   };
 
+  /*
+   * Discard selections made after opening the popup.
+   */
   const handleCancelFilter = () => {
     setDraftFilters({
       companyIds: [...filters.companyIds],
@@ -403,7 +505,9 @@ export default function History() {
       missionIds: [...filters.missionIds],
       deviceSns: [...filters.deviceSns],
       workers: [...filters.workers],
-      detectionTypes: [...filters.detectionTypes],
+      detectionTypes: [
+        ...filters.detectionTypes,
+      ],
       workIssues: [...filters.workIssues],
     });
 
@@ -411,12 +515,16 @@ export default function History() {
     setIsFilterOpen(false);
   };
 
+  /*
+   * Remove one applied chip.
+   */
   const removeAppliedFilter = (
     key: AvailableFilterKey,
     value: string
   ) => {
     setFilters((prev) => ({
       ...prev,
+
       [key]: prev[key].filter(
         (item) => item !== value
       ),
@@ -424,37 +532,41 @@ export default function History() {
   };
 
   /*
-   * Applied filter chips
+   * Convert applied filter values to UI chips.
    */
-
   const appliedFilterChips = useMemo(() => {
-    return filterCategories.flatMap((category) => {
-      const selectedValues = filters[category.key];
+    return filterCategories.flatMap(
+      (category) => {
+        const selectedValues =
+          filters[category.key];
 
-      return selectedValues.map((value) => {
-        const option = category.options.find(
-          (item) => item.value === value
-        );
+        return selectedValues.map((value) => {
+          const option =
+            category.options.find(
+              (item) => item.value === value
+            );
 
-        return {
-          key: category.key,
-          categoryLabel: category.label,
-          value,
-          valueLabel: option?.label ?? value,
-        };
-      });
-    });
+          return {
+            key: category.key,
+            categoryLabel: category.label,
+            value,
+            valueLabel:
+              option?.label ?? value,
+          };
+        });
+      }
+    );
   }, [filterCategories, filters]);
 
   /*
    * History table
    */
-
   const columns = [
     {
       title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
+
       render: (
         _: unknown,
         __: HistoryManagementTable,
@@ -466,6 +578,7 @@ export default function History() {
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
+
       render: (item: string) => (
         <>{item || "-"}</>
       ),
@@ -475,6 +588,7 @@ export default function History() {
       dataIndex: "companyName",
       key: "companyName",
       enableSort: true,
+
       render: (value: string) => (
         <HighlightText
           text={value}
@@ -487,6 +601,7 @@ export default function History() {
       dataIndex: "siteName",
       key: "siteName",
       enableSort: true,
+
       render: (value: string) => (
         <HighlightText
           text={value}
@@ -499,6 +614,7 @@ export default function History() {
       dataIndex: "missionName",
       key: "missionName",
       enableSort: true,
+
       render: (value: string) => (
         <HighlightText
           text={value}
@@ -511,6 +627,7 @@ export default function History() {
       dataIndex: "deviceName",
       key: "deviceName",
       enableSort: true,
+
       render: (value: string) => (
         <HighlightText
           text={value}
@@ -523,6 +640,7 @@ export default function History() {
       dataIndex: "userName",
       key: "userName",
       enableSort: true,
+
       render: (value: string) => (
         <HighlightText
           text={value}
@@ -539,6 +657,7 @@ export default function History() {
     {
       title: "",
       key: "action",
+
       render: (
         _: unknown,
         record: HistoryManagementTable
@@ -548,14 +667,18 @@ export default function History() {
           trigger={["hover"]}
           popupRender={() => (
             <ActionMenu
-              onEdit={() => handleView(record)}
+              onEdit={() =>
+                handleView(record)
+              }
               onDownload={() =>
                 handleDownload(record)
               }
               isShowEdit={true}
               isShowDownload={true}
               isShowDelete={false}
-              editLabel={t("history_view_report")}
+              editLabel={t(
+                "history_view_report"
+              )}
               isDownloading={
                 downloadingHistoryId ===
                 record.historyId
@@ -563,7 +686,11 @@ export default function History() {
             />
           )}
         >
-          <a onClick={(e) => e.preventDefault()}>
+          <a
+            onClick={(e) =>
+              e.preventDefault()
+            }
+          >
             <img
               src={ActionIcon}
               alt="ActionIcon"
@@ -577,7 +704,6 @@ export default function History() {
   /*
    * Keyword search
    */
-
   const searchFilteredList = filterByQuery(
     list,
     searchKeyword,
@@ -592,33 +718,39 @@ export default function History() {
   );
 
   /*
-   * Structured filters
+   * Structured filtering
    *
-   * OR within same category:
-   * company A OR company B
-   *
-   * AND across categories:
-   * company AND site AND mission...
+   * OR inside the same category.
+   * AND between different categories.
    */
-
-  const filteredList = searchFilteredList.filter(
-    (item) => {
+  const filteredList =
+    searchFilteredList.filter((item) => {
       const matchesDate =
         !dateRange ||
         !dateRange[0] ||
         !dateRange[1] ||
         (() => {
           const itemDate = new Date(
-            item.createdAt.replace(" ", "T")
+            item.createdAt.replace(
+              " ",
+              "T"
+            )
           ).getTime();
 
           const from =
-            dateRange[0].startOf("day").valueOf();
+            dateRange[0]
+              .startOf("day")
+              .valueOf();
 
           const to =
-            dateRange[1].endOf("day").valueOf();
+            dateRange[1]
+              .endOf("day")
+              .valueOf();
 
-          return itemDate >= from && itemDate <= to;
+          return (
+            itemDate >= from &&
+            itemDate <= to
+          );
         })();
 
       const matchesCompany =
@@ -631,7 +763,9 @@ export default function History() {
       const matchesSite =
         filters.siteIds.length === 0 ||
         (!!item.siteId &&
-          filters.siteIds.includes(item.siteId));
+          filters.siteIds.includes(
+            item.siteId
+          ));
 
       const matchesMission =
         filters.missionIds.length === 0 ||
@@ -649,7 +783,58 @@ export default function History() {
 
       const matchesWorker =
         filters.workers.length === 0 ||
-        filters.workers.includes(item.userName);
+        filters.workers.includes(
+          item.userName
+        );
+
+      /*
+       * Same-category OR:
+       *
+       * Person OR Vehicle OR NO-Hardhat
+       *
+       * A row passes when at least one selected detection
+       * type exists in its detectionTypes array.
+       */
+      const matchesDetectionType =
+        filters.detectionTypes.length ===
+          0 ||
+        filters.detectionTypes.some(
+          (selectedType) =>
+            (
+              item.detectionTypes || []
+            ).includes(selectedType)
+        );
+
+      const hasWorkIssue =
+        Boolean(item.workIssue?.trim());
+
+      /*
+       * Work Issue options also use OR behavior.
+       *
+       * HAS_ISSUE OR NO_ISSUE means all records,
+       * which follows the same-category OR rule.
+       */
+      const matchesWorkIssue =
+        filters.workIssues.length === 0 ||
+        filters.workIssues.some(
+          (selectedIssue) => {
+            if (
+              selectedIssue ===
+              WORK_ISSUE_HAS
+            ) {
+              return hasWorkIssue;
+            }
+
+            if (
+              selectedIssue ===
+              WORK_ISSUE_NONE
+            ) {
+              return !hasWorkIssue;
+            }
+
+            return false;
+          }
+        );
 
       return (
         matchesDate &&
@@ -657,84 +842,87 @@ export default function History() {
         matchesSite &&
         matchesMission &&
         matchesRobot &&
-        matchesWorker
+        matchesWorker &&
+        matchesDetectionType &&
+        matchesWorkIssue
       );
-    }
-  );
+    });
 
   /*
-   * Filter popup content
+   * + Add Filter popup
    */
-
   const filterPopup = (
     <div
       className="bg-white rounded-[8px] shadow-lg overflow-hidden"
       style={{
-        width: 520,
+        width: 560,
         border: "1px solid #E5E7EB",
       }}
     >
       <div
         className="flex"
         style={{
-          minHeight: 310,
+          minHeight: 350,
         }}
       >
-        {/* Left category list */}
-        <div
-          className="w-[170px] border-r border-gray-200 bg-gray-50"
-        >
+        {/* Filter categories */}
+        <div className="w-[190px] border-r border-gray-200 bg-gray-50">
           <div className="px-4 py-4 font-semibold text-[15px] border-b border-gray-200">
             {t("history_add_filter")}
           </div>
 
           <div className="py-2">
-            {filterCategories.map((category) => {
-              const selectedCount =
-                draftFilters[category.key].length;
+            {filterCategories.map(
+              (category) => {
+                const selectedCount =
+                  draftFilters[
+                    category.key
+                  ].length;
 
-              const active =
-                activeFilterCategory ===
-                category.key;
+                const active =
+                  activeFilterCategory ===
+                  category.key;
 
-              return (
-                <button
-                  key={category.key}
-                  type="button"
-                  onClick={() => {
-                    setActiveFilterCategory(
-                      category.key
-                    );
-                    setFilterSearchKeyword("");
-                  }}
-                  className={[
-                    "w-full flex items-center justify-between",
-                    "px-4 py-3 text-left text-sm",
-                    "transition-colors",
-                    active
-                      ? "bg-blue-50 text-blue-600 font-medium"
-                      : "text-gray-700 hover:bg-gray-100",
-                  ].join(" ")}
-                >
-                  <span>{category.label}</span>
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => {
+                      setActiveFilterCategory(
+                        category.key
+                      );
 
-                  {selectedCount > 0 && (
-                    <span className="text-xs text-gray-500">
-                      {selectedCount}
+                      setFilterSearchKeyword(
+                        ""
+                      );
+                    }}
+                    className={[
+                      "w-full flex items-center justify-between",
+                      "px-4 py-3 text-left text-sm",
+                      "transition-colors",
+
+                      active
+                        ? "bg-blue-50 text-blue-600 font-medium"
+                        : "text-gray-700 hover:bg-gray-100",
+                    ].join(" ")}
+                  >
+                    <span>
+                      {category.label}
                     </span>
-                  )}
-                </button>
-              );
-            })}
 
-            {/*
-              AI Detection Type and Work Issue will be
-              added here once backend/list data exists.
-            */}
+                    {selectedCount > 0 && (
+                      <span className="text-xs text-gray-500">
+                        {selectedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+            )}
           </div>
         </div>
 
-        {/* Right option list */}
+        {/* Filter values */}
         <div className="flex-1 flex flex-col">
           <div className="px-4 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3">
@@ -743,7 +931,8 @@ export default function History() {
               </div>
 
               <div className="text-xs text-gray-500">
-                {activeCategory?.options.length ?? 0}
+                {activeCategory
+                  ?.options.length ?? 0}
               </div>
             </div>
 
@@ -755,16 +944,22 @@ export default function History() {
                   e.target.value
                 )
               }
-              placeholder={`${t("history_filter_search")} ${
-                activeCategory?.label ?? ""
+              placeholder={`${t(
+                "history_filter_search"
+              )} ${
+                activeCategory?.label ??
+                ""
               }`}
             />
           </div>
 
-          <div className="flex-1 max-h-[230px] overflow-y-auto px-4 py-3">
-            {visibleFilterOptions.length === 0 ? (
+          <div className="flex-1 max-h-[260px] overflow-y-auto px-4 py-3">
+            {visibleFilterOptions.length ===
+            0 ? (
               <div className="py-8 text-center text-sm text-gray-400">
-                {t("history_filter_no_results")}
+                {t(
+                  "history_filter_no_results"
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -774,7 +969,9 @@ export default function History() {
                       key={option.value}
                       checked={draftFilters[
                         activeFilterCategory
-                      ].includes(option.value)}
+                      ].includes(
+                        option.value
+                      )}
                       onChange={() =>
                         toggleDraftFilter(
                           activeFilterCategory,
@@ -792,9 +989,11 @@ export default function History() {
         </div>
       </div>
 
-      {/* Popup footer */}
+      {/* Footer */}
       <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 bg-white">
-        <Button onClick={handleCancelFilter}>
+        <Button
+          onClick={handleCancelFilter}
+        >
           {t("history_filter_cancel")}
         </Button>
 
@@ -809,9 +1008,8 @@ export default function History() {
   );
 
   /*
-   * Initial loading
+   * Load History
    */
-
   useEffect(() => {
     getList();
   }, [getList]);
@@ -819,7 +1017,6 @@ export default function History() {
   /*
    * PDF generation
    */
-
   useEffect(() => {
     if (
       !downloadDetail ||
@@ -833,13 +1030,17 @@ export default function History() {
 
     const generatePdf = async () => {
       try {
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() =>
-              resolve()
+        await new Promise<void>(
+          (resolve) => {
+            requestAnimationFrame(
+              () => {
+                requestAnimationFrame(
+                  () => resolve()
+                );
+              }
             );
-          });
-        });
+          }
+        );
 
         if (
           cancelled ||
@@ -864,7 +1065,9 @@ export default function History() {
       } finally {
         if (!cancelled) {
           setDownloadDetail(null);
-          setDownloadingHistoryId(null);
+          setDownloadingHistoryId(
+            null
+          );
         }
       }
     };
@@ -893,7 +1096,9 @@ export default function History() {
           <RangePicker
             size="large"
             className="min-w-[300px]"
-            onChange={handleDateRangeChange}
+            onChange={
+              handleDateRangeChange
+            }
             value={dateRange}
             placeholder={[
               t("common_from"),
@@ -903,65 +1108,80 @@ export default function History() {
 
           <Search
             size="large"
-            placeholder={t("history_search_placeholder")}
+            placeholder={t(
+              "history_search_placeholder"
+            )}
             value={searchKeyword}
             onChange={(e) =>
-              setSearchKeyword(e.target.value)
+              setSearchKeyword(
+                e.target.value
+              )
             }
             className="flex-1 rounded-[7px]"
             allowClear
           />
         </div>
 
-        {/* Applied filters */}
+        {/* Applied filter chips */}
         <div className="flex flex-wrap items-center gap-2 mb-[22px] min-h-[34px]">
-          {appliedFilterChips.length > 0 && (
+          {appliedFilterChips.length >
+            0 && (
             <span className="text-sm text-gray-500 mr-1">
-              {t("history_applied_filters")}
+              {t(
+                "history_applied_filters"
+              )}
             </span>
           )}
 
-          {appliedFilterChips.map((chip) => (
-            <div
-              key={`${chip.key}-${chip.value}`}
-              className={[
-                "inline-flex items-center gap-2",
-                "h-[32px] px-3",
-                "border border-gray-200",
-                "rounded-[6px]",
-                "bg-gray-50 text-sm",
-              ].join(" ")}
-            >
-              <span className="text-xs text-gray-400">
-                {chip.categoryLabel}
-              </span>
-
-              <span className="text-gray-700">
-                {chip.valueLabel}
-              </span>
-
-              <button
-                type="button"
-                aria-label={`Remove ${chip.valueLabel}`}
-                onClick={() =>
-                  removeAppliedFilter(
-                    chip.key,
-                    chip.value
-                  )
-                }
-                className="text-gray-400 hover:text-gray-700 text-base leading-none"
+          {appliedFilterChips.map(
+            (chip) => (
+              <div
+                key={`${chip.key}-${chip.value}`}
+                className={[
+                  "inline-flex items-center gap-2",
+                  "h-[32px] px-3",
+                  "border border-gray-200",
+                  "rounded-[6px]",
+                  "bg-gray-50 text-sm",
+                ].join(" ")}
               >
-                ×
-              </button>
-            </div>
-          ))}
+                <span className="text-xs text-gray-400">
+                  {
+                    chip.categoryLabel
+                  }
+                </span>
+
+                <span className="text-gray-700">
+                  {chip.valueLabel}
+                </span>
+
+                <button
+                  type="button"
+                  aria-label={`Remove ${chip.valueLabel}`}
+                  onClick={() =>
+                    removeAppliedFilter(
+                      chip.key,
+                      chip.value
+                    )
+                  }
+                  className="text-gray-400 hover:text-gray-700 text-base leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )
+          )}
 
           <Dropdown
             open={isFilterOpen}
-            onOpenChange={handleFilterOpenChange}
+            onOpenChange={
+              handleFilterOpenChange
+            }
             trigger={["click"]}
             placement="bottomLeft"
-            popupRender={() => filterPopup}
+            popupRender={() =>
+              filterPopup
+            }
           >
             <Button
               type="default"
@@ -1003,7 +1223,9 @@ export default function History() {
           <WorkReportContent
             detail={downloadDetail}
             reportMeta={selectedHistory}
-            reportRef={directDownloadRef}
+            reportRef={
+              directDownloadRef
+            }
             isExportingPdf={true}
           />
         </div>

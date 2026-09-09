@@ -595,5 +595,9 @@
 "history_filter_apply": "Apply",
 "history_filter_cancel": "Cancel",
 "history_filter_no_results": "No results",
-"history_filter_search": "Search"
+"history_filter_search": "Search",
+"history_detection_type": "AI Detection Type",
+"history_work_issue": "Work Issue",
+"history_has_work_issue": "Has Work Issue",
+"history_no_work_issue": "No Work Issue" 
   }

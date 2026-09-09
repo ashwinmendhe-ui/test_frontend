@@ -673,5 +673,9 @@
 "history_filter_apply": "적용",
 "history_filter_cancel": "취소",
 "history_filter_no_results": "검색 결과가 없습니다",
-"history_filter_search": "검색"
+"history_filter_search": "검색",
+"history_detection_type": "AI 감지 유형",
+"history_work_issue": "작업 이슈",
+"history_has_work_issue": "작업 이슈 있음",
+"history_no_work_issue": "작업 이슈 없음"
 }
