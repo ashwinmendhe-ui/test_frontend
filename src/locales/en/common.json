@@ -618,5 +618,6 @@
 "work_report_generating_pdf": "Generating PDF...",
 "work_report_pdf_failed": "Failed to download PDF.",
 "work_report_playback_info_unavailable": "Playback information is not available.",
-"work_report_history_id_unavailable": "History information is not available."
+"work_report_history_id_unavailable": "History information is not available.",
+"mission_type_safety_surveillance": "Safety surveillance"
   }

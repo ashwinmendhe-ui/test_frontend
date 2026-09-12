@@ -40,11 +40,15 @@ export default function MissionForm({
   ];
 
   const missionTypeOptions = [
-    { value: "Patrol", label: t("mission_type_patrol") },
-    { value: "Monitoring", label: t("mission_type_monitoring") },
-    { value: "Delivery", label: t("mission_type_delivery") },
-    { value: "Cleaning", label: t("mission_type_cleaning") },
-  ];
+  { value: "Patrol", label: t("mission_type_patrol") },
+  {
+    value: "Safety surveillance",
+    label: t("mission_type_safety_surveillance"),
+  },
+  { value: "Delivery", label: t("mission_type_delivery") },
+  { value: "Cleaning", label: t("mission_type_cleaning") },
+  { value: "Monitoring", label: t("mission_type_monitoring") },
+];
 
   const { list: listCompany, getList: getListCompany } = useCompanyStore();
   const { list: listSite, getListByCompany } = useSiteStore();
