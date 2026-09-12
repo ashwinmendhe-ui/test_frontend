@@ -1,5 +1,6 @@
 import { robotApi } from "@/api";
 import { create } from "zustand";
+import { normalizeDeviceType } from "@/utils/deviceType";
 
 export interface DetailDevice {
   companyAddress?: string;
@@ -102,7 +103,7 @@ const mapRobotListItem = (item: any): RobotManagementTable => ({
   companyName: item.companyName || item.company?.name || "",
   siteId: item.siteId || item.site?.siteId || item.site?.id || "",
   siteName: item.siteName || item.site?.name || "",
-  deviceType: item.deviceType || "",
+deviceType: normalizeDeviceType(item.deviceType),
   brandName: item.brandName || "",
   model: item.model || "",
   deviceSn: item.deviceSn || "",
@@ -120,7 +121,7 @@ const mapRobotDetail = (item: any): DetailDevice => ({
   description: item.description || "",
   deviceId: item.deviceId || "",
   deviceSn: item.deviceSn || "",
-  deviceType: item.deviceType || "",
+deviceType: normalizeDeviceType(item.deviceType),
   firmware: item.firmware || "",
   id: item.id || 0,
   model: item.model || "",

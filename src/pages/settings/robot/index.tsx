@@ -3,8 +3,14 @@ import ActionIcon from "@/assets/table-action-icon.svg";
 import ActionMenu from "@/components/common/actionMenu";
 import CustomModal from "@/components/common/customModal";
 import StatusBadge from "@/components/common/statusBadge";
-import { SortableTable, type SortableTableColumn } from "@/components/common/table";
-import { useRobotStore, type RobotManagementTable } from "@/stores/robotStore";
+import {
+  SortableTable,
+  type SortableTableColumn,
+} from "@/components/common/table";
+import {
+  useRobotStore,
+  type RobotManagementTable,
+} from "@/stores/robotStore";
 import { useUserStore } from "@/stores/userStore";
 import { Button, DatePicker, Dropdown, Input, message } from "antd";
 import type { Dayjs } from "dayjs";
@@ -13,6 +19,7 @@ import { Link, useNavigate } from "react-router-dom";
 import HighlightText from "@/components/common/HighlightText";
 import { filterByQuery } from "@/utils/filterByQuery";
 import { useTranslation } from "react-i18next";
+import { normalizeDeviceType } from "@/utils/deviceType";
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -28,7 +35,11 @@ export default function Robot() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] =
     useState<RobotManagementTable | null>(null);
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+
+  const [dateRange, setDateRange] = useState<
+    [Dayjs | null, Dayjs | null] | null
+  >(null);
+
   const [searchKeyword, setSearchKeyword] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -46,7 +57,9 @@ export default function Robot() {
 
     try {
       await deleteRobot(selectedRecord.deviceId);
+
       messageApi.success(t("robot_delete_success"));
+
       setIsModalOpen(false);
       setSelectedRecord(null);
     } catch (error: any) {
@@ -66,8 +79,13 @@ export default function Robot() {
       title: t("table_id"),
       key: "rowIndex",
       enableSort: false,
-      render: (_: unknown, __: RobotManagementTable, index: number) => index + 1,
+      render: (
+        _: unknown,
+        __: RobotManagementTable,
+        index: number
+      ) => index + 1,
     },
+
     {
       title: t("robot_table_name"),
       dataIndex: "deviceName",
@@ -77,6 +95,7 @@ export default function Robot() {
         <HighlightText text={value} query={searchKeyword} />
       ),
     },
+
     {
       title: t("robot_table_company"),
       dataIndex: "companyName",
@@ -86,6 +105,7 @@ export default function Robot() {
         <HighlightText text={value} query={searchKeyword} />
       ),
     },
+
     {
       title: t("robot_table_site"),
       dataIndex: "siteName",
@@ -97,15 +117,31 @@ export default function Robot() {
         </div>
       ),
     },
+
     {
       title: t("robot_table_type"),
       dataIndex: "deviceType",
       key: "deviceType",
       enableSort: true,
-      render: (value: string) => (
-        <HighlightText text={value} query={searchKeyword} />
-      ),
+      render: (value: string) => {
+        const type = normalizeDeviceType(value);
+
+        const label =
+          type === "Drone"
+            ? t("robot_type_drone")
+            : type === "Robot"
+            ? t("robot_type_quadruped")
+            : value || "-";
+
+        return (
+          <HighlightText
+            text={label}
+            query={searchKeyword}
+          />
+        );
+      },
     },
+
     {
       title: t("robot_table_brand"),
       dataIndex: "brandName",
@@ -113,6 +149,7 @@ export default function Robot() {
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
+
     {
       title: t("robot_table_model"),
       dataIndex: "model",
@@ -120,6 +157,7 @@ export default function Robot() {
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
+
     {
       title: t("robot_table_serial_number"),
       dataIndex: "deviceSn",
@@ -127,28 +165,37 @@ export default function Robot() {
       enableSort: true,
       render: (value?: string) => <>{value || "-"}</>,
     },
+
     {
       title: t("robot_table_identifier"),
       dataIndex: "deviceId",
       key: "deviceId",
       enableSort: true,
       render: (value: string) => (
-        <HighlightText text={value} query={searchKeyword} />
+        <HighlightText
+          text={value}
+          query={searchKeyword}
+        />
       ),
     },
+
     {
       title: t("robot_table_created_date"),
       dataIndex: "createdAt",
       key: "createdAt",
       enableSort: true,
     },
+
     {
       title: t("table_status"),
       dataIndex: "status",
       key: "status",
       enableSort: true,
-      render: (item: string) => <StatusBadge status={item} />,
+      render: (item: string) => (
+        <StatusBadge status={item} />
+      ),
     },
+
     {
       title: "",
       key: "action",
@@ -173,16 +220,20 @@ export default function Robot() {
     },
   ] satisfies SortableTableColumn<RobotManagementTable>[];
 
-  const searchFilteredList = filterByQuery(list, searchKeyword, [
-    "deviceName",
-    "companyName",
-    "siteName",
-    "deviceType",
-    "brandName",
-    "model",
-    "deviceSn",
-    "deviceId",
-  ]);
+  const searchFilteredList = filterByQuery(
+    list,
+    searchKeyword,
+    [
+      "deviceName",
+      "companyName",
+      "siteName",
+      "deviceType",
+      "brandName",
+      "model",
+      "deviceSn",
+      "deviceId",
+    ]
+  );
 
   const filteredList = searchFilteredList.filter((item) => {
     const matchesDate =
@@ -191,15 +242,22 @@ export default function Robot() {
       !dateRange[1] ||
       (() => {
         const itemDate = new Date(item.createdAt).getTime();
-        const from = dateRange[0]?.startOf("day").valueOf() ?? 0;
-        const to = dateRange[1]?.endOf("day").valueOf() ?? 0;
+
+        const from =
+          dateRange[0]?.startOf("day").valueOf() ?? 0;
+
+        const to =
+          dateRange[1]?.endOf("day").valueOf() ?? 0;
+
         return itemDate >= from && itemDate <= to;
       })();
 
     return matchesDate;
   });
 
-  const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+  const handleDateRangeChange = (
+    dates: [Dayjs | null, Dayjs | null] | null
+  ) => {
     setDateRange(dates);
   };
 
@@ -213,7 +271,9 @@ export default function Robot() {
 
       <div className="w-full relative min-w-0">
         {loading && (
-          <div className="mb-3 text-sm text-gray-500">{t("common_loading")}</div>
+          <div className="mb-3 text-sm text-gray-500">
+            {t("common_loading")}
+          </div>
         )}
 
         <div className="flex flex-wrap justify-between items-start gap-4 mt-[26px] mb-[22px]">
@@ -223,13 +283,19 @@ export default function Robot() {
               className="w-full sm:w-auto min-w-[240px]"
               onChange={handleDateRangeChange}
               value={dateRange}
-              placeholder={[t("common_from"), t("common_to")]}
+              placeholder={[
+                t("common_from"),
+                t("common_to"),
+              ]}
             />
+
             <Search
               size="large"
               placeholder={t("robot_search_placeholder")}
               value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
+              onChange={(e) =>
+                setSearchKeyword(e.target.value)
+              }
               className="min-w-[220px] flex-1 rounded-[7px]"
               allowClear
             />
@@ -248,7 +314,11 @@ export default function Robot() {
         </div>
 
         <div className="w-full min-w-0 overflow-x-auto">
-          <SortableTable columns={columns} data={filteredList} rowKey="deviceId" />
+          <SortableTable
+            columns={columns}
+            data={filteredList}
+            rowKey="deviceId"
+          />
         </div>
       </div>
 

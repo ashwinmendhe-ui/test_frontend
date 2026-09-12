@@ -180,8 +180,8 @@
 
   "site_search_placeholder": "Search Site",
   "site_table_company": "Company",
-  "site_table_registered_drone": "Registered Drone",
-  "site_table_online_drone": "Online Drone",
+  "site_table_registered_drone": "Registered Robot",
+"site_table_online_drone": "Online Robot",
   "site_table_created_date": "Created Date",
   "site_table_address": "Address",
   "site_delete_title": "Delete",

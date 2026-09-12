@@ -1,5 +1,6 @@
 import { missionApi } from "@/api";
 import { create } from "zustand";
+import { normalizeDeviceType } from "@/utils/deviceType";
 
 export interface MissionManagementTable {
   missionId: string;
@@ -71,7 +72,7 @@ const mapMissionListItem = (item: any): MissionManagementTable => ({
   siteId: item.siteId || item.site?.siteId || item.site?.id || "",
   siteName: item.siteName || item.site?.name || "",
   location: item.location || "",
-  deviceType: item.deviceType || "",
+deviceType: normalizeDeviceType(item.deviceType),
   missionType: item.missionType || item.category || "",
   file: item.file || item.fileName || "",
   createdAt: item.createdAt || item.createdDate || "",
@@ -87,7 +88,7 @@ const mapMissionDetail = (item: any): MissionFormValue => ({
   missionType: item.missionType || item.category || "",
   file: item.file || item.fileName || "",
   downloadUrl: item.downloadUrl || "",
-  deviceType: item.deviceType || "",
+deviceType: normalizeDeviceType(item.deviceType),
   description: item.description || "",
 });
 

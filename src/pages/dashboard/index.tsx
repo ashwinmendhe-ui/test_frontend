@@ -51,52 +51,50 @@ type DashboardCard = {
 export default function Dashboard() {
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
+
   const {
-  dashboard,
-  stat,
-  loading,
-  getDashboard,
-  getDashboardStat,
-  getDashboardSilent,
-  getDashboardStatSilent,
-} = useDashboardStore();
+    dashboard,
+    stat,
+    loading,
+    getDashboard,
+    getDashboardStat,
+    getDashboardSilent,
+    getDashboardStatSilent,
+  } = useDashboardStore();
 
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [deviceStatusMap, setDeviceStatusMap] = useState<Record<string, any>>(
-    {}
-  );
+
+  const [deviceStatusMap, setDeviceStatusMap] = useState<
+    Record<string, any>
+  >({});
 
   const userRole = detailUserLogin?.roles?.[0];
 
   // const handleStatusMessage = useCallback((message: any) => {
   //   const key = message.deviceSn || message.deviceId;
   //   if (!key) return;
-
+  //
   //   setDeviceStatusMap((prev) => ({
   //     ...prev,
   //     [key]: message,
   //   }));
   // }, []);
 
-  const handleDashboardDeviceMessage = useCallback(
-  () => {
+  const handleDashboardDeviceMessage = useCallback(() => {
     getDashboardSilent();
     getDashboardStatSilent();
-  },
-  [getDashboardSilent, getDashboardStatSilent]
-);
+  }, [getDashboardSilent, getDashboardStatSilent]);
 
-useWebSocket(
-  import.meta.env.VITE_WS_URL,
-  TOPIC.DASHBOARD_DEVICES,
-  handleDashboardDeviceMessage,
-  true,
-  () => {
-    getDashboardSilent();
-    getDashboardStatSilent();
-  }
-);
-
+  useWebSocket(
+    import.meta.env.VITE_WS_URL,
+    TOPIC.DASHBOARD_DEVICES,
+    handleDashboardDeviceMessage,
+    true,
+    () => {
+      getDashboardSilent();
+      getDashboardStatSilent();
+    }
+  );
 
   useEffect(() => {
     getDashboard();
@@ -115,6 +113,7 @@ useWebSocket(
           },
         ]
       : []),
+
     {
       key: "site",
       label: t("dashboard_card_site"),
@@ -122,6 +121,7 @@ useWebSocket(
       bgClass: "bg-[#FBF6FF]",
       icon: HomeSite,
     },
+
     ...(userRole === 1 || userRole === 2
       ? [
           {
@@ -133,6 +133,7 @@ useWebSocket(
           },
         ]
       : []),
+
     {
       key: "robot",
       label: t("dashboard_card_robot"),
@@ -145,9 +146,12 @@ useWebSocket(
   const mergedDashboard = useMemo(() => {
     return dashboard.map((item) => {
       const live =
-        deviceStatusMap[item.deviceSn] || deviceStatusMap[item.deviceId];
+        deviceStatusMap[item.deviceSn] ||
+        deviceStatusMap[item.deviceId];
 
-      if (!live) return item;
+      if (!live) {
+        return item;
+      }
 
       return {
         ...item,
@@ -158,18 +162,88 @@ useWebSocket(
     });
   }, [dashboard, deviceStatusMap]);
 
+  /**
+   * Default dashboard ordering defined by FPTRP-221:
+   *
+   * 1. Active
+   * 2. Working
+   * 3. Inactive
+   *
+   * Status aliases used by the application are grouped here as well:
+   *
+   * active / online / true     -> Active
+   * working                    -> Working
+   * inactive / offline / false -> Inactive
+   */
+  const getStatusPriority = (
+    status: string | boolean
+  ): number => {
+    if (status === true) {
+      return 0;
+    }
+
+    if (status === false) {
+      return 2;
+    }
+
+    const normalizedStatus = String(
+      status || ""
+    ).toLowerCase();
+
+    if (
+      normalizedStatus === "active" ||
+      normalizedStatus === "online"
+    ) {
+      return 0;
+    }
+
+    if (normalizedStatus === "working") {
+      return 1;
+    }
+
+    if (
+      normalizedStatus === "inactive" ||
+      normalizedStatus === "offline"
+    ) {
+      return 2;
+    }
+
+    // Unknown/new statuses stay after the defined groups.
+    return 3;
+  };
+
+  /**
+   * Sort after dashboard/live status values have been merged.
+   * Use a copied array so the store data is not mutated.
+   */
+  const sortedDashboard = useMemo(() => {
+    return [...mergedDashboard].sort(
+      (a, b) =>
+        getStatusPriority(a.status) -
+        getStatusPriority(b.status)
+    );
+  }, [mergedDashboard]);
+
+  /**
+   * Apply search after default status grouping so the filtered
+   * result keeps the same Active -> Working -> Inactive order.
+   */
   const filteredData = useMemo(() => {
-    return filterByQuery(mergedDashboard, searchKeyword, [
-      "deviceName",
-      "companyName",
-      "siteName",
-      "location",
-      "status",
-      "missionName",
-      "deviceId",
-      "deviceSn",
-    ]);
-  }, [mergedDashboard, searchKeyword]);
+    return filterByQuery(
+      sortedDashboard,
+      searchKeyword,
+      [
+        "deviceName",
+        "companyName",
+        "siteName",
+        "location",
+        "status",
+        "missionName",
+        "deviceId",
+        "deviceSn",
+      ]
+    );
+  }, [sortedDashboard, searchKeyword]);
 
   const HOME_COLUMN_WIDTH = 180;
 
@@ -180,7 +254,10 @@ useWebSocket(
     enableSort: true,
     width: HOME_COLUMN_WIDTH,
     render: (value: string) => (
-      <HighlightText text={value || "-"} query={searchKeyword} />
+      <HighlightText
+        text={value || "-"}
+        query={searchKeyword}
+      />
     ),
   };
 
@@ -194,7 +271,10 @@ useWebSocket(
       enableSort: true,
       width: HOME_COLUMN_WIDTH,
       render: (value: string) => (
-        <HighlightText text={value || "-"} query={searchKeyword} />
+        <HighlightText
+          text={value || "-"}
+          query={searchKeyword}
+        />
       ),
     },
 
@@ -204,10 +284,16 @@ useWebSocket(
       key: "deviceName",
       enableSort: true,
       width: HOME_COLUMN_WIDTH,
-      render: (value: string, record: DashboardRow) => (
+      render: (
+        value: string,
+        record: DashboardRow
+      ) => (
         <div>
           <div>
-            <HighlightText text={value || "-"} query={searchKeyword} />
+            <HighlightText
+              text={value || "-"}
+              query={searchKeyword}
+            />
           </div>
 
           {record.deviceSn && (
@@ -229,7 +315,10 @@ useWebSocket(
       enableSort: true,
       width: HOME_COLUMN_WIDTH,
       render: (value?: string) => (
-        <HighlightText text={value || "-"} query={searchKeyword} />
+        <HighlightText
+          text={value || "-"}
+          query={searchKeyword}
+        />
       ),
     },
 
@@ -239,9 +328,9 @@ useWebSocket(
       key: "status",
       enableSort: true,
       width: HOME_COLUMN_WIDTH,
-      render: (value: string | boolean) => (
-        <StatusBadge status={value} />
-      ),
+      render: (
+        value: string | boolean
+      ) => <StatusBadge status={value} />,
     },
 
     {
@@ -267,7 +356,10 @@ useWebSocket(
       title: t("dashboard_table_view_mission"),
       key: "action",
       width: HOME_COLUMN_WIDTH,
-      render: (_: unknown, record: DashboardRow) => {
+      render: (
+        _: unknown,
+        record: DashboardRow
+      ) => {
         const currentStatus = String(
           record.status || ""
         ).toLowerCase();
@@ -291,7 +383,9 @@ useWebSocket(
             to={`/stream/${record.deviceId}`}
             state={{
               fromDashboard: true,
-              openLiveStream: currentStatus === "working",
+
+              openLiveStream:
+                currentStatus === "working",
 
               companyId: record.companyId,
               companyName: record.companyName,
@@ -309,15 +403,16 @@ useWebSocket(
               status: record.status,
             }}
           >
-            <img src={ViewDrone} alt="view" />
+            <img
+              src={ViewDrone}
+              alt="view"
+            />
           </Link>
         );
       },
     },
   ];
-  
 
-  
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[11px]">
@@ -330,6 +425,7 @@ useWebSocket(
               <span className="text-[60px] font-bold leading-none text-[#333D4B]">
                 {item.value}
               </span>
+
               <span className="mt-4 bg-white rounded-full py-1 px-4 text-[12px] text-[#333D4B] font-semibold w-fit">
                 {item.label}
               </span>
@@ -347,9 +443,13 @@ useWebSocket(
       <div className="mt-[26px] mb-[22px]">
         <Search
           size="large"
-          placeholder={t("dashboard_search_placeholder")}
+          placeholder={t(
+            "dashboard_search_placeholder"
+          )}
           value={searchKeyword}
-          onChange={(e) => setSearchKeyword(e.target.value)}
+          onChange={(e) =>
+            setSearchKeyword(e.target.value)
+          }
           className="w-full rounded-[7px]"
           allowClear
         />
