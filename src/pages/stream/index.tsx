@@ -2915,6 +2915,13 @@ const showDangerDetection =
     dangerModules.some((d) => d.value === m)
   );
 
+const canStartWork = Boolean(
+  values?.company &&
+  values?.site &&
+  values?.device &&
+  values?.mission
+);
+
   const liveLatitude = parseCoordinate(
   liveDeviceInfo?.latitude,
   liveDeviceInfo?.lat,
@@ -3076,8 +3083,9 @@ const SmallStatusBadge = ({
                   <Button
                     type="primary"
                     loading={isLoading}
+                    disabled={!canStartWork}
                     onClick={handleStartWork}
-                    className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#16A34A]! border-[#16A34A]! text-white! font-bold! text-[18px]!"
+                    className="w-[150px]! h-[56px]! rounded-[10px]! bg-[#16A34A]! border-[#16A34A]! text-white! font-bold! text-[18px]! disabled:opacity-50! disabled:cursor-not-allowed!"
                   >
                     {t("stream_start_work")}
                   </Button>

@@ -767,6 +767,29 @@ export default function UserForm({
   ] satisfies SortableTableColumn<AssignedSiteRow>[];
 
 
+  const handleCompanyChange = (companyId: string) => {
+  setSites([]);
+  setSiteOptions([]);
+  setMissionOptions([]);
+  setDeviceOptions([]);
+
+  setSelectedSiteRecord(null);
+
+  setIsAssignSiteOpen(false);
+  setIsEditSiteOpen(false);
+  setIsDeleteSiteOpen(false);
+
+  formAssign.resetFields();
+  formEditSite.resetFields();
+
+  form.setFieldsValue({
+    companyId,
+    siteIds: [],
+    missionIds: [],
+    deviceIds: [],
+  });
+};
+
   return (
     <div className="w-full mx-auto py-6 overflow-hidden">
       <Form
@@ -909,11 +932,12 @@ export default function UserForm({
                 <div className="h-[41px] rounded-[6px] border border-[#d9d9d9] bg-[#fafafa]" />
               ) : (
                 <Select
-                  placeholder={t("user_placeholder_select_company")}
-                  options={companyOptions}
-                  loading={companyLoading}
-                  disabled={userRole === 2 || userRole === 3}
-                />
+                placeholder={t("user_placeholder_select_company")}
+                options={companyOptions}
+                loading={companyLoading}
+                disabled={userRole === 2 || userRole === 3}
+                onChange={handleCompanyChange}
+              />
               )}
             </Form.Item>
 
