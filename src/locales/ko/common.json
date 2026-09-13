@@ -695,6 +695,7 @@
 "work_report_pdf_failed": "PDF 다운로드에 실패했습니다.",
 "work_report_playback_info_unavailable": "재생 정보를 사용할 수 없습니다.",
 "work_report_history_id_unavailable": "히스토리 정보를 사용할 수 없습니다.",
-"mission_type_safety_surveillance": "안전감시"
-
+"mission_type_safety_surveillance": "안전감시",
+"robot_validation_invalid_identifier": "로봇 식별자는 유효한 UUID 형식이어야 합니다.",
+"stream_vector_space_disabled_drone": "드론 작업중에는 비활성화 됩니다."
 }

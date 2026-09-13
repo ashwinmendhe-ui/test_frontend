@@ -170,7 +170,6 @@ export default function Playback() {
       historyDetail?: any;
     }
   | undefined;
-
   const historySeekTime = timeToSeconds(historyPlaybackState?.timestamp);
   const { t } = useTranslation();
   const { detailUserLogin } = useUserStore();
@@ -186,6 +185,16 @@ export default function Playback() {
   );
 
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
+  const [selectedVideoOptions, setSelectedVideoOptions] = useState<
+    Record<
+      string,
+      {
+        value: string;
+        label: string;
+        sessionId?: string | null;
+      }
+    >
+  >({});
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [, setDuration] = useState(0);
@@ -447,20 +456,35 @@ const [selectedModules, setSelectedModules] = useState<number[]>(() =>
   const selectedVideoItems = useMemo(
   () =>
     selectedVideos.map((url) => {
-      const matched = videoOptions.find((item) => item.value === url);
-
-      return (
-        matched || {
-          value: url,
-          label: historyPlaybackState?.historyDetail?.missionName
-            ? `${historyPlaybackState.historyDetail.missionName} - ${
-                historyPlaybackState.timestamp || ""
-              }`
-            : url,
-        }
+      const currentOption = videoOptions.find(
+        (item) => item.value === url
       );
+
+      if (currentOption) {
+        return currentOption;
+      }
+
+      const cachedOption = selectedVideoOptions[url];
+
+      if (cachedOption) {
+        return cachedOption;
+      }
+
+      return {
+        value: url,
+        label: historyPlaybackState?.historyDetail?.missionName
+          ? `${historyPlaybackState.historyDetail.missionName} - ${
+              historyPlaybackState.timestamp || ""
+            }`
+          : url,
+      };
     }),
-  [selectedVideos, videoOptions, historyPlaybackState]
+  [
+    selectedVideos,
+    videoOptions,
+    selectedVideoOptions,
+    historyPlaybackState,
+  ]
 );
 
   const metadataBaseByVideo = useMemo(() => {
@@ -654,62 +678,62 @@ const formatOffset = (offset: number) => {
   }, []);
 
   const handleSelectChange = (
-    fieldName: keyof PlaybackFormValues,
-    value: string
-  ) => {
-    form.setFieldValue(fieldName, value);
+  fieldName: keyof PlaybackFormValues,
+  value: string
+) => {
+  form.setFieldValue(fieldName, value);
 
-    if (fieldName === "company") {
-      form.setFieldsValue({
-        site: undefined,
-        device: undefined,
-        mission: undefined,
-      });
+  if (fieldName === "company") {
+    form.setFieldsValue({
+      site: undefined,
+      device: undefined,
+      mission: undefined,
+    });
 
-      setSelectedVideos([]);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-      setBookmarksByVideo({});
-      setLabelsByVideo({});
-      resetPlayback();
-    } else if (fieldName === "site") {
-      form.setFieldsValue({
-        device: undefined,
-        mission: undefined,
-      });
+    // Keep already selected comparison videos.
+    // Only reset the available playback list for the new filter hierarchy.
+    resetPlayback();
+  } else if (fieldName === "site") {
+    form.setFieldsValue({
+      device: undefined,
+      mission: undefined,
+    });
 
-      setSelectedVideos([]);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-      setBookmarksByVideo({});
-      setLabelsByVideo({});
-      resetPlayback();
-    } else if (fieldName === "device") {
-      form.setFieldsValue({
-        mission: undefined,
-      });
+    // Keep already selected comparison videos.
+    resetPlayback();
+  } else if (fieldName === "device") {
+    form.setFieldsValue({
+      mission: undefined,
+    });
 
-      setSelectedVideos([]);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-      setBookmarksByVideo({});
-      setLabelsByVideo({});
-      resetPlayback();
-    } else if (fieldName === "mission") {
-      setSelectedVideos([]);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-      setBookmarksByVideo({});
-      setLabelsByVideo({});
-    }
-  };
+    // Keep already selected comparison videos.
+    resetPlayback();
+  }
+
+  // Mission change does not clear selected videos.
+  // The playback-list effect below will fetch recordings for the new mission.
+};
 
   const handleVideoSelectionChange = (value: string[]) => {
     const limited = value.slice(0, 2);
+
+    // Cache metadata for selected videos so it remains available
+    // when company/site/device/mission filters change.
+    setSelectedVideoOptions((prev) => {
+      const next = { ...prev };
+
+      limited.forEach((url) => {
+        const option = videoOptions.find(
+          (item) => item.value === url
+        );
+
+        if (option) {
+          next[url] = option;
+        }
+      });
+
+      return next;
+    });
 
     Object.keys(playerRefs.current).forEach((key) => {
       if (!limited.includes(key)) {
@@ -723,27 +747,42 @@ const formatOffset = (offset: number) => {
     setIsPlaying(false);
     setVideoTimes({});
     setVideoDurations({});
+
     setVideoOffsets(
-      limited.reduce<Record<string, number>>((result, videoUrl) => {
-        result[videoUrl] = 0;
-        return result;
-      }, {})
+      limited.reduce<Record<string, number>>(
+        (result, videoUrl) => {
+          result[videoUrl] = 0;
+          return result;
+        },
+        {}
+      )
     );
+
     setVideoLoading({});
     setVideoUnavailable({});
     playbackErrorCountRef.current = {};
+
     setBookmarksByVideo((prev) => {
       const next: Record<string, VideoBookmark[]> = {};
+
       limited.forEach((url) => {
-        if (prev[url]) next[url] = prev[url];
+        if (prev[url]) {
+          next[url] = prev[url];
+        }
       });
+
       return next;
     });
+
     setLabelsByVideo((prev) => {
       const next: Record<string, LabelsMap> = {};
+
       limited.forEach((url) => {
-        if (prev[url]) next[url] = prev[url];
+        if (prev[url]) {
+          next[url] = prev[url];
+        }
       });
+
       return next;
     });
   };
@@ -751,13 +790,28 @@ const formatOffset = (offset: number) => {
   const handleRemoveVideo = (index: number) => {
     const removedVideo = selectedVideos[index];
 
+    setSelectedVideoOptions((prev) => {
+      if (!removedVideo) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[removedVideo];
+
+      return next;
+    });
+
     if (removedVideo) {
       delete playerRefs.current[removedVideo];
     }
 
     setVideoLoading((prev) => {
       const next = { ...prev };
-      if (removedVideo) delete next[removedVideo];
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
       return next;
     });
 
@@ -771,51 +825,70 @@ const formatOffset = (offset: number) => {
       return next;
     });
 
-  setVideoOffsets((prev) => {
-    const next = { ...prev };
+    setVideoOffsets((prev) => {
+      const next = { ...prev };
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
+      return next;
+    });
 
     if (removedVideo) {
-      delete next[removedVideo];
+      delete playbackErrorCountRef.current[removedVideo];
     }
 
-    return next;
-  });
+    setSelectedVideos((prev) =>
+      prev.filter((_, i) => i !== index)
+    );
 
-if (removedVideo) {
-  delete playbackErrorCountRef.current[removedVideo];
-}
-
-    setSelectedVideos((prev) => prev.filter((_, i) => i !== index));
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
 
     setVideoTimes((prev) => {
       const next = { ...prev };
-      if (removedVideo) delete next[removedVideo];
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
       return next;
     });
 
     setVideoDurations((prev) => {
       const next = { ...prev };
-      if (removedVideo) delete next[removedVideo];
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
       return next;
     });
 
     setBookmarksByVideo((prev) => {
       const next = { ...prev };
-      if (removedVideo) delete next[removedVideo];
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
       return next;
     });
 
     setLabelsByVideo((prev) => {
       const next = { ...prev };
-      if (removedVideo) delete next[removedVideo];
+
+      if (removedVideo) {
+        delete next[removedVideo];
+      }
+
       return next;
     });
   };
 
- const handlePlayPause = async () => {
+   const handlePlayPause = async () => {
   if (selectedVideos.length === 0) return;
 
   try {

@@ -303,6 +303,19 @@ const [liveDeviceInfo, setLiveDeviceInfo] = useState<any>(null);
   }));
 }, [missionList, robotList, values?.device]);
 
+const selectedDeviceForStream = robotList.find(
+  (item) => item.deviceId === values?.device
+);
+
+const selectedDeviceType =
+  selectedDeviceForStream?.deviceType ||
+  selectedRobotDetail?.deviceType ||
+  "";
+
+const isDroneOperation =
+  normalizeDeviceTypeForCompare(selectedDeviceType) === "drone";
+
+
 const restoreMissionSelection = useCallback(
   (missionId?: string | null) => {
     if (!missionId) {
@@ -1895,7 +1908,15 @@ useEffect(() => {
 }, [isStreaming]);
 
 useEffect(() => {
-  if (!isStreaming || !streamMapUrl || mapReady) return;
+  if (isDroneOperation) {
+    setMapReady(false);
+    setMapRetryKey(0);
+    return;
+  }
+
+  if (!isStreaming || !streamMapUrl || mapReady) {
+    return;
+  }
 
   const checkMapReady = async () => {
     try {
@@ -1917,11 +1938,20 @@ useEffect(() => {
 
   checkMapReady();
 
-  const timer = setInterval(checkMapReady, 3000);
+  const timer = window.setInterval(
+    checkMapReady,
+    3000
+  );
 
-  return () => clearInterval(timer);
-}, [isStreaming, streamMapUrl, mapReady]);
-
+  return () => {
+    window.clearInterval(timer);
+  };
+}, [
+  isDroneOperation,
+  isStreaming,
+  streamMapUrl,
+  mapReady,
+]);
 
 useEffect(() => {
   if (!streamPlaybackUrl || !isStreaming) {
@@ -2922,6 +2952,7 @@ const canStartWork = Boolean(
   values?.mission
 );
 
+
   const liveLatitude = parseCoordinate(
   liveDeviceInfo?.latitude,
   liveDeviceInfo?.lat,
@@ -3192,35 +3223,45 @@ const SmallStatusBadge = ({
             {/* Vector Space + Travel Route Map */}
           <div className="grid grid-cols-2 gap-3 min-w-0">
             {/* Vector Space */}
-            <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
-              <SmallStatusBadge
-                label={t("stream_vector_space")}
-                status={!isStreaming ? "idle" : mapReady ? "live" : "loading"}
-              />
+<div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">
+  <SmallStatusBadge
+    label={t("stream_vector_space")}
+    status={
+      !isStreaming || isDroneOperation
+        ? "idle"
+        : mapReady
+        ? "live"
+        : "loading"
+    }
+  />
 
-              {isStreaming && streamMapUrl && mapReady ? (
-                <HLSPlayer
-                  key={`vector-${streamMapUrl}-${mapRetryKey}`}
-                  src={streamMapUrl}
-                  metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
-                  className="w-full h-full object-contain bg-black"
-                  autoPlay
-                  muted
-                  controls={false}
-                  selectedClassIds={[]}
-                  showCommonDetection={false}
-                  showDangerDetection={false}
-                  disableBackgroundTasks={true}
-                  type="vector"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
-                  {isStreaming
-                    ? t("stream_vector_space_loading")
-                    : t("stream_active_after_start")}
-                </div>
-              )}
-            </div>
+  {isDroneOperation ? (
+    <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-white text-[15px]">
+      {t("stream_vector_space_disabled_drone")}
+    </div>
+  ) : isStreaming && streamMapUrl && mapReady ? (
+    <HLSPlayer
+      key={`vector-${streamMapUrl}-${mapRetryKey}`}
+      src={streamMapUrl}
+      metadataBaseUrl={streamMapUrl.replace("/map.m3u8", "")}
+      className="w-full h-full object-contain bg-black"
+      autoPlay
+      muted
+      controls={false}
+      selectedClassIds={[]}
+      showCommonDetection={false}
+      showDangerDetection={false}
+      disableBackgroundTasks={true}
+      type="vector"
+    />
+  ) : (
+    <div className="absolute inset-0 flex items-center justify-center text-white text-[15px]">
+      {isStreaming
+        ? t("stream_vector_space_loading")
+        : t("stream_active_after_start")}
+    </div>
+  )}
+</div>
 
             {/* Travel Route Map */}
             <div className="relative bg-[#788191] rounded-[10px] h-[220px] overflow-hidden">

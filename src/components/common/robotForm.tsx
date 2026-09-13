@@ -85,7 +85,8 @@ export default function RobotForm({
         siteName:
           listSite.find((site) => site.siteId === values.siteId)?.name ||
           values.siteName,
-      };      
+      };
+
       const res = await onSubmit(newValues);
 
       if (res?.code === -1 || res?.code === "BAD_REQUEST") {
@@ -266,6 +267,26 @@ export default function RobotForm({
               </div>
             }
             name="deviceId"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (!value || value.trim() === "") {
+                    return Promise.resolve();
+                  }
+
+                  const uuidRegex =
+                    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+                  if (!uuidRegex.test(value.trim())) {
+                    return Promise.reject(
+                      new Error(t("robot_validation_invalid_identifier"))
+                    );
+                  }
+
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <Input
               placeholder={t("robot_placeholder_identifier")}

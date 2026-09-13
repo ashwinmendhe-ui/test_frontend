@@ -619,5 +619,7 @@
 "work_report_pdf_failed": "Failed to download PDF.",
 "work_report_playback_info_unavailable": "Playback information is not available.",
 "work_report_history_id_unavailable": "History information is not available.",
-"mission_type_safety_surveillance": "Safety surveillance"
+"mission_type_safety_surveillance": "Safety surveillance",
+"robot_validation_invalid_identifier": "Robot Identifier must be a valid UUID.",
+"stream_vector_space_disabled_drone": "Disabled during drone operation"
   }
