@@ -294,6 +294,60 @@ export default function UserForm({
     };
   }, [mode, initialValues?.companyId, initialValues?.companyName]);
 
+
+  useEffect(() => {
+  if (mode !== "add") {
+    return;
+  }
+
+  // SYS_ADMIN selects the company manually.
+  if (userRole === 1) {
+    return;
+  }
+
+  const companyId = detailUserLogin?.user?.companyId;
+  const companyName = detailUserLogin?.user?.companyName;
+
+  if (!companyId) {
+    return;
+  }
+
+  // Automatically bind Company Admin / Company User
+  // to their own company.
+  form.setFieldsValue({
+    companyId,
+  });
+
+  // Make sure the disabled Select can display the company name,
+  // even if companyApi.getList() does not return companies
+  // for a company-scoped user.
+  if (companyName) {
+    setCompanyOptions((prev) => {
+      const alreadyExists = prev.some(
+        (option) => option.value === companyId
+      );
+
+      if (alreadyExists) {
+        return prev;
+      }
+
+      return [
+        {
+          value: companyId,
+          label: companyName,
+        },
+        ...prev,
+      ];
+    });
+  }
+}, [
+  mode,
+  userRole,
+  detailUserLogin?.user?.companyId,
+  detailUserLogin?.user?.companyName,
+  form,
+]);
+
   useEffect(() => {
     if (!initialValues) return;
     if (mode === "edit" && !companyReady) return;
